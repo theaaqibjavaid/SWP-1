@@ -1,0 +1,21 @@
+[package]
+name = "swp-detection"
+description = "SWP-1 detection: the scanner's front door (input classification and safe archive handling) and the matching engine that reads a candidate tree against one or more protected releases without ever executing it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+swp-core.workspace = true
+swp-crypto.workspace = true
+swp-identity.workspace = true
+swp-manifest.workspace = true
+swp-adapters.workspace = true
+swp-embedding.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+zip.workspace = true
+tar.workspace = true
+flate2.workspace = true

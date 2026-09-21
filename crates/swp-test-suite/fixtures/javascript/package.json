@@ -1,0 +1,11 @@
+{
+  "name": "swp1-fixture-report",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fixture project used by the SWP-1 test suites.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "license": "UNLICENSED"
+}

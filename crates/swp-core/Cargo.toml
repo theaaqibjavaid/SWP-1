@@ -1,0 +1,15 @@
+[package]
+name = "swp-core"
+description = "SWP-1 protocol foundation: versions, error model, resource limits, canonicalization, canonical JSON, identity types. Language-agnostic and I/O free."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+unicode-normalization.workspace = true

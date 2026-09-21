@@ -1,0 +1,17 @@
+[package]
+name = "swp-manifest"
+description = "SWP-1 manifest layer: keyed site identity, the signed private manifest, the public release fingerprint, and the public/private classification of every artifact."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+swp-core.workspace = true
+swp-crypto.workspace = true
+swp-identity.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+base64.workspace = true

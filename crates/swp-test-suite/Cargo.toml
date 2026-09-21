@@ -1,0 +1,77 @@
+[package]
+name = "swp-test-suite"
+description = "SWP-1 cross-crate integration and validation suites: secret-leak sweep, adversarial removal, false positives, collisions, resource exhaustion, refactoring matrix, and the final acceptance scenario. Also the deterministic fixture generator and the `swp-validate` measurement harness."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "swp_test_suite"
+path = "src/lib.rs"
+
+[dependencies]
+swp-core.workspace = true
+swp-crypto.workspace = true
+swp-identity.workspace = true
+swp-cli.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+walkdir.workspace = true
+base64.workspace = true
+
+[dev-dependencies]
+# §45's archive-bomb case has to *build* a hostile container, and the only zip
+# writer available is the one this workspace already vendors for reading them.
+# Test-only: nothing in the shipped product depends on it from here.
+zip.workspace = true
+# Likewise the grammar: a suite that mutates source has to be able to say the
+# mutation left something a parser still accepts, and only `swp-adapters` knows
+# what the product's own parser thinks.
+swp-adapters.workspace = true
+
+# The plan's directory layout is preserved by naming each suite explicitly:
+# cargo only auto-discovers top-level tests/*.rs, and these are grouped by what
+# they attack rather than by which crate they exercise.
+[[test]]
+name = "secret_leak"
+path = "tests/leak/secret_scan.rs"
+
+[[test]]
+name = "detection_matrix"
+path = "tests/detection/matrix.rs"
+
+[[test]]
+name = "family_roundtrip"
+path = "tests/detection/roundtrip.rs"
+
+[[test]]
+name = "false_positive"
+path = "tests/false_positive/corpora.rs"
+
+[[test]]
+name = "collision"
+path = "tests/collision/identities.rs"
+
+[[test]]
+name = "property_chains"
+path = "tests/property/chains.rs"
+
+[[test]]
+name = "resource_limits"
+path = "tests/resource/hostile.rs"
+
+[[test]]
+name = "performance"
+path = "tests/performance/scale.rs"
+
+# §52's seven removal attempts, from the attacker's side of the boundary.
+[[test]]
+name = "adversarial_removal"
+path = "tests/adversarial/attacks.rs"
+
+# §57's seven-row scenario across three projects, run through the CLI.
+[[test]]
+name = "acceptance_scenario"
+path = "tests/acceptance/final_scenario.rs"

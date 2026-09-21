@@ -1,0 +1,16 @@
+[package]
+name = "swp-evidence"
+description = "SWP-1 evidence engine: turns a detection run into typed, explainable evidence items, a deterministic evidence level with the rule that produced it, and the versioned report both the CLI and the tests read."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+swp-core.workspace = true
+swp-detection.workspace = true
+swp-identity.workspace = true
+swp-manifest.workspace = true
+serde.workspace = true
+serde_json.workspace = true

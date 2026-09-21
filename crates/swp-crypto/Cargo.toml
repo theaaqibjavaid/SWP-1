@@ -1,0 +1,24 @@
+[package]
+name = "swp-crypto"
+description = "SWP-1 cryptographic layer: CSPRNG, domain-separated HMAC derivation, SHA-256, Ed25519 manifest signatures, and secret sealing. The only crate allowed to touch key material."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+swp-core.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+ed25519-dalek.workspace = true
+getrandom.workspace = true
+zeroize.workspace = true
+subtle.workspace = true
+base64.workspace = true
+serde.workspace = true
+
+[features]
+# Compiled into test builds only. Exposes plaintext key material so the
+# secret-leak suite can grep artifacts for it. Never enabled in a release build.
+test-hooks = []

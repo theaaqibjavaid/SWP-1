@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.85"
+license = "LicenseRef-Proprietary"
+repository = ""
+publish = false
+
+[workspace.dependencies]
+swp-core = { path = "crates/swp-core" }
+swp-crypto = { path = "crates/swp-crypto" }
+swp-identity = { path = "crates/swp-identity" }
+swp-manifest = { path = "crates/swp-manifest" }
+swp-embedding = { path = "crates/swp-embedding" }
+swp-detection = { path = "crates/swp-detection" }
+swp-evidence = { path = "crates/swp-evidence" }
+swp-adapters = { path = "crates/swp-adapters" }
+swp-cli = { path = "crates/swp-cli" }
+swp-test-suite = { path = "crates/swp-test-suite" }
+
+sha2 = "0.10"
+hmac = "0.12"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.9"
+getrandom = "0.3"
+subtle = "2"
+zeroize = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+clap = { version = "4", features = ["derive"] }
+thiserror = "2"
+walkdir = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+unicode-normalization = "0.1"
+base64 = "0.22"
+toml = "0.8"
+proptest = "1"
+
+tree-sitter = "0.25"
+tree-sitter-javascript = "0.25"
+tree-sitter-typescript = "0.23"
+tree-sitter-python = "0.23"
+
+[profile.release]
+opt-level = 3
+lto = "thin"

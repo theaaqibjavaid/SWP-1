@@ -1,0 +1,21 @@
+[package]
+name = "swp-adapters"
+description = "SWP-1 language adapters: the only crate that knows source syntax. Turns concrete source into the abstract token stream the core canonicalizes, decides which literal positions are safe to rewrite, and renders/decodes the equivalent-form families that carry watermark bits."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+swp-core.workspace = true
+swp-crypto.workspace = true
+serde.workspace = true
+tree-sitter.workspace = true
+tree-sitter-javascript.workspace = true
+tree-sitter-typescript.workspace = true
+tree-sitter-python.workspace = true
+
+[dev-dependencies]
+# Deliberately no `swp-test-suite` here: the shared suites depend on this crate,
+# and adapter fixtures are small enough to live inline.
