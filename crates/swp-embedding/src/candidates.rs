@@ -76,7 +76,8 @@ pub struct Candidate {
     pub families: Vec<FormFamily>,
     /// Keyed identity, indexed by [`swp_manifest::SLOTS`].
     pub locations: [LocationId; 4],
-    /// Keyed, release-scoped ordering value. Smaller is chosen first.
+    /// Keyed, release-scoped ordering value. Smaller is chosen first among the
+    /// candidates a file's geometry leaves tied; see [`crate::select`]'s header.
     pub priority: [u8; 32],
     /// The literal as written, already known to fit the manifest's hint bound.
     pub original: String,

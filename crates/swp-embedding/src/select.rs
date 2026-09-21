@@ -332,6 +332,13 @@ fn share_ladder(target: usize, files: usize) -> Vec<usize> {
     out
 }
 
+/// A candidate's standing in its file's queue: the reach of its own edit first,
+/// then its keyed priority. See the module header for why that order.
+fn standing(file: &crate::candidates::FileScan, i: usize) -> (u32, [u8; 32]) {
+    let cand = &file.candidates[i];
+    (cand.blocks_until(), cand.priority)
+}
+
 /// Decide one candidate, or say why it cannot be used.
 fn accept(
     scan: &Scan,
@@ -595,49 +602,48 @@ export const B = 2000;
         std::fs::remove_dir_all(&root).unwrap();
     }
 
+    /// The number of sites a tree can hold is a property of the tree, not of the
+    /// secret protecting it: geometry decides who blocks whom, and the key only
+    /// picks which of two mutually-blocking candidates takes the slot. Before the
+    /// footprint ordering this measured 8–15 of the same 24-site request across
+    /// secrets, which is a constellation size no document can quote.
     #[test]
-    fn a_second_release_of_the_same_tree_chooses_a_different_selection() {
-        let root = tree("release", 4, 6);
+    fn capacity_does_not_depend_on_the_secret() {
+        let root = tree("capacity", 4, 6);
         let limits = Limits::default();
         let cfg = ProtectConfig::default();
         let walked = crate::walk::walk(&root, &cfg, &limits).unwrap();
-        let one = {
-            let s = crate::candidates::scan(
-                &root,
-                &walked,
-                &keys(),
-                &cfg,
-                TagWidth::DEFAULT,
-                &limits,
-            )
-            .unwrap();
-            select(&s, 8, &limits).unwrap()
-        };
-        let two = {
-            use swp_core::id::ReleaseId;
-            use swp_core::version::CanonicalizerVersion;
-            use swp_crypto::RootSecret;
-            let other = swp_manifest::ManifestKeys::derive(
-                &RootSecret::from_bytes(&[11u8; 32]).unwrap(),
+        let reach = |secret: u8| {
+            let keys = swp_manifest::ManifestKeys::derive(
+                &swp_crypto::RootSecret::from_bytes(&[secret; 32]).unwrap(),
                 &swp_core::id::ProjectId::new("swp1-abcdefghijklmnop").unwrap(),
-                &ReleaseId::new("rel-bbbbbbbbbbbb").unwrap(),
-                CanonicalizerVersion::V1,
+                &swp_core::id::ReleaseId::new("rel-aaaaaaaaaaaa").unwrap(),
+                swp_core::version::CanonicalizerVersion::V1,
             );
-            let s = crate::candidates::scan(
-                &root,
-                &walked,
-                &other,
-                &cfg,
-                TagWidth::DEFAULT,
-                &limits,
-            )
-            .unwrap();
-            select(&s, 8, &limits).unwrap()
+            let s =
+                crate::candidates::scan(&root, &walked, &keys, &cfg, TagWidth::DEFAULT, &limits)
+                    .unwrap();
+            let sel = select(&s, 8, &limits).unwrap();
+            let mut footprint: Vec<(usize, u32)> = sel
+                .chosen
+                .iter()
+                .map(|c| {
+                    let cand = &s.files[c.file].candidates[c.candidate];
+                    (c.file, cand.blocks_until())
+                })
+                .collect();
+            footprint.sort();
+            (sel.chosen.len(), footprint)
         };
-        assert_ne!(one.chosen, two.chosen, "selection is release-scoped");
-        // Same tree, same candidate pool: a new release re-selects among the same
-        // locations, so it adds coverage rather than invalidating the first one.
-        assert_eq!(one.chosen.len(), two.chosen.len());
+        let (n1, f1) = reach(11);
+        let (n2, f2) = reach(214);
+        assert!(n1 > 1, "the fixture holds {n1} sites, which tests nothing");
+        assert_eq!(n1, n2, "two secrets placed a different number of sites");
+        assert_eq!(
+            f1, f2,
+            "two secrets filled a different set of slots, so the key decided geometry \
+             rather than the tie inside it"
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
