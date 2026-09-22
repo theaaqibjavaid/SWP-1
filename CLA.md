@@ -11,12 +11,11 @@ this document exists instead of a two-line waiver.
 
 > **This is not legal advice, and drafting a licence program from a template is a
 > decision that should be reviewed by counsel before the first external
-> contribution is merged.** In particular, replace the bracketed fields in §9 with
-> the legal entity that actually owns this project — "the project's GitHub
-> organisation" is not a party that can hold a copyright grant — and confirm that
-> §2's relicensing right is expressed the way you need it in your jurisdiction.
-> The §9 fields are the same `OWNER` placeholder that appears in `Cargo.toml` and
-> `NOTICE`; fill them in once, in all three.
+> contribution is merged.** §9 names the party taking these grants — an entity,
+> not "the project's GitHub organisation", because an organisation account cannot
+> hold a copyright grant — and the §2 relicensing right should be confirmed by
+> counsel as expressed the way it needs to be in your jurisdiction. A contributor
+> relies on both, and neither is verifiable from a template.
 
 ## 1. Definitions
 
@@ -151,10 +150,11 @@ and it does not remove your contribution from SWP-1's public history.
 
 ## 9. The Maintainers, and how to sign
 
-The party in this agreement is **[legal entity name]** ("the Maintainers"),
-reachable at **[contact email]**, operating the SWP-1 project at
-**https://github.com/OWNER/swp**. These rights may be exercised by a successor in
-interest to the project.
+The party in this agreement is **Yeast Technologies** ("the Maintainers"), a
+business owned by Aaqib Javaid, who is SWP-1's copyright holder, reachable at
+**aaqib100javaid@gmail.com**, operating the SWP-1 project at
+**https://github.com/theaaqibjavaid/SWP-1**. These rights may be exercised by a
+successor in interest to the project.
 
 To sign, open a pull request with your contribution and add one line to your
 first submission's description, or send the same by email:

@@ -4,9 +4,9 @@
 
 | situation | route |
 | --- | --- |
-| something the tool does that it should not | [open an issue](https://github.com/OWNER/swp/issues/new/choose) with a reproducing tree |
+| something the tool does that it should not | [open an issue](https://github.com/theaaqibjavaid/SWP-1/issues/new/choose) with a reproducing tree |
 | something the documentation says that is not true | an issue, and treat it as a bug report — a wrong sentence here is a product defect |
-| how do I do X | [discussions](https://github.com/OWNER/swp/discussions), or [USER-GUIDE.md](docs/USER-GUIDE.md) first |
+| how do I do X | [discussions](https://github.com/theaaqibjavaid/SWP-1/discussions), or [USER-GUIDE.md](docs/USER-GUIDE.md) first |
 | a suspected security problem | **[SECURITY.md](SECURITY.md), not an issue** — a public issue is a disclosure |
 | you need an answer in hours, or you run a fork | [SPONSORS.md](SPONSORS.md) |
 

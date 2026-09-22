@@ -1,8 +1,8 @@
 name: Release
 
-# Push a tag `v*` and this builds the three binaries, checks they are the version
-# the tag says, and publishes a GitHub Release whose notes come out of
-# `CHANGELOG.md` rather than out of a model's head.
+# Push a tag `v*` and this builds the release binaries for four targets, checks
+# they are the version the tag says, and publishes a GitHub Release whose notes
+# come out of `CHANGELOG.md` rather than out of a model's head.
 #
 # Deliberately not included here: publishing to crates.io. A registry publish is
 # permanent in a way a binary upload is not — it can be yanked, never removed — so
@@ -41,6 +41,8 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
       - name: tag, manifest and changelog must agree
         id: agree
+        env:
+          REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -67,14 +69,29 @@ jobs:
             exit 1
           fi
 
-          if grep -rl "github.com/OWNER" --exclude-dir=.git --exclude-dir=target . \
-              | grep -v 'scripts/check-release.sh'; then
-            echo "the repository address is still the OWNER placeholder in the files"
-            echo "above; a release would point its own links at nothing, and a crate"
-            echo "published from this tree would carry the placeholder into the index."
+          # The address a crate would carry into the registry index, read from the
+          # tagged manifest rather than assumed, against the repository this run is
+          # actually happening in. A fork that copies this tree without editing
+          # `Cargo.toml` would publish crates pointing at somebody else's tree, and
+          # release notes built from `${REPO}` would link to this one — so the two
+          # have to be named the same place, which is what this checks.
+          MANIFEST_REPO=$(sed -n 's|^repository = "https://github\.[a-z]*/\([^/]*/[^/]*\)"$|\1|p' Cargo.toml | head -n1)
+          if [ "$MANIFEST_REPO" != "$REPO" ]; then
+            echo "Cargo.toml says this source lives at github.com/${MANIFEST_REPO:-nowhere},"
+            echo "but the release is running in github.com/$REPO."
             exit 1
           fi
-          echo "v$VERSION is consistent."
+
+          # An unfilled field in a legal or policy page is the same class of bug as
+          # a placeholder URL: it reads as finished and is not. These are the exact
+          # bracketed labels those pages were drafted with.
+          if grep -rln "\[legal entity name\]\|\[contact email\]\|\[name · \|fill in before release\|\[GitHub organisation owner\]\|\[key fingerprint\]" \
+              --exclude-dir=.git --exclude-dir=target --exclude-dir=.github \
+              --exclude=check-release.sh .; then
+            echo "the files above still carry an unfilled bracketed field."
+            exit 1
+          fi
+          echo "v$VERSION is consistent, and it is this repository's."
 
   build:
     name: build (${{ matrix.artifact }})

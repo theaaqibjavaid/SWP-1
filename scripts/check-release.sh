@@ -76,17 +76,33 @@ for c in $PUBLISHABLE; do
     fi
 done
 
-printf '\n== a placeholder that ships is a bug, not a TODO ==\n'
-# `--exclude` here, not a filter below: this file names the string it searches for.
-HITS=$(grep -rl "github.com/OWNER" --exclude-dir=.git --exclude-dir=target --exclude-dir=.swp \
-    --exclude=check-release.sh . 2>/dev/null || true)
-if [ -n "$HITS" ]; then
-    note "the repository address is still the OWNER placeholder in:"
-    printf '        %s\n' $HITS
-    note "publishing and the release workflow both point at a URL nobody owns."
-    bad "replace OWNER before releasing"
+printf '\n== the published address, and the parties named in the legal pages ==\n'
+# The address is read from the manifest, not written here, so this cannot drift
+# into endorsing a URL the tree does not use. `release.yml` checks the same string
+# against the repository a release actually runs in; offline, the most a check can
+# say is that the address exists, is well-formed, and is not the placeholder this
+# project was drafted with.
+REPO=$(sed -n 's|^repository = "https://github\.[a-z]*/\([^/]*/[^/]*\)"$|\1|p' Cargo.toml | head -n1)
+if [ -z "$REPO" ]; then
+    bad "Cargo.toml has no github.com repository address"
+elif printf '%s' "$REPO" | grep -qi "OWNER\|TODO\|example"; then
+    bad "the repository address is still a placeholder: $REPO"
+    note "a crate published from here carries that URL into the registry index"
 else
-    ok "no OWNER placeholder anywhere in the tree"
+    ok "published address: github.com/$REPO"
+    note "confirm this is the tree you are releasing from; release.yml insists"
+fi
+
+# An unfilled field in a legal page reads as finished and is not. These are the
+# bracketed labels those pages were drafted with, and one of them — a CLA that
+# names no entity — is the difference between a grant and a receipt.
+if grep -rln "\[legal entity name\]\|\[contact email\]\|\[name · \|fill in before release\|\[GitHub organisation owner\]\|github\.com/OWNER" \
+    --exclude-dir=.git --exclude-dir=target --exclude-dir=.swp --exclude-dir=.github \
+    --exclude=check-release.sh . 2>/dev/null; then
+    bad "an unfilled field remains in the files above"
+    note "SECURITY.md, CLA.md §9, NOTICE and MAINTAINERS.md name real parties now"
+else
+    ok "no unfilled legal or policy field in the tree"
 fi
 
 printf '\n== the sources contain no built artefacts ==\n'

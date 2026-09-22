@@ -100,11 +100,6 @@ jobs:
   release-readiness:
     name: release readiness
     runs-on: ubuntu-latest
-    # Informational until the OWNER placeholder in Cargo.toml is replaced, because
-    # the check below refuses that placeholder — correctly, and while the
-    # repository address is undecided the refusal would only make every run red.
-    # Drop this line once the address exists, and it becomes a gate.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2

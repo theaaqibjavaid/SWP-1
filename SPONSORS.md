@@ -8,7 +8,7 @@ What sponsorship buys is **attention and engineering time** — the scarce thing
 an open-source project, and the one thing that can be sold without making anybody
 else's copy of the software worse.
 
-Sponsor here: https://github.com/sponsors/OWNER
+Sponsor here: https://github.com/sponsors/theaaqibjavaid
 
 ## Why this exists
 
@@ -113,5 +113,5 @@ bugs.
 
 Sponsorship income is recorded in the project's public accounting alongside the
 time it pays for, and `CHANGELOG.md` says which release a funded item landed in. If
-that stops being true, [open an issue](https://github.com/OWNER/swp/issues) —
+that stops being true, [open an issue](https://github.com/theaaqibjavaid/SWP-1/issues) —
 this page is a commitment, and commitments here are meant to be checked.

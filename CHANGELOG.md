@@ -127,5 +127,5 @@ These are absences with reasons, not a backlog:
   protected literal leaves nothing to key on, and produces the same report as an
   original. `NO_PROVENANCE_DETECTED` is not a finding of originality.
 
-[Unreleased]: https://github.com/OWNER/swp/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/OWNER/swp/releases/tag/v1.0.0
+[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0

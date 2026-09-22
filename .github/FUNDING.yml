@@ -1,7 +1,8 @@
 # Who funds the maintenance of this project. The tiers and, more importantly, the
 # limits of what sponsorship buys, are in SPONSORS.md.
 #
-# OWNER is the placeholder that also appears in Cargo.toml and NOTICE: the GitHub
-# account or organisation that receives sponsorships. Replace all three at once —
-# `grep -rl github.com/OWNER .` finds them.
-github: OWNER
+# GitHub shows this as a "Sponsor" button on the repository. The account named here
+# is the one that receives the money; the tiers describe what it is spent on, not a
+# price list, so a sponsor who reads one and expects the other should be told which
+# is which — see SPONSORS.md's "What sponsorship does not buy".
+github: theaaqibjavaid

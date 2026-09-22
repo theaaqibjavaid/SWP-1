@@ -60,13 +60,14 @@ loud which half is a bug.
 ## How to report
 
 Use a **private security advisory**: GitHub → Security → *Report a vulnerability*
-on the repository, https://github.com/OWNER/swp/security/advisories/new. That keeps
+on the repository, https://github.com/theaaqibjavaid/SWP-1/security/advisories/new. That keeps
 the details out of a public issue while the fix is written.
 
-If you would rather not use GitHub, write to **[security contact — fill in before
-release, and use an address you control rather than a personal account]**, and
-encrypt if you can; the fingerprint is published in the same place as the
-maintainer list, [MAINTAINERS.md](MAINTAINERS.md).
+If you would rather not use GitHub, write to **aaqib100javaid@gmail.com**, the
+security contact named in [MAINTAINERS.md](MAINTAINERS.md). No OpenPGP key is
+published for that address, so treat ordinary email as unencrypted: ask for a key
+before sending anything you would not put in a public issue, and a private security
+advisory is the better route for exactly that reason.
 
 Please include: the output of `swp --version`, the operating system, a reproducing
 input (a tree, an archive, or the smallest file that still does it), and the exit

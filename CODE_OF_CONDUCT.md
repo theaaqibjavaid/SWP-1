@@ -60,15 +60,18 @@ effect of driving them out of the project.
 
 ## Reporting
 
-Report to **[contact address from `SECURITY.md`'s maintainer list]**, or to any
-maintainer you are comfortable approaching; the list of who that is lives in
-[MAINTAINERS.md](MAINTAINERS.md). Reports are read by at least two maintainers
-where that is possible, and the identity of a reporter is not shared with the
-person reported about without their agreement.
+Report to **aaqib100javaid@gmail.com**, or to any maintainer you are comfortable
+approaching; the list of who that is lives in [MAINTAINERS.md](MAINTAINERS.md).
+Reports are read by at least two maintainers where that is possible — and with two
+maintainers, one of whom owns the repository, that qualifier is doing real work, so
+say in your report whether you are willing for the other to see it. The identity of
+a reporter is not shared with the person reported about without their agreement.
 
 If the person being reported on is a maintainer, you may send the report to a
-GitHub organisation owner instead, and that maintainer is excluded from every part
-of the handling.
+GitHub repository owner instead, and that maintainer is excluded from every part of
+the handling. Where the owner *is* the subject, there is no one inside this project
+to escalate to; the options are GitHub's own reporting process, or leaving, and
+this page will not pretend otherwise.
 
 We will not publish a reporter's name, and we will not require a report to be made
 under a real name.

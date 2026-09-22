@@ -9,13 +9,20 @@ addresses below are the ones those processes depend on.
 
 | role | who | what they decide |
 | --- | --- | --- |
-| Owner | `[GitHub organisation owner]` | the repository, its settings, the sponsor arrangement, and who else has write access |
-| Lead maintainer | `[name · GitHub handle · email]` | what merges, and the wording of a claim in the documentation |
-| Maintainer | `[name · GitHub handle · email]` | triage, review, and release builds |
-| Security contact | `[name or alias · address · key fingerprint]` | intake of a private advisory and the embargo decision |
+| Owner | Aaqib Javaid · [@theaaqibjavaid](https://github.com/theaaqibjavaid) · aaqib100javaid@gmail.com | the repository, its settings, the sponsor arrangement, and who else has write access |
+| Lead maintainer | Aaqib Javaid · same as above | what merges, and the wording of a claim in the documentation |
+| Maintainer | justin-coders · [@justin-coders](https://github.com/justin-coders) | triage, review, and release builds |
+| Security contact | Aaqib Javaid · aaqib100javaid@gmail.com · no key published | intake of a private advisory and the embargo decision |
 
-Fill these in before the first public release, with people rather than aliases
-where possible. An empty table is how a security report ends up in a public issue.
+Three of those four rows are the same person. That is stated rather than
+smoothed over, because two documents depend on it: a security advisory has one
+intake reader and no second pair of eyes before the embargo decision, and the
+conduct route in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), which promises that a
+report is read by at least two maintainers where that is possible, cannot deliver
+that promise for a report about the owner. What follows from this list is that
+adding a second maintainer who is not the owner is the highest-value
+contribution available to this project, and [ROADMAP.md](ROADMAP.md) does not need
+to say so for it to be true.
 
 A role here is a set of decisions somebody answers for, not a badge: the lead
 maintainer is the person who says no to a change that would make a report claim
@@ -46,8 +53,10 @@ contact, the replacement is named in the same change, because
 
 ## Legal identity
 
-The copyright holder of SWP-1 and the party named in [CLA.md](CLA.md) are
-`[legal entity name]`. Where that is an individual rather than an entity, say so
-in the CLA's §9 before the first external contribution is signed; a licence grant
-to a party that does not exist is a grant nobody can rely on, and this project's
-contributors deserve a counterparty they can point at.
+SWP-1's copyright holder is **Aaqib Javaid**, and the party that takes
+contributor grants in [CLA.md](CLA.md) §9 is **Yeast Technologies**, a business he
+owns; `NOTICE` names both on one line. The distinction matters to a contributor,
+who should be able to point at a counterparty, so it is stated in the CLA rather
+than left to be inferred from a GitHub account. As the project stands on two named
+people and one company, all of them the same interest — which is exactly what a
+CLA discloses by putting the entity's name in §9.

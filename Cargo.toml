@@ -7,12 +7,11 @@ version = "1.0.0"
 edition = "2021"
 rust-version = "1.85"
 license = "Apache-2.0"
-# OWNER is the one string in this repository that is not the product's to
-# choose: replace it with the account or organisation the public tree lives
-# under before the first `cargo publish`. It is a placeholder on purpose —
-# inventing an address here would put a URL nobody owns into a registry index.
-repository = "https://github.com/OWNER/swp"
-documentation = "https://github.com/OWNER/swp/tree/main/docs"
+# The address below is the published location of the public tree, and the one
+# string here that a build cannot verify: `scripts/check-release.sh` prints it
+# alongside the version so a release is checked against it rather than assumed.
+repository = "https://github.com/theaaqibjavaid/SWP-1"
+documentation = "https://github.com/theaaqibjavaid/SWP-1/tree/main/docs"
 keywords = ["watermarking", "provenance", "supply-chain", "code-analysis", "cli"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
 publish = ["crates.io"]

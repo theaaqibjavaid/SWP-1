@@ -2,8 +2,8 @@
 
 **Source Watermark Protocol v1** — a command line tool named `swp`.
 
-[![CI](https://github.com/OWNER/swp/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/swp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/OWNER/swp)](https://github.com/OWNER/swp/releases)
+[![CI](https://github.com/theaaqibjavaid/SWP-1/actions/workflows/ci.yml/badge.svg)](https://github.com/theaaqibjavaid/SWP-1/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/theaaqibjavaid/SWP-1)](https://github.com/theaaqibjavaid/SWP-1/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](rust-toolchain.toml)
 [![Platforms: Windows · Linux · macOS](https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux%20%C2%B7%20macos-lightgrey)](docs/GETTING-STARTED.md)
@@ -19,11 +19,11 @@ It is a provenance instrument. It is not DRM, and it does not pretend otherwise.
 
 | | |
 | --- | --- |
-| **Install** | `cargo install --path crates/swp-cli --locked`, or a [prebuilt binary](https://github.com/OWNER/swp/releases) |
+| **Install** | `cargo install --path crates/swp-cli --locked`, or a [prebuilt binary](https://github.com/theaaqibjavaid/SWP-1/releases) |
 | **Language** | Rust 2021, MSRV 1.85, no network code path |
 | **Licence** | [Apache-2.0](LICENSE) |
 | **Protocol** | `SWP-1` · report schema `SWP-1-report-v1` |
-| **Ask** | [discussions](https://github.com/OWNER/swp/discussions) · [SUPPORT.md](SUPPORT.md) |
+| **Ask** | [discussions](https://github.com/theaaqibjavaid/SWP-1/discussions) · [SUPPORT.md](SUPPORT.md) |
 | **Report a vulnerability** | [SECURITY.md](SECURITY.md), privately |
 
 ## Contents
@@ -69,7 +69,7 @@ swp --version
 ```
 
 Prebuilt binaries for Windows, Linux and macOS x64 are on the
-[releases page](https://github.com/OWNER/swp/releases), with a `SHA256SUMS`
+[releases page](https://github.com/theaaqibjavaid/SWP-1/releases), with a `SHA256SUMS`
 covering every artifact of that release:
 
 ```sh

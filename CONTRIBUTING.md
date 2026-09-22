@@ -36,7 +36,7 @@ grammars are prebuilt crates, the CLI's argument parser is hand-written, and
 there is no code generation step to run.
 
 ```sh
-git clone https://github.com/OWNER/swp
+git clone https://github.com/theaaqibjavaid/SWP-1
 cd swp
 cargo build                 # or cargo build --release
 cargo test --workspace
