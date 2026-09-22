@@ -34,7 +34,7 @@ Two consequences worth holding on to:
 
 * **a project cannot be half-protected by a missing adapter.** `swp protect`
   refuses the whole run when nothing in scope has a parser, rather than writing a
-  release over the files it happens to understand (§11: skipped, never forced).
+  release over the files it happens to understand — skipped, never forced.
 * **adding a language does not change what a release means.** The manifest fields,
   the site ids and the evidence rules are the same for a Rust adapter as for a
   JavaScript one, because none of them is derived from a grammar. That is what
@@ -104,8 +104,8 @@ would protect swp1-… — release rel-…
 exit 0
 ```
 
-The default target is four sites, which is what `swp init` suggested for a tree
-this size. Asking for more is a flag, not an edit:
+The target is four sites — `swp init`'s measured suggestion for a tree this size,
+not the built-in default of 16. Asking for more is a flag, not an edit:
 
 ```console
 $ swp protect --sites 12
@@ -301,7 +301,7 @@ The generic *adapter* is a different thing from a generic *project*: the fallbac
 inside `swp-adapters` is a lexical scanner used when a manifest names a language
 this build has no grammar for, and it caps a site's evidence at `MODERATE`
 (`TOKEN` strength) rather than letting an approximate radius claim provenance.
-[`LANGUAGE-ADAPTERS.md`](LANGUAGE-ADAPTERS.md#what-the-fallback-adapter-does-and-does-not-give-you)
+[`LANGUAGE-ADAPTERS.md`](LANGUAGE-ADAPTERS.md#10-what-the-fallback-adapter-does-and-does-not-give-you)
 has the ceiling and why it exists.
 
 ---

@@ -91,8 +91,8 @@ file: `swp scan ./copy > out.txt 2>&1`.
 
 Errors always carry the same three lines — the code and what went wrong, an
 `at:` line naming the file when one is implicated, and a `next:` line saying what
-to do about it. The third is not decoration: §49's rule is that a message has to
-tell the reader their move, and several of them are asserted by name in the test
+to do about it. The third is not decoration: a message has to tell the reader
+their move, and several of them are asserted by name in the test
 suite.
 
 ```console
@@ -208,7 +208,7 @@ What was modified
 How the constellation is built
   …
 
-What was refused, and why (§11: skipped, never forced)
+What was refused, and why (skipped, never forced)
   constellation-full       26
   overlapping-radius       1
 
@@ -339,8 +339,9 @@ an old finding is not a new one.
 
 ## Exit codes
 
-`2` means you asked for something the tool does not do; every code above it means
-the tool ran. All seventeen, with the name the error line prints for it:
+`2` means you asked for something the tool does not do; every other code means it
+ran and is telling you what it found. All eighteen, with the name the error line
+prints for it:
 
 | code | name | when |
 | --- | --- | --- |

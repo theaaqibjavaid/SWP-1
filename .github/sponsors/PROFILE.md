@@ -77,7 +77,7 @@ is the part of this arrangement a sponsor should read first:
 
 ## 5. The tiers
 
-![The three sponsorship tiers](https://github.com/theaaqibjavaid/SWP-1/raw/main/.github/sponsors/assets/swp-tier-ladder.svg)
+![The three monthly sponsorship tiers](https://github.com/theaaqibjavaid/SWP-1/raw/main/.github/sponsors/assets/swp-tier-ladder.svg)
 
 | | |
 | --- | --- |

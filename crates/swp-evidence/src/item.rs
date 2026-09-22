@@ -428,7 +428,11 @@ mod tests {
 
     #[test]
     fn every_kind_names_itself_and_declares_whether_it_proves_anything() {
-        assert_eq!(EvidenceKind::ALL.len(), 7, "§22 lists seven categories");
+        assert_eq!(
+            EvidenceKind::ALL.len(),
+            7,
+            "seven evidence categories, and ALL must hold all of them"
+        );
         for kind in EvidenceKind::ALL {
             assert!(kind.as_str().chars().next().unwrap().is_ascii_uppercase());
             let json = serde_json::to_value(kind).unwrap();

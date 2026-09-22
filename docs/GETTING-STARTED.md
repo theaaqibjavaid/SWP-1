@@ -14,7 +14,9 @@ running the same sequence from scratch.
 
 * **Rust 1.85 or newer.** `rustc --version` to check. The workspace declares
   `rust-version = "1.85"`, so an older toolchain refuses to build rather than
-  failing somewhere subtle.
+  failing somewhere subtle. If you use rustup, `rust-toolchain.toml` overrides that
+  question and installs the one version CI builds and lints with, so the number you
+  see from `rustc --version` will be newer than the minimum.
 * **A machine this tool can write to.** No server, no account, no database. SWP-1
   is offline-first: it makes no network call in any code path, and it never
   uploads your source, your reports, or a telemetry ping.
@@ -86,9 +88,11 @@ why the suggestion aims at spread rather than at a large number.
 
 ## 4. What the secret is, and where it is not
 
-`init` draws 256 bits from the operating system's random source and seals them to
-your user account (DPAPI on Windows). From those bits everything else is derived:
-the project id, the signing key for the manifests, and the per-site codes.
+`init` draws 256 bits from the operating system's random source. On Windows they
+are sealed to your user account with DPAPI; on Linux and macOS the file holds them
+unencrypted behind a `0600` mode, so there the permissions are the protection.
+From those bits everything else is derived: the project id, the signing key for
+the manifests, and the per-site codes.
 
 * It lives in `.swp/private/root.key` and nowhere else.
 * It is never printed by any command, never written into a report, a manifest, a
@@ -123,13 +127,13 @@ embed_strings = true
 exit 0
 ```
 
-The four `[protect]` keys are the ones you will touch:
+Five `[protect]` keys exist; the four you will touch are:
 
 | key | default | meaning |
 | --- | --- | --- |
 | `targets` | `["src"]` | which paths to walk; a directory or a file, store-relative |
 | `excludes` | `[]` | glob patterns dropped from the walk, on top of the built-in list |
-| `target_sites` | 4, suggested by `init` | how many fragments to aim for; 4–4096 |
+| `target_sites` | 16; `init` writes a measured suggestion instead | how many fragments to aim for; 4–4096 |
 | `tag_bits` | 4 | bits per site, 2–8. One site at 4 bits is 1-in-16 by chance, which is why one fragment is never a finding |
 
 `embed_strings = false` restricts a constellation to numeric literals. The `[limits]`
@@ -315,8 +319,9 @@ Two paths, and both are needed:
 audit trail; `swp inspect store` prints the classification of every artifact,
 including a `may commit` column, so you never have to remember this table.
 
-Back the private half up to somewhere that is not this working copy, sealed to
-you, before you protect anything. The recovery path if you lose it is: restore the
+Back the private half up to somewhere that is not this working copy, encrypted
+there rather than merely copied, before you protect anything. The recovery path if
+you lose it is: restore the
 backup, or accept that old releases can no longer be verified and start a new
 project id — a new `swp init` never replaces a secret in place, so the old copies
 and the new ones are different projects, deliberately.

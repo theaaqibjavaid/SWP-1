@@ -7,8 +7,8 @@ addition the product needs and semver alone does not supply: the protocol
 carries its own version (`SWP-1`), the report carries its own schema tag
 (`SWP-1-report-v1`), and a change to either is a change to a *document format*
 rather than to a function. See
-[§Versioning in the spec](docs/SWP-1-SPEC.md) for what each of the three numbers
-is allowed to do to the other two.
+[the spec's versioning section](docs/SWP-1-SPEC.md#14-versioning) for what each of
+the three numbers is allowed to do to the other two.
 
 This project does not have a changelog entry for something it has not shipped. A
 line under a released heading is a claim that the released build does it, and
@@ -31,7 +31,7 @@ offline machine that never runs the code it is reading.
 **Commands.** Seven verbs, one help surface, and stable exit codes — the five a
 normal run reaches are `0` nothing found · `1` provenance detected · `10` part of
 the candidate was never examined · `2` used incorrectly · `3` the secret is not
-available; all seventeen are named in
+available; all eighteen are named in
 [CLI.md](docs/CLI.md#exit-codes):
 
 - `swp init` — mints the project identity and its root secret, seals the secret
@@ -83,11 +83,11 @@ secret and fails on the first line the product no longer prints. A value that
 varies with the key is written as `…`; a value that does not is re-checked.
 
 **Measurement.** Thirty-four test targets, 520 tests, including a suite whose
-whole job is to defeat the watermark (§52's seven removal attempts), a
+whole job is to defeat the watermark through seven removal attempts, a
 false-positive suite over corpora of boilerplate, generated code and real
 open-source shapes, a collision suite over identity and site keys, a
 resource-exhaustion suite over hostile archives and pathological trees, and a
-scenario (§57) that runs the acceptance matrix through the installed binary.
+scenario that runs the acceptance matrix through the installed binary.
 
 ### Not included, deliberately
 

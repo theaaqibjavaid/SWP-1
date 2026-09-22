@@ -23,24 +23,29 @@ it are the one category of pull request that will be closed rather than revised.
 * Search the open issues. If you found a false positive or a missed detection,
   that is a bug and it needs a reproducing tree; if you think a claim in the
   documentation is wrong, that is a bug too, and a more serious one.
-* Open an issue before a change that alters the protocol, the report schema, the
-  evidence ladder, the CLI surface, or the dependency list. Those five things are
-  expensive to reverse and cheap to discuss.
+* Open an issue before a change that alters the protocol or an artifact format,
+  what a report is permitted to claim, the CLI surface, the dependency list, or
+  key material and sealing. Those five are expensive to reverse and cheap to
+  discuss, and they are the same five the pull request template asks about.
 * For anything smaller — an adapter gap, a wrong word, a confusing error message —
   a pull request is a fine first contact.
 
 ## Getting set up
 
-The crate builds on Rust 1.85 or newer, and `rust-toolchain.toml` names the one
-version this project actually builds and lints with, so CI and your machine agree.
+The workspace declares Rust 1.85 as its minimum supported version, and
+`rust-toolchain.toml` names the one version this project actually builds and lints
+with, so CI and your machine agree. The floor is a declaration in `Cargo.toml`, not a
+CI job: nothing in the matrix compiles the tree at 1.85, so the minimum is what the
+manifest promises rather than what the suite proves. If you depend on an old toolchain
+and hit a failure at the declared floor, that is a bug worth filing.
 Nothing else is needed: the grammars are prebuilt crates, the CLI's argument parser
 is hand-written, and there is no code generation step to run.
 
 ```sh
 git clone https://github.com/theaaqibjavaid/SWP-1
 cd SWP-1
-cargo build                 # or cargo build --release
-cargo test --workspace
+cargo build --locked            # or cargo build --release --locked
+cargo test --workspace --locked
 cargo run -p swp-cli -- --version
 ```
 

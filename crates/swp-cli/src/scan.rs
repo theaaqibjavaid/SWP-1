@@ -262,7 +262,7 @@ mod tests {
         assert!(r.out.contains("NO_PROVENANCE_DETECTED"), "{}", r.out);
         assert!(
             r.out.contains("does not establish authorship"),
-            "the §51 boundary travels with the text too:\n{}",
+            "the authorship boundary travels with the report text too:\n{}",
             r.out
         );
         // The exit code is the last line of the text, so a reader who pipes the

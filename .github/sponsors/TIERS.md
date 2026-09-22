@@ -3,7 +3,7 @@
 The field values to enter at **github.com/settings/sponsors → Sponsorships → Tiers**
 for the profile at <https://github.com/sponsors/theaaqibjavaid>.
 
-This file is derived. **[SPONSORS.md](../SPONSORS.md) is the promise**; if the two
+This file is derived. **[SPONSORS.md](../../SPONSORS.md) is the promise**; if the two
 disagree, that page is right and this one is stale. `scripts/check-release.sh`
 compares the tier names and prices between them and fails if they drift.
 
@@ -49,7 +49,7 @@ advisory channel, and a maintainer review of your configuration. Everything in B
 ```
 
 **Rewards to enable:** everything in Builder, plus the support arrangement described
-in [SPONSORS.md](../SPONSORS.md#tier-2--production).
+in [SPONSORS.md](../../SPONSORS.md#tier-2--production--100-a-month).
 
 State the SLA as an acknowledgement commitment, not a resolution commitment. A
 promise about *fixing* something in 48 hours is a promise the project will one day
@@ -76,8 +76,9 @@ it belongs in the description, which is why it is in the text above.
 ## Two settings that are not tiers
 
 * **`.github/FUNDING.yml`** already points the repository's Sponsor button at
-  `github: theaaqibjavaid`. Nothing to change there; it is what makes the badge in
-  `README.md` resolve.
+  `github: theaaqibjavaid`. Nothing to change there; it is what makes that button
+  appear. The pink badge at the top of `README.md` is a static shield pointing at
+  the same URL, so it renders whether or not the tiers below are published.
 * **Links on the profile page.** Add `https://github.com/theaaqibjavaid/SWP-1`,
   `https://github.com/theaaqibjavaid/SWP-1/blob/main/SPONSORS.md`, and the
   repository's Discussions. The second link matters more than it looks: a sponsor

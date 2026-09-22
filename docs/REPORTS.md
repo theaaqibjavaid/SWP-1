@@ -1,10 +1,10 @@
 # Reports: structure and interpretation
 
-SWP-1 produces one kind of artifact beyond the source it edits: a report. §33
-asks for a versioned document that is machine-readable and human-readable at the
-same time, and this build resolves that by making the document JSON and the text
-a rendering of the same struct — there is no second implementation of the prose
-that could drift away from the fields.
+SWP-1 produces one kind of artifact beyond the source it edits: a report. A
+report has to be a versioned document that is machine-readable and
+human-readable at the same time, and this build resolves that by making the
+document JSON and the text a rendering of the same struct — there is no second
+implementation of the prose that could drift away from the fields.
 
 This page is the reference for both schemas and for what each number may be used
 for. It is deliberately paired with [`SWP-1-SPEC.md`](SWP-1-SPEC.md), which
@@ -32,7 +32,7 @@ the per-site table, which is the whole point of verifying.
 
 Neither is signed. A report is an observation made by whoever held the secret at
 that moment; the signed artifacts of a release are its record and its manifest,
-described in §5 and §6 of the spec.
+described in [§8 Artifacts](SWP-1-SPEC.md#8-artifacts).
 
 ## Where a report goes
 
@@ -63,8 +63,8 @@ That is the second reason the directory is private, after the obvious one that
 it was produced with the secret. A report quotes source text: an evidence item
 carries the matched span as it stands in the candidate, which for a protected
 literal is a rendering of your watermark. Nothing in a report lets anyone
-*derive* the watermark without the secret, and the secret-leak sweep in §29 is
-built on exactly that distinction — but a report is a document about your
+*derive* the watermark without the secret, and the secret-leak sweep
+is built on exactly that distinction — but a report is a document about your
 watermark's locations, and it belongs with your source rather than in a public
 issue. `swp report <name> --output out.json` exports one document, unchanged
 bytes, so you can choose which finding to hand over.
@@ -89,7 +89,7 @@ The top level is twelve fields, in the order the document writes them:
 | `evidence` | object[] | the observations themselves |
 | `omissions` | string[] | paths the walk refused, with the reason |
 | `notes` | string[] | caveats about the run: widths probed, containers opened, caps reached |
-| `limitations` | string[] | the §51 boundary, inside the document |
+| `limitations` | string[] | the claims no report may support, inside the document |
 
 `run` is `command` (the command that made the document — `scan` or `verify`),
 `created_at` (RFC 3339 UTC) and `generator` (the build that wrote it, so an old
@@ -169,14 +169,18 @@ confirmation can be described, not a partition of `fragments`: the copy scan
 above reports ten fragments, and the same ten are also its ten exact renderings.
 
 `canonical_only` is the one view of the four that can be non-zero for a copy
-nobody touched, and so the line elided above: across the twenty recorded runs of
-this suite it printed `0` eighteen times for a `copy/` edited in no way, and `1`
-twice. Which of a release's sites arrive through the value-normalized radii
-rather than the name-preserving ones is decided by the project's key, not by the
-candidate, and `fragments`, `bits` and the level were the same in all twenty. It
-grades nothing — the ladder counts a confirmation whichever radii delivered it —
-and the field exists so an operator can see how a confirmation arrived, which is
-the same question `swp verify` answers with its `refactored` boolean.
+nobody touched, and so the line elided above: the copy scan printed earlier
+renders it as `…`, because the key decides it, while that same run fixes
+`fragments` at `10`, `bits` at `40` and the level at `VERY_STRONG`. Which of a
+release's sites arrive through the value-normalized radii rather than the
+name-preserving ones follows from the project's key, not the candidate, so this
+one count varies between runs — a `copy/` edited in no way can print `0` or `1` —
+while those three stay put whichever key is in use; a reader can watch it in the
+false-positive suite's positive control
+(`cargo test -p swp-test-suite --test false_positive`). It grades nothing — the
+ladder counts a confirmation whichever radii delivered it — and the field exists
+so an operator can see how a confirmation arrived, which is the same question
+`swp verify` answers with its `refactored` boolean.
 
 *What the search cost*: `files` (distinct candidate files holding a
 confirmation), `bits` (keyed bits the confirmed sites carry), `probes`,
@@ -198,9 +202,9 @@ Evidence (1 item(s))
 exit 0
 ```
 
-That is §27's requirement: a clean answer states how hard it looked. A report
-whose `literals_tried` is `12` over one file is not the same statement as the
-one above, whatever both say about provenance.
+That is what makes a negative auditable: a clean answer states how hard it
+looked. A report whose `literals_tried` is `12` over one file is not the same
+statement as the one above, whatever both say about provenance.
 
 `bits` is `fragments × tag_bits` in the ordinary case and it is the number to
 compare between releases of the same project: 40 bits at 4 bits a site is ten
@@ -208,7 +212,8 @@ confirmations, and a scan of a partial copy that found six of them reports
 `24`. `chance` is the expected number of those confirmations an unrelated tree
 would produce by luck, computed over the comparisons this scan actually
 performed; `guarantee` is `fragments − chance`. Both are described in the spec's
-§11 and neither is a probability that anybody copied anything.
+[§12 Evidence](SWP-1-SPEC.md#12-evidence) and neither is a probability that
+anybody copied anything.
 
 ### Evidence items
 
@@ -264,10 +269,11 @@ and the four basis lines quoted are its text. Occasionally the same scan also
 lands a code by chance somewhere in that tree — one value in sixteen per probe,
 and the tree offers hundreds of probes — and then `EV-000` is a
 `PARTIAL_WATERMARK_MATCH`, whose basis is the site tally in its own two lines,
-and the four lines quoted belong to `EV-001`. Two of the twenty recorded runs of
-this suite produced that second shape, and it is stated here rather than hidden,
-because what stops a chance code from becoming a finding is the whole of §27's
-point.
+and the four lines quoted belong to `EV-001`. Which of the two shapes a run
+prints follows from the key and varies between runs — the transcript above shows
+the first — and the second is stated here rather than hidden, because what stops
+a chance code from becoming a finding is the whole point of the false-positive
+suite (`cargo test -p swp-test-suite --test false_positive`).
 
 ## Reading the levels
 
@@ -301,7 +307,7 @@ The same two tests decide whether a scan may print the *verdict*
 `PROVENANCE_DETECTED`: a `guarantee` above zero **and** a level of at least
 `MODERATE`, or a fingerprint match. A single 4-bit confirmation is therefore
 listed as `WEAK` evidence while the command still exits `0`: it is a lead worth
-looking at, not a finding, and §27's rule that a verdict may not say more than
+looking at, not a finding, and the rule that a verdict may not say more than
 its evidence level does is enforced by that one condition rather than by prose.
 
 A complete "why" block, from a verification run over a tree that had a copy of
@@ -356,8 +362,9 @@ code with the JavaScript one — it models alarms and temperature readings, not
 invoices and tax — but it is written in the same idioms, and a loop of the shape
 `let total = 0; for (let i = 0; i < xs.length; i += 1) { … }` canonicalizes the
 same under both. A scan of that tree against the JavaScript release reproduces
-several of its keyed addresses, and eighteen times in twenty it reproduces none
-of its codes:
+several of its keyed addresses; whether it reproduces any of their *codes* is a
+matter of luck in the other project's key, and in the run printed below it
+reproduces none:
 
 ```console
 $ swp scan ../typescript-foreign
@@ -378,7 +385,8 @@ fragment count, the bits it confirms, and the level and verdict computed from
 them. When the count is `0/10` the verdict is `NO_PROVENANCE_DETECTED`, the
 level is `NONE`, and the command exits `0`. When a key is unlucky and one of the
 tree's several hundred probes also matches its 4-bit code — which is what the
-two runs out of twenty above did — the count is `1/10`, the level is `WEAK`, and
+report's own `chance` figure exists to discount — the count is `1/10`, the level
+is `WEAK`, and
 the verdict is `INCONCLUSIVE` with exit `10`: one confirmation is a lead, and a
 lead the coincidence bound covers is not allowed to be called a result.
 
@@ -484,8 +492,9 @@ same tree prints a different first row in two different projects — see
 `refactored` are elided together because they are the same fact: four radii
 listed with `refactored: false` is a site found by its own text, and two — the
 value-normalized pair — with `refactored: true` is the site this key happened to
-render in a form the literal-preserving radii do not reach, which is the one such
-row in twenty that this example prints. Everything else here is what this project
+render in a form the literal-preserving radii do not reach. How many such rows a
+release carries follows from that key, which is why the count is elided above and
+never quoted as a property of the tree. Everything else here is what this project
 prints under any key, and this test suite re-runs it that way. `found_in` and
 `found_line` are the detector's own answer rather
 than a restatement of `file` and `line_hint`: a tree that repeats the site's
@@ -519,7 +528,7 @@ $ swp verify --format json
   "limitations": [
     "a site that carries its code is a statement about this artifact, not about who wrote it or what rights attach to it",
     "an absent site means the watermark is not here, which a deleted function, a formatter that removed a literal and a deliberate strip all produce identically",
-    "the §16 fingerprint is about the whole tree: it can say no-match while every site is intact, because ordinary edits change the tree hash without touching a watermark"
+    "the fingerprint is a hash of the whole tree: it can say no-match while every site is intact, because ordinary edits change the tree hash without touching a watermark"
   ],
 ```
 
@@ -527,7 +536,8 @@ $ swp verify --format json
 
 The root secret, any key derived from it, any expected tag, and any raw location
 id. Those are the artifacts that would turn a forwarded document into a copy of
-the watermark, and §29's leak sweep runs over the report path as well as over
+the watermark, and the secret-leak sweep runs over the report path as well as
+over
 source and logs.
 
 What a report does contain is source text — yours, and the candidate's — plus

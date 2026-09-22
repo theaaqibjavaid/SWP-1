@@ -295,7 +295,7 @@ fn limitations(verdict: Verdict) -> Vec<String> {
          it or what rights attach to it",
         "an absent site means the watermark is not here, which a deleted function, a formatter \
          that removed a literal and a deliberate strip all produce identically",
-        "the §16 fingerprint is about the whole tree: it can say no-match while every site is \
+        "the fingerprint is a hash of the whole tree: it can say no-match while every site is \
          intact, because ordinary edits change the tree hash without touching a watermark",
     ];
     if verdict == Verdict::Inconclusive {

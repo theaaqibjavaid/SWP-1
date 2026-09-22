@@ -48,6 +48,9 @@ $ swp verify
 exit 0
 ```
 
+The copy is `src/` alone — no `.swp/`, so the candidate carries no key, no
+manifest and nothing to trust:
+
 ```console
 $ swp scan ./copy
 result    PROVENANCE_DETECTED
@@ -63,7 +66,7 @@ exit 1
 
 ```console
 $ swp protect --sites 12
-What was refused, and why (§11: skipped, never forced)
+What was refused, and why (skipped, never forced)
   overlapping-radius       13
 exit 0
 ```
@@ -81,7 +84,7 @@ plan rel-… — what this run intended, written before any of it happened
   asked       12 site(s), ceiling 12 · 8 planned · 13 refused · 4 bit(s)
   strings     enabled
 
-What was refused, and why (§11: skipped, never forced)
+What was refused, and why (skipped, never forced)
   overlapping-radius     src/temperature.ts           line …
 exit 0
 ```
@@ -107,6 +110,7 @@ cd examples/typescript
 swp init
 swp protect --sites 12
 swp verify
+mkdir -p copy/src && cp src/* copy/src/
 swp scan ./copy
 ```
 

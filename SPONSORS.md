@@ -32,15 +32,21 @@ that gets done on a schedule rather than when there is time.
 This page is the promise; the amounts on it are the amounts, and
 [`.github/sponsors/TIERS.md`](.github/sponsors/TIERS.md) is the sheet of field
 values to paste into GitHub's form — `scripts/check-release.sh` fails if the tier
-names or prices in the two files disagree. Amounts are monthly, in US dollars, and
-are the same for everyone at that level.
+names or prices in the two files disagree. Three amounts are monthly, in US
+dollars, and the same for everyone at that level; the Supporter row below is a
+one-time amount.
+
+### Supporter — $25, once
+
+A contribution to maintenance time with no rewards attached. It is not a tier:
+there is no queue, no channel, and nothing unlocked, because a level that pretends
+to be a membership is worse than one that says it is a thank-you.
 
 ### Tier 1 — Builder · $10 a month
 
 For somebody using SWP-1 in anger and wanting to see where it is going.
 
-* Pre-release builds of the next version, including development snapshots of
-  SWP-2's public surface, before they are tagged.
+* Pre-release builds of the next version of this project, before they are tagged.
 * A sponsor-only changelog: what is being worked on, and what got dropped and
   why.
 * The sponsor announcements channel for the project's roadmap discussions.
@@ -116,7 +122,10 @@ bugs.
 
 ## For maintainers
 
-Sponsorship income is recorded in the project's public accounting alongside the
-time it pays for, and `CHANGELOG.md` says which release a funded item landed in. If
-that stops being true, [open an issue](https://github.com/theaaqibjavaid/SWP-1/issues) —
-this page is a commitment, and commitments here are meant to be checked.
+What a sponsorship paid for is answerable from the repository: `CHANGELOG.md`
+names the release each funded item landed in, and the test suite that re-runs
+every documented transcript is the record of the maintenance this page says the
+money goes to. GitHub's own sponsor statements are the accounting; this page does
+not pretend to publish a second set of books. If a tier stops describing what
+actually happens, [open an issue](https://github.com/theaaqibjavaid/SWP-1/issues) —
+commitments here are meant to be checked.

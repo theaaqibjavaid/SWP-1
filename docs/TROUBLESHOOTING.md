@@ -13,7 +13,7 @@ Three rules cover most of what goes wrong:
   file, it is about a flag, a setting, or a verdict.
 * **Nothing is repaired by force.** A command that refuses has written nothing.
   `swp protect` is the only command that edits source, and it edits only after
-  every rewrite in it has been re-parsed and proved (§11). So a failed run costs
+  every rewrite in it has been re-parsed and proved. So a failed run costs
   you a re-typed command, never a tree.
 * **`swp init` is not a fix for a missing store.** It creates a project, which
   means it creates a *new secret*. Run it on a project whose releases you still
@@ -260,11 +260,11 @@ exit 15
 ```
 
 The refusal is the honest behaviour, and it is a refusal rather than a warning
-for a reason §14 states plainly: the lexical fallback can *scan* source it has no
-parser for, at MODERATE strength at most, but embedding into text the tool cannot
-re-read after rewriting it means the proof that the rewrite preserved the code is
-absent. `swp protect` will not do that to your source on the assumption that you
-wanted the strongest thing it knows how to do.
+because the lexical fallback can *scan* source it has no parser for, at MODERATE
+strength at most, but embedding into text the tool cannot re-read after
+rewriting it means the proof that the rewrite preserved the code is absent.
+`swp protect` will not do that to your source on the assumption that you wanted
+the strongest thing it knows how to do.
 
 If part of the tree *is* a supported language, name it:
 `swp protect --target src/js`, or `[protect] targets` in the config. If it is not
@@ -278,11 +278,11 @@ These print on a run that succeeded, and most readers meet them first:
 
 | line | what it says | what to do |
 | --- | --- | --- |
-| `warning: 21 candidate location(s) were refused for safety; the release carries 10 sites` | §11: a location whose rewrite could not be proved safe, or whose radius belongs to another site, was skipped | nothing, usually. `swp inspect plan --release <id>` lists each one with its reason. Want more sites? `--sites` asks for more; the tree decides how many are safe |
+| `warning: 21 candidate location(s) were refused for safety; the release carries 10 sites` | a location whose rewrite could not be proved safe, or whose radius belongs to another site, was skipped | nothing, usually. `swp inspect plan --release <id>` lists each one with its reason. Want more sites? `--sites` asks for more; the tree decides how many are safe |
 | `warning: no file under the default scope has a language adapter, so swp protect will refuse this tree` (from `swp init`) | the store is fine; the tree's languages are not parsed | point `[protect] targets` at a supported subtree, or accept that this tree is scan-only |
 | `warning: <setting> is above the ceiling this build enforces; using <ceiling>` | a `[limits]` value was clamped, because a bigger one is a run this build will not survive | leave it. The clamped value is what the run used, and `swp inspect config` shows both |
 | `survived N site(s) found in another file` (from `swp verify`) | N site addresses were matched at a *different* file than the manifest recorded, which is what a moved function or a rename looks like | read it with `channels`; a site found in another file still carries its code. Ordinary edits between two `protect` runs produce this line, and it is not tampering |
-| `fingerprint no-match (release published …)` with `verdict INTACT` | §16: the fingerprint is a hash of the whole tree, so any edit moves it; the sites are what survived | nothing. This is the pair the design expects after a normal commit |
+| `fingerprint no-match (release published …)` with `verdict INTACT` | the fingerprint is a hash of the whole tree, so any edit moves it; the sites are what survived | nothing. This is the pair the design expects after a normal commit |
 | `scope N file(s), M byte(s) — PARTIAL, see notes` in a report you thought was clean | the ceiling stopped part of the walk even though the run finished | see the limits section above; a `PARTIAL` report can only be `INCONCLUSIVE` |
 
 ## "The scan found nothing, and I know it is a copy"
@@ -309,7 +309,7 @@ Check these in order. Each has a line in a report that settles it:
 
 The opposite confusion — a scan that found something in a tree you are sure is
 unrelated — is answered by the report's coincidence bound and by
-[REPORTS.md](REPORTS.md#three-readings), which works through a real near miss:
+[REPORTS.md](REPORTS.md#three-readings-of-the-same-tool), which works through a real near miss:
 address collisions with none of the codes, graded `NONE`.
 
 ## When you think the tool is wrong
@@ -333,7 +333,7 @@ design: an evidence item names its kind, its strength, and the span it is about.
 
 ## Reporting a failure
 
-`swp` is offline and keeps it that way (§34), so nothing about your project is
+`swp` is offline and keeps it that way, so nothing about your project is
 sent anywhere without you sending it. To report a build problem, include:
 
 * `swp --version`, in full — the protocol, schema and canonicalizer versions are

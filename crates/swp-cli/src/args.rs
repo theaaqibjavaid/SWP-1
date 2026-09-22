@@ -651,7 +651,11 @@ mod tests {
                 c.name()
             );
         }
-        assert_eq!(Command::ALL.len(), 7, "§32 lists seven commands");
+        assert_eq!(
+            Command::ALL.len(),
+            7,
+            "seven verbs, and ALL must hold all of them"
+        );
     }
 
     #[test]

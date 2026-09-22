@@ -53,7 +53,8 @@ loud which half is a bug.
   contain.** `LIMIT_REACHED` and the `[limits]` ceilings are a security boundary
   against hostile input, not a performance tuning knob. A candidate that exhausts
   memory or CPU past a configured ceiling is a bug. (A `INTERNAL_ERROR`, exit `70`,
-  is an invariant this build holds having broken; report it too.)
+  means an internal invariant that is supposed to be unbreakable did break; report
+  that too, because it is the most honest crash report this tool can produce.)
 * **Anything that makes a report say something stronger than the measurement
   behind it**, including in the documentation.
 
@@ -87,7 +88,7 @@ never needs it.
 
 The acknowledgement window is a target we can meet as volunteers, not a contract.
 Where a paying arrangement exists, response commitments for that arrangement are
-in [SPONSORS.md](SPONSORS.md#what-sponsors-get) — and they are commitments about
+in [SPONSORS.md](SPONSORS.md#the-tiers) — and they are commitments about
 *attention and engineering time*, never about withholding a fix from anybody who
 runs this software.
 

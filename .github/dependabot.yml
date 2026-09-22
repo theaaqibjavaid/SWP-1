@@ -18,11 +18,14 @@ updates:
       time: "06:00"
       timezone: Etc/UTC
     # Every direct dependency belongs to a group below, and a group opens one pull
-    # request rather than one per crate. `update-types` stops at minor and patch on
-    # purpose: without it a group happily bundles a major — this configuration once
-    # proposed moving `zip` from 2 to 8 inside a group named "containers", which is
-    # a review decision arriving dressed as housekeeping. A major still shows up, in
-    # the release notes of the grouped pull request and whenever a human asks for it.
+    # request rather than one per crate. `update-types` stops the group at minor and
+    # patch on purpose: without it a group happily bundles a major — this
+    # configuration once proposed moving `zip` from 2 to 8 inside a group named
+    # "containers", which is a review decision arriving dressed as housekeeping.
+    # Leaving a group does not make a major invisible. An update that matches no
+    # group rule is raised individually, so a major arrives as its own single-crate
+    # pull request for a person to read. That is the right outcome and it is also
+    # the reason for the limit below.
     groups:
       rustcrypto:
         patterns:
@@ -60,8 +63,10 @@ updates:
         update-types:
           - minor
           - patch
-    # Four groups, four pull requests at most, and one of them is the maintenance
-    # line rather than a stack of single-crate bumps.
+    # This is not "four groups, four pull requests". The limit counts open
+    # version-update pull requests for the whole cargo entry — grouped and
+    # individual together — which is what keeps the ungrouped majors mentioned
+    # above from arriving six at a time on a Tuesday.
     open-pull-requests-limit: 4
     commit-message:
       prefix: deps

@@ -43,7 +43,7 @@ What was modified
   src/cart.py — 2 site(s), 1213 → … bytes
   src/money.py — 2 site(s), 1103 → … bytes
 
-What was refused, and why (§11: skipped, never forced)
+What was refused, and why (skipped, never forced)
   constellation-full       14
 exit 0
 ```
@@ -61,7 +61,7 @@ What was modified (2 file(s))
   src/cart.py — 3 site(s), 1213 → … bytes
   src/money.py — 5 site(s), 1103 → … bytes
 
-What was refused, and why (§11: skipped, never forced)
+What was refused, and why (skipped, never forced)
   overlapping-radius       10
 exit 0
 ```
@@ -83,6 +83,9 @@ $ swp verify
 Every site of this release is present with its code. That is the whole claim; it says nothing about the tree being otherwise unchanged.
 exit 0
 ```
+
+The copy is `src/` alone — no `.swp/`, so the candidate carries no key, no
+manifest and nothing to trust:
 
 ```console
 $ swp scan ./copy

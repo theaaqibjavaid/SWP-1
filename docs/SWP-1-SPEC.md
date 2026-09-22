@@ -24,7 +24,7 @@ changing a literal's spelling — and also why detection **requires** the secret
 There is no mode in which SWP-1 scans for your watermark using only public
 artifacts: the public release record proves that a manifest is yours, and the
 manifest lists where the sites are, but only the key derives what each site must
-carry. See [§12](#12-what-must-be-trusted).
+carry. See [§13](#13-what-must-be-trusted).
 
 ## 2. Vocabulary
 
@@ -32,7 +32,7 @@ carry. See [§12](#12-what-must-be-trusted).
 | --- | --- |
 | **literal** | a number or string in source text. `LiteralClass` is `integer` or `string`; a float is never a site, because "same value" is not decidable for one across spellings |
 | **fragment** | the bits a rewritten literal carries, `tag_bits` of them |
-| **family** | the way a fragment is spelled — one of seven (see [§5](#5-fragment-families)) |
+| **family** | the way a fragment is spelled — one of seven (see [§6](#6-fragment-families)) |
 | **site** | one literal carrying one fragment, addressed by its surroundings rather than by its own text |
 | **radius key** | one of the four digests that address a site (see [§4](#4-site-identity-the-four-radius-keys)) |
 | **constellation** | the set of sites one release embeds, and the spacing rule among them |
@@ -368,6 +368,6 @@ table; [TROUBLESHOOTING.md](TROUBLESHOOTING.md) is the prose.
 * **Key sharing, delegation, or a registry.** One project, one secret, one store.
   There is no third party, no online service, and no way for one project to
   verify another's fragments.
-* **Any legal or forensic conclusion.** [../README.md](../README.md) and §51 of
-  the brief both state this first, because it is the claim most likely to be
-  inferred and the one this tool never earns by itself.
+* **Any legal or forensic conclusion.** [../README.md](../README.md) states this
+  first, because it is the claim most likely to be inferred and the one this tool
+  never earns by itself.

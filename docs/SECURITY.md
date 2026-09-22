@@ -12,8 +12,9 @@ or theft changes what the tool can prove.
 
 This page is the counterpart of [`THREAT-MODEL.md`](THREAT-MODEL.md), which works
 attack by attack. Here the organizing question is "where is the secret, and what
-holds it there". The rules the secret produces are in
-[`SWP-1-SPEC.md`](SWP-1-SPEC.md) §3 and §4.
+holds it there". The rules the secret produces are in the spec's
+[§3 Keys and identities](SWP-1-SPEC.md#3-keys-and-identities) and
+[§4 Site identity](SWP-1-SPEC.md#4-site-identity-the-four-radius-keys).
 
 ---
 
@@ -25,7 +26,7 @@ holds it there". The rules the secret produces are in
 * [What is signed, and what a signature does not buy](#what-is-signed-and-what-a-signature-does-not-buy)
 * [The public and private line](#the-public-and-private-line)
 * [What each artifact costs to lose](#what-each-artifact-costs-to-lose)
-* [Keeping the secret out: the §29 sweep](#keeping-the-secret-out-the-29-sweep)
+* [Keeping the secret out: the leak sweep](#keeping-the-secret-out-the-leak-sweep)
 * [A candidate tree is hostile input](#a-candidate-tree-is-hostile-input)
 * [Offline, and how to check that claim](#offline-and-how-to-check-that-claim)
 * [What is trusted](#what-is-trusted)
@@ -53,7 +54,7 @@ Four adversaries, and what stands in each one's way:
 
 | adversary | wants | stopped by | not stopped |
 | --- | --- | --- | --- |
-| a copier of your published source | to use it undetected | the keyed constellation in the literals themselves; the codes are not computable without your secret | a rewrite thorough enough to remove every site — see §50's third attack in [`THREAT-MODEL.md`](THREAT-MODEL.md) |
+| a copier of your published source | to use it undetected | the keyed constellation in the literals themselves; the codes are not computable without your secret | a rewrite thorough enough to remove every site — see [attack 3](THREAT-MODEL.md#3-intentional-watermark-removal) in [`THREAT-MODEL.md`](THREAT-MODEL.md) |
 | a thief of your repository | to forge or strip evidence | `.swp/private/` being gitignored *and* ACLed; the manifest holding no tags | reading a stolen manifest as a map of where to cut, which is exactly what it is |
 | the owner of a tree you scan | to make your scan lie or crash | the bounds, the name checks, the never-execute rule, and the fact that a candidate's own `.swp/` is never consulted | making the scan inconclusive, which is a real cost and is reported |
 | someone who wants to frame you | to make an innocent tree carry your marks | they need your root secret, or your private manifest, for that site list is keyed and theirs is not | planting *their* fragments into a tree you then scan — which the coincidence bound keeps at a lead rather than a finding |
@@ -166,8 +167,8 @@ tested:
   the first big-endian word and every width in use divides 2³², so the mask is
   exact and there is no bias to correct. No primitive in `swp-crypto` was written
   here: `sha2`, `hmac`, `ed25519-dalek`, `getrandom`, `zeroize`, `subtle`,
-  `base64`, plus `crypt32` for DPAPI. That is §30's rule, and `cargo tree` is the
-  check.
+  `base64`, plus `crypt32` for DPAPI. That list is the whole crypto surface, and
+  `cargo tree` is the check.
 
 The asymmetry that makes re-protection safe is deliberate: location ids and tags
 are keyed by the **project**, not the release, so protecting a second time keeps
@@ -334,7 +335,7 @@ more reason than that.
 | a private manifest | every site and both of its spellings | nothing unforgeable; the derivation domains stay unreachable |
 | `root.key` | the tag key: forge your marks, compute any site, sign any release | the ability to *deny* having issued a forged record, and every release's trustworthiness until you rotate by starting a new project |
 
-## Keeping the secret out: the §29 sweep
+## Keeping the secret out: the leak sweep
 
 The rule this build holds itself to is absolute in one direction: the root
 secret, any key derived from it, and any expected tag appear in **no** artifact —
@@ -364,11 +365,10 @@ what keep that gap narrow rather than merely invisible.
 
 ## A candidate tree is hostile input
 
-§21's rule is that SWP-1 must never execute an untrusted project, and
-`swp-detection` takes it literally: **no process is spawned anywhere in that
-crate**. The only `Command::new` in the entire product is `icacls`, in
-`swp-crypto`, run against a file the store is hardening — never against a
-candidate.
+SWP-1 must never execute an untrusted project, and `swp-detection` takes it
+literally: **no process is spawned anywhere in that crate**. The only
+`Command::new` in the entire product is `icacls`, in `swp-crypto`, run against a
+file the store is hardening — never against a candidate.
 
 An archive is treated as a source carrier, not a program. The only operations
 performed on one are "list" and "copy out a regular file", and an entry is
@@ -383,10 +383,10 @@ root:
 * `tar`'s `setuid`, `setgid` and mode bits are not applied, because the extracted
   tree is read and then deleted.
 
-Then the bounds, from `swp-core::Limits`, four of them around containers alone —
-entry count, per-entry size, cumulative expanded bytes, and per-entry compression
-ratio, since a 42-byte zip can expand to terabytes. The defaults, with the hard
-ceiling in parentheses:
+Then the bounds, from `swp-core::Limits`, five of them around containers alone —
+entry count, per-entry size, cumulative expanded bytes, per-entry compression
+ratio, and how many levels deep a container may be opened, since a 42-byte zip can
+expand to terabytes. The defaults, with the hard ceiling in parentheses:
 
 | key | default | ceiling | guards |
 | --- | --- | --- | --- |
@@ -397,6 +397,7 @@ ceiling in parentheses:
 | `max_parse_millis` | 2,000 | 20,000 | wall clock per document |
 | `max_files` | 200,000 | 1,000,000 | the size of a walk |
 | `max_total_bytes` | 8 GiB | 64 GiB | cumulative bytes per operation |
+| `max_sites_per_file` | 4,000 | 20,000 | candidate sites one file can offer |
 | `max_archive_entries` | 10,000 | 100,000 | entries listed |
 | `max_archive_member_bytes` | 64 MiB | 256 MiB | one member |
 | `max_archive_expanded_bytes` | 2 GiB | 16 GiB | a container's whole output |
@@ -481,8 +482,8 @@ block that travels inside every report.
 
 ## What SWP-1 must not claim
 
-§51 states this as a prohibition on the documentation, and the documentation
-defers. SWP-1 does not guarantee:
+The prohibition runs on the documentation as well as on the code, and the
+documentation defers. SWP-1 does not guarantee:
 
 * **legal ownership** — nothing here adjudicates rights;
 * **proof of authorship by itself** — a watermark shows that a tree carries the

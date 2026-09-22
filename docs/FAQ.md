@@ -10,10 +10,10 @@ them: [GETTING-STARTED.md](GETTING-STARTED.md) for the first run,
 [THREAT-MODEL.md](THREAT-MODEL.md) for what an attacker actually achieves, and
 [VALIDATION.md](VALIDATION.md) for the numbers.
 
-Every transcript below was printed by this build, and a test re-runs each one
-(§41). Where a number is decided by the project's own key it appears as `…`;
-[Why do my numbers differ from the ones in the documentation?](#why-do-my-numbers-differ-from-the-ones-in-the-documentation)
-says which those are.
+Every transcript below was printed by this build, and a test re-runs each one.
+Where a number is decided by the project's own key it appears as `…`; the last
+question under
+[Reading the output](#reading-the-output) says which those are.
 
 ## What it is
 
@@ -27,10 +27,10 @@ can hand to somebody, with the arithmetic next to it.
 
 **Is this DRM? Can it stop someone from copying my code?**
 No, and no. Nothing here withholds, licenses, expires or unlocks anything; a
-protected file runs exactly as an unprotected one does. §11's rule is that a mark
-is only ever placed where it changes no meaning, and the whole product is
-therefore a measurement, not a control. The question a copy can be asked is
-"does this carry your code", not "can this still run".
+protected file runs exactly as an unprotected one does. A mark is only ever
+placed where it changes no meaning, and the whole product is therefore a
+measurement, not a control. The question a copy can be asked is "does this
+carry your code", not "can this still run".
 
 **Then what is it for?**
 For the cases where a copy is discovered and the question is whether the two
@@ -41,7 +41,7 @@ triaged before legal gets involved. It is also for the case before any of that:
 conversation about one is like.
 
 **Can it prove I wrote this?**
-Not by itself, and §51 forbids the claim. A confirmation says "this tree
+Not by itself, and no `swp` output claims it. A confirmation says "this tree
 reproduces literals whose values come from a secret that project holds". For
 that to mean authorship you additionally need that the secret was never
 disclosed, that the release was made before the other copy existed, and that the
@@ -61,13 +61,14 @@ on it, which is the most a tool can offer a non-tool process.
 Yes, and the measurement is on the record: on a 24-site release, an attacker who
 locates the sites and deletes exactly those renderings ends at **0 of 24
 confirmed, `NO_PROVENANCE_DETECTED / NONE`**. Anyone who tells you a watermark
-is impossible to remove is selling something else. §26 is the rule;
+is impossible to remove is selling something else, and no page here claims it.
 [THREAT-MODEL.md](THREAT-MODEL.md#3-intentional-watermark-removal) has the four
 removal attacks and what each one cost.
 
 **So why use it, if removal is possible?**
-Because removal and refactoring are different acts with different costs. §25
-applied thirteen ordinary refactoring forms to that same release: twelve of the
+Because removal and refactoring are different acts with different costs.
+`tests/detection/matrix.rs` applied thirteen ordinary refactoring forms to that
+same release: twelve of the
 thirteen still produced a finding, eleven at `VERY_STRONG`. The one that hurt was
 `dead_code_removal`, which took the count to 5 and still produced a finding.
 Removing the watermark means knowing which literals carry it — and to know that
@@ -79,8 +80,10 @@ mark or do visible surgery, and either way you get an artifact".
 **What if they rewrite the code completely?**
 Then there is nothing to find, and this tool does not claim otherwise. Detection
 needs the literals and the code around them. A clean reimplementation of the same
-behaviour is a different thing to argue about and a different thing to test.
-[FAQ: does a `NONE` result mean the code is original?](#does-a-none-result-mean-my-code-is-clean)
+behaviour is a different thing to argue about and a different thing to test. The
+question "Is a `NONE` result 'my code is clean'?", at the end of
+[Keys, loss and disclosure](#keys-loss-and-disclosure), puts the same bound in one
+sentence.
 
 **How many bits is the mark, and what does that mean for a false hit?**
 Four per site by default, so one value in sixteen at each site the scan probes.
@@ -92,7 +95,8 @@ Two or more confirmed sites, a level of at least `MODERATE`, and a positive
 arithmetic is in [REPORTS.md](REPORTS.md#reading-the-levels).
 
 **Can two projects collide?**
-Measured in §28: 48 addresses derived under one key and 48 under another, over
+Measured in `tests/collision/identities.rs`: 48 addresses derived under one key
+and 48 under another, over
 identical source, shared **0**. 50 independently minted projects produced 50
 distinct ids and 50 distinct verify-key sets, and across the 1,225 pairs the
 longest shared id prefix was 2 characters. Project ids are 80 bits; the expected
@@ -100,7 +104,8 @@ number of colliding pairs in that whole experiment is about 10⁻²¹.
 
 **Will it accuse an innocent project?**
 Not on its own arithmetic, which is the only kind of promise worth making here.
-§27 ran 30 scans of six unrelated corpora against five independent identities
+`tests/false_positive/corpora.rs` ran 30 scans of six unrelated corpora against
+five independent identities
 each: **0 of the 30 confirmed a site**, 946 spans reached a tag comparison, and
 the bound for that volume was 21.2 confirmations expected by chance (59.1 under
 the loosest assumption). Cross-project scans over sibling trees generated from
@@ -137,7 +142,7 @@ that stopped it.
 **Does it change what my code does?**
 No, and it is built to refuse rather than risk it. Every rewrite is re-parsed and
 compared against the value it must preserve; a location that cannot hold a mark
-safely is skipped, never forced (§11). On the JavaScript example:
+safely is skipped, never forced. On the JavaScript example:
 
 ```console
 $ swp protect --dry-run
@@ -159,29 +164,33 @@ the dry run: they are the candidates this build judged unsafe to mark, and the
 reason each one was refused is one command away.
 
 **How many sites should I protect?**
-The default `target_sites` is 4; the example releases use 10 and 12. More sites
-mean more rungs available on the evidence ladder — `VERY_STRONG` needs eight
-confirmations across three files — but they also mean more edited literals, and
-§11's skip rule means a small or dense tree cannot always supply what you ask
-for. Ask for 12, read the refusal counts, and keep the number where the refusals
-are all the boring kind (`constellation-full`).
+The built-in `target_sites` is 16, and `swp init` overwrites it with a number
+measured against your tree instead — 4 for a project of up to three files, 12 for
+4–15, rising to 48 as the tree grows. The example releases embed 10 and 8: what
+their trees could carry once the refusals were taken out. More sites mean more
+rungs available on the evidence ladder — `VERY_STRONG` needs eight confirmations
+across three files — but they also mean more edited literals, and the skip rule
+means a small or dense tree cannot always supply what you ask for. Ask for a
+number, read the refusal counts, and keep the one where the refusals are all the
+boring kind (`constellation-full`).
 
 **Which languages work today?**
-JavaScript, TypeScript and Python through tree-sitter grammars, plus a generic
-tokenizing fallback for files the grammars do not cover. That fallback still
-produces real, verifiable sites and marks them with a weaker canonicalization
-story; the honest per-language picture, including what `pyproject.toml` is to
-this tool, is in
-[LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md). Anything else is unsupported, and
-`swp` says so in its omission list rather than guessing.
+JavaScript, TypeScript and Python through tree-sitter grammars. Everything else
+is refused rather than guessed at: there is a hand-written tokenizing adapter for
+"a caller named a language this build has no grammar for", but it claims no file
+extensions, so no `protect` or `scan` walk ever selects it — an unsupported tree
+gets `NO_SAFE_LOCATIONS` and a clear reason. The honest per-language picture,
+including what `pyproject.toml` is to this tool, is in
+[LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md), which also settles what
+`pyproject.toml` is to this tool.
 
 **Can I point it at an archive instead of a directory?**
 Yes — a file, a directory, a `.zip`, a `.tar`, a `.tar.gz` or a gzipped single
 file, sniffed from the bytes rather than the extension. Containers are opened to
 a bounded depth and never executed; an archive found *inside* one is reported as
 a note, not extracted, because a scanner that chases nested containers is a
-denial-of-service invitation. [SECURITY.md](SECURITY.md) has the four limits that
-bind a container scan.
+denial-of-service invitation. [SECURITY.md](SECURITY.md#a-candidate-tree-is-hostile-input)
+has the five limits that bind a container scan.
 
 **Do I have to commit anything?**
 Nothing is required. `swp/public/` and `.swp/config.toml` are committable by
@@ -203,7 +212,7 @@ scan` 29 to 33 ms per file over a 241-file, 0.35 MiB tree — and the scan is
 deliberately re-run five times in that measurement, because a single figure from
 one busy run is not a number worth documenting. The full ladder, from 13 files to
 721, with the heap each tier holds, is in
-[VALIDATION.md](VALIDATION.md#performance). Two rules matter more than the
+[VALIDATION.md](VALIDATION.md#11-performance). Two rules matter more than the
 constants: nothing in `scan` ever runs the candidate, and every loop is bounded
 by a limit, so a scan that gets too slow is a scan that stops and says which
 limit it stopped at.
@@ -221,12 +230,12 @@ the dry run above prints a `Back this up` list.
 **What happens if my `root.key` leaks?**
 The holder can derive every site address and both renderings of every protected
 literal, which is a complete removal tool: they can find each mark and take it
-out. §52 measured the framing case too, and it is the reason this page exists —
-planting those fragments into an unrelated tree with the leaked manifest's own
-keys confirmed **0 of 24** sites, because a handful of copied fragments is not a
-constellation and the bound says so. A leak is a removal problem, not a
-forgery problem, and the mitigation is still rotation-free by design: a *new
-project* for future releases.
+out. The adversarial suite measured the framing case too, and it is the reason
+this page exists — planting those fragments into an unrelated tree with the
+leaked manifest's own keys confirmed **0 of 24** sites, because a handful of
+copied fragments is not a constellation and the bound says so. A leak is a
+removal problem, not a forgery problem, and the mitigation is still
+rotation-free by design: a *new project* for future releases.
 
 **Is `swp inspect fragments` safe to run in the open?**
 It is safe to *run* and unsafe to *publish*, and the command prints its own
@@ -245,8 +254,9 @@ issue, they are the removal recipe.
 **Can I rotate or revoke a key?**
 No, and the reason is structural: the root secret is the root of every id you
 have ever published, so "revoking" it erases your ability to connect your old
-releases to your new ones. §29's related limitation is stated in
-[SECURITY.md](SECURITY.md). If you believe a key is burned, start a new project
+releases to your new ones. The leak sweep is what stands in place of
+revocation, and [SECURITY.md](SECURITY.md#keeping-the-secret-out-the-leak-sweep)
+states its own limit. If you believe a key is burned, start a new project
 and keep the old records for the old copies.
 
 **Is a `NONE` result "my code is clean"?**
@@ -259,7 +269,7 @@ is the document to share rather than a screenshot of a verdict line.
 ## Reading the output
 
 **Why does `verify` say `INTACT` while the fingerprint says `no-match`?**
-Because they measure different things and both are telling the truth. The §16
+Because they measure different things and both are telling the truth. The whole-tree
 fingerprint is a hash of the whole canonicalized tree: one edited file, one added
 directory, and it changes. The sites are keyed locations, and they are intact
 until their own code moves.
@@ -300,7 +310,7 @@ Because part of every transcript is decided by *your project's* key: which
 literal becomes site 0, whether it is a string or a number, which rendering form
 it gets, the family mix, the byte growth per file, every id and digest and
 timestamp, and the probe and chance columns. The convention this documentation
-uses is `…` — U+2026 — in exactly those positions, and a test (§41) re-runs each
+uses is `…` — U+2026 — in exactly those positions, and a test re-runs each
 block and fails if a line that is *not* elided stops matching. So a page that
 shows `10/10` really does show 10 of 10 for any key; where you see `…`, that is
 the key speaking.

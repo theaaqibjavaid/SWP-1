@@ -51,9 +51,11 @@ Anything outside it is invisible to protection *and* to verification, so a proje
 whose code lives in `lib/` or `packages/` needs its targets set before the first
 `swp protect`.
 
-`excludes` adds to a built-in list that is there because those files are either
-generated or hopeless: `**/.swp/**`, `**/node_modules/**`, `**/target/**`,
-`**/*.min.js`, `**/*.map`. Excluded and refused paths are counted in the "the walk
+`excludes` adds to a built-in list of thirteen patterns that is there because those
+files are either generated or hopeless: `**/.git/**`, `**/.swp/**`,
+`**/node_modules/**`, `**/target/**`, `**/dist/**`, `**/build/**`, `**/venv/**`,
+`**/.venv/**`, `**/__pycache__/**`, `**/vendor/**`, `**/*.min.js`, `**/*.min.css`
+and `**/*.map`. Excluded and refused paths are counted in the "the walk
 refused or excluded" line `init` prints, so a surprise in that number is a hint to
 look at your scope before your watermark.
 
@@ -69,9 +71,10 @@ Two knobs, and the trade-off between them is the whole design:
 * **Sites** spread the watermark across files. A constellation inside one file is
   one `rm` away from nothing, which is why `init`'s suggestion aims at spread and
   why a scan of a *partial* copy — three files out of forty — can still reach a
-  finding. The ladder needs fragments in at least two files for `STRONG` and three
-  for `VERY_STRONG`, and at least 4 and 8 respectively, so a release with 4 sites
-  in 1 file cannot out-grading a single-file copy.
+  finding. `STRONG` wants four confirmations in at least two files — or six, which
+  is the bar when count is the only argument available — and `VERY_STRONG` wants
+  eight in at least three, so a single file carrying a whole release buys a lower
+  grade than the same number of sites spread across the project.
 * **Tag bits** decide how much each site proves: at 4 bits one site is 1-in-16 by
   chance; at 8 bits, 1-in-256. Wider tags cost capacity, because a family has to
   be able to spell that many distinct renderings inside the literal's radius.
@@ -148,11 +151,15 @@ Three things worth knowing before you wire it up:
   pipeline treats non-zero as red, invert it deliberately and read the `result`
   field, not the code: `swp scan ./candidate --format json > report.json`, then
   branch on `.result` and on `.candidate.partial`.
-* **The secret is sealed to the Windows account that created it** (DPAPI, user
-  scope). A CI runner that is a different account, a different container or a
-  different machine needs the secret restored through the documented recovery
-  path, not copied byte-for-byte from a developer laptop — a copy that will not
-  unseal is a silent way to make protection impossible.
+* **Whether a copied secret unseals depends on the operating system.** On Windows
+  the store seals it to the account that created it (DPAPI, user scope), so a CI
+  runner that is a different account, a different container or a different machine
+  needs the secret restored through the documented recovery path, not copied
+  byte-for-byte from a developer laptop — a copy that will not unseal is a silent
+  way to make protection impossible. On Linux and macOS there is no sealing to
+  bypass: the same bytes sit in `.swp/private/root.key` behind a `0600` mode, so a
+  copy does work, and those permissions are the only thing protecting it at rest.
+  Neither platform's behaviour makes ordinary email of the key safe.
 * **Never save a report into a build artifact you publish.** `--save` writes under
   `.swp/private/reports/`, and one names your source paths, your sites and the
   files a candidate contained. `-o/--output` to a path you then handle deliberately
@@ -209,7 +216,7 @@ and nothing else.
 
 Seventeen ceilings, all in `.swp/config.toml`, all enforced by the walker, the
 parser and the archive reader. They exist because a scan runs against source
-everybody can send you, and §42's hostile-input suite is where each one is
+everybody can send you, and `tests/resource/hostile.rs` is where each one is
 measured. Defaults as this build ships them:
 
 | key | default | guards |

@@ -2,9 +2,7 @@
 
 **Version 1.0, adapted from the Contributor Covenant 2.1 (CC-BY-4.0).**
 The section structure is deliberately the standard one, so a reader who knows any
-other project's code of conduct knows where to look for enforcement. If the
-maintainers would rather adopt the canonical text word for word, that is a
-one-commit change and the attribution line above is all the Covenant requires.
+other project's code of conduct knows where to look for enforcement.
 
 ## Our commitment
 
@@ -62,9 +60,8 @@ effect of driving them out of the project.
 
 Report to **aaqib100javaid@gmail.com**, or to any maintainer you are comfortable
 approaching; the list of who that is lives in [MAINTAINERS.md](MAINTAINERS.md).
-Reports are read by at least two maintainers where that is possible — and with two
-maintainers, one of whom owns the repository, that qualifier is doing real work, so
-say in your report whether you are willing for the other to see it. The identity of
+More than one maintainer reads a report unless you ask otherwise, so say in your
+report whether you would rather it be handled by one named person. The identity of
 a reporter is not shared with the person reported about without their agreement.
 
 If the person being reported on is a maintainer, you may send the report to a

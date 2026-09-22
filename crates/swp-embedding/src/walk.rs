@@ -286,7 +286,7 @@ fn walk_tree(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Result<Walk, 
                 // says so instead of counting it as a clean read.
                 out.omissions.push(Omission {
                     path: rel,
-                    reason: "symbolic link, never followed (§21)".to_string(),
+                    reason: "symbolic link, never followed".to_string(),
                     kind: OmissionKind::NotExamined,
                 });
                 continue;

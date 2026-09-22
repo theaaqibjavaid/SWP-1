@@ -2,9 +2,9 @@
 
 What it takes to teach SWP-1 a language, and what an adapter may never do.
 
-The promise this page has to keep is the one §3 of the brief makes: *universal*
-means one protocol with a per-language seam, not one tool that already knows every
-language. The seam is real — nothing in `swp-core`, `swp-embedding`,
+The promise this page has to keep is that *universal* means one protocol with a
+per-language seam, not one tool that already knows every language. The seam is
+real — nothing in `swp-core`, `swp-embedding`,
 `swp-detection`, `swp-evidence`, `swp-manifest` or `swp-identity` branches on a
 language name — and §12 below lists, honestly, the enumerations you still have to
 touch.
@@ -56,11 +56,12 @@ release stores, and a renamed adapter cannot re-parse its own old manifests.
 
 ---
 
-## 2. Required interface (§12's nine operations)
+## 2. Required interface
 
-The brief names nine operations — identify, parse, canonicalize, analyze, find
+Nine operations make up the adapter contract — identify, parse, canonicalize,
+analyze, find
 candidate locations, embed, extract features, detect, validate. They are on
-`trait LanguageAdapter: Send + Sync` (`adapter.rs:120`), grouped where the data
+`trait LanguageAdapter: Send + Sync` (`adapter.rs`), grouped where the data
 falls out rather than one method per noun: `analyze` *is* parse + token stream +
 candidate locations, because a language cannot find safe literal sites without
 having parsed the file, and splitting those into three calls would let a caller
@@ -88,7 +89,7 @@ for your language, never to add a spelling the shared decoder would not accept
 back; a rendering your `extract` cannot decode is a watermark that exists in the
 manifest and nowhere in the world.
 
-`Capabilities` (`analyze.rs:95`) is a promise, and the report degrades to it:
+`Capabilities` (`analyze.rs`) is a promise, and the report degrades to it:
 
 ```rust
 pub const AST: Capabilities = Capabilities {
@@ -105,15 +106,16 @@ Say `scopes: false` if you cannot tell a local name from a free one and L2 will
 canonicalize exactly as L1 does; say `reparse: false` if you cannot re-parse your
 own output, and `validate` stops being a proof. Claiming more than you can
 deliver does not make a project look better protected — it makes a report print a
-level the evidence does not reach, which §13 forbids in the plainest terms.
+level the evidence does not reach, which is the one claim an adapter must never
+make.
 
 ---
 
 ## 3. Parser expectations
 
-A parsed language is a `Grammar` table (`ts.rs:39`) plus a tree-sitter
+A parsed language is a `Grammar` table (`ts.rs`) plus a tree-sitter
 `Language`. The AST pass is shared. `AstAdapter` is one struct
-(`adapter.rs:405`) holding a name and a `fn() -> &'static Grammar`; its four
+(`adapter.rs`) holding a name and a `fn() -> &'static Grammar`; its four
 trait methods read the table, and `analyze` is `ts::analyze(self.table(), source,
 limits)`.
 
@@ -159,7 +161,8 @@ You do not implement canonicalization. You feed it. `swp_core::canon` turns a
 definition of what "the same code" means:
 
 * **L1** — formatting-insensitive: whitespace collapsed, comments gone, spellings
-  kept. This is the release fingerprint's level (§16).
+  kept. This is the release fingerprint's level
+  ([§9 Fingerprints](SWP-1-SPEC.md#9-fingerprints)).
 * **L2** — L1 plus locally bound identifiers renamed `#l0`, `#l1`, … by first
   occurrence. Free names, member names and property keys are preserved, because
   renaming those changes what the program talks to.
@@ -184,21 +187,21 @@ not let `skipped` include anything a radius boundary depends on.
 
 ---
 
-## 5. Safe embedding rules (§11: skipped, never forced)
+## 5. Safe embedding rules
 
 `swp-embedding` asks you to render a code at a family (`render`), splices the
 result, and then asks `validate` whether that was safe. The rules your adapter is
 responsible for:
 
 **Gate on the dialect, both directions.** `Dialect`
-(`dialect.rs:14`) is six facts: `max_exact_integer`,
+(`dialect.rs`) is six facts: `max_exact_integer`,
 `integer_division_truncates`, `adjacent_strings`, `hex_escapes`, `quote_chars`,
 `digit_separator`. The four numeric families are bounded by
 `max_exact_integer` (JavaScript stops at 2^53 − 1 because a number there is a
 double; Python's bound is `i128::MAX`); `str-adjacent` exists only where
 `adjacent_strings` is true; `str-escape` is offered only where `hex_escapes` is.
-`available_number_families` (`forms.rs:117`) and
-`available_string_families` (`forms.rs:435`) apply those gates — do not
+`available_number_families` (`forms.rs`) and
+`available_string_families` (`forms.rs`) apply those gates — do not
 re-implement them, and never widen one "just for this site".
 
 **Refuse positions, not just spellings.** A literal that is perfectly rewritable
@@ -223,13 +226,13 @@ candidate site, and every one is reported by name so the price of safety is
 visible in `swp inspect plan`.
 
 **A string must survive being rewritten at all.** `is_rewrite_safe`
-(`forms.rs:396`) is the guard: no backslash, no newline, no quote character that
+(`forms.rs`) is the guard: no backslash, no newline, no quote character that
 the chosen quoting cannot reproduce. Otherwise `ContainsEscape`,
 `MultilineOrTemplate`, `StringPrefix` and `EmptyLiteral` each name a literal that
 never becomes a candidate.
 
 **`validate` fails closed.** The default implementation re-parses `after`, then
-proves three things per site (`adapter.rs:194`): the surrounding code canonicalizes
+proves three things per site (`adapter.rs`): the surrounding code canonicalizes
 identically before and after at **L1, L2 and L3** (`ALL_LEVELS = 3`); the new
 spelling decodes back to the original value; and the code it carries is the one
 requested. `Proof { sites_verified, levels_stable, parse_errors }` is checked with
@@ -238,7 +241,7 @@ an error rather than a skipped site. That is deliberate: a transformation that
 cannot pass this proof is not a bug to be found later, it is a silent behavior
 change, which is the one thing a watermark must never do.
 
-`RefusalKind` (`literal.rs:33`) is the closed vocabulary all of the above reports
+`RefusalKind` (`literal.rs`) is the closed vocabulary all of the above reports
 through — fourteen variants, from `not-a-literal` to `resource-limit` — and its
 `as_str` strings are what a user reads in `swp inspect plan`. Add a variant only
 for a reason a reader cannot already name; a refusal kind nobody can act on is
@@ -248,13 +251,13 @@ noise in the one table that is supposed to be actionable.
 
 ## 6. Feature extraction
 
-`analyze` fills an `Analysis` through `AnalysisBuilder` (`analyze.rs:305`):
+`analyze` fills an `Analysis` through `AnalysisBuilder` (`analyze.rs`):
 `push_token`, `set_file`, `push_statement`, `push_scope`, `push_site`,
 `push_refusal`, `finish`. The result carries `language`, `capabilities`,
 `tokens`, `sites`, `refusals`, `parse_errors`, `nodes`, `truncated`, the whole-file
 span, and the statement/scope span lists `validate` searches.
 
-A `CandidateSite` (`analyze.rs:133`) is `span`, the `token` index it came from, a
+A `CandidateSite` (`analyze.rs`) is `span`, the `token` index it came from, a
 `SiteValue` (`Integer(i128)` or `Text(OwnedString)` — *after* interpretation, so
 `0x10` is 16, `"a" "b"` is one string), the `statement` and `scope` radii as byte
 spans, and a `path` breadcrumb for reports. `push_site` is the only one of these
@@ -276,7 +279,7 @@ inside an `if`, you have built a smaller constellation, not a safer one.
 
 Do not pre-select for the key. `swp protect` derives a per-candidate priority
 from the release under the site's own four location ids
-(`candidates.rs:352`); an adapter that picks its own favorite literals produces a
+(`candidates.rs`); an adapter that picks its own favorite literals produces a
 release nobody can reproduce with `--release`, and reproducibility is what makes a
 report checkable a year later.
 
@@ -291,17 +294,17 @@ family the manifest recorded? Your `extract` answers the second question.
 
 Three rules the scan depends on:
 
-* **One family, strictly.** `observed_code` (`find.rs:846` region) decodes a
+* **One family, strictly.** `observed_code` (in `swp-detection/src/find.rs`) decodes a
   candidate literal under *the* family the manifest names, with the same strict
   decoder that rendered it. Widening this to "try every family and report the
   best" would turn a 2^-width coincidence rate into a several-families-deep one,
   and the entire value of the tag channel is that its false-positive rate is a
-  number we can state (§24: document observed results, do not invent thresholds).
+  number a measurement produces rather than one a designer picks.
 * **`None` is the ordinary answer.** `extract` returning `None` means "this is not
   a rendering of that family", not "mismatch". A `Some` whose code disagrees is
   the mismatch. An adapter that guesses returns false positives.
 * **Evidence strength is capped by kind, not by confidence.**
-  `AdapterKind::max_evidence()` (`analyze.rs:46`) caps a lexical analysis at
+  `AdapterKind::max_evidence()` (`analyze.rs`) caps a lexical analysis at
   `Token` (`MODERATE`), and `EvidenceStrength::is_provenance()` is
   `Ast | Exact` only. A report sorting these levels is sorting the coarse order
   the spec names; there are four levels and nothing interpolates between two.
@@ -320,7 +323,7 @@ A language is supported when these pass, not when the parser compiles.
    `every_site_that_carries_a_width_renders_and_decodes_back`,
    `a_sites_radii_hold_the_site_and_agree_with_the_query_api`,
    `analyzing_the_same_file_twice_gives_the_same_answer`. Add files to the corpus
-   (`token_stream.rs:109`) covering your statement, scope and binding rules —
+   (`PARSED` in `token_stream.rs`) covering your statement, scope and binding rules —
    including the cases where your language's answer differs from JavaScript's.
 2. **Hostile input** — `tests/hostile_input.rs` runs the limit cases per adapter:
    deep nesting, huge files, truncation, invalid UTF-8, BOMs. Your parser must
@@ -330,13 +333,13 @@ A language is supported when these pass, not when the parser compiles.
    per language and asserts `every_family_the_writer_emits_the_reader_finds` and
    `the_form_corpus_keeps_every_family_reachable`. Add a fixture project to
    `crates/swp-test-suite/src/fixtures.rs` and register it in
-   `crates/swp-test-suite/src/project.rs:72`. This is the test that catches an
+   `crates/swp-test-suite/src/project.rs`. This is the test that catches an
    adapter whose ids do not survive an actual write-then-scan.
 4. **The fallback expectation** — `an_unsupported_language_lands_on_the_fallback_and_says_so`
    asserts the exact set `parsed_languages()` returns. It will fail when you add a
    language, which is the point: it is a statement of what this build supports,
    and it must be updated by somebody who means it.
-5. **Documentation** — `crates/swp-test-suite/tests/docs/examples.rs:42` lists
+5. **Documentation** — `crates/swp-test-suite/tests/docs/examples.rs` lists
    the example trees every `console` block in the manual is re-produced against.
    A new language with no example has a new claim with no evidence.
 
@@ -349,7 +352,7 @@ passed unit tests tells you what its radii really are.
 
 ## 9. Security requirements
 
-* **Never execute what you parse** (§21). No subprocess, no project script, no
+* **Never execute what you parse.** No subprocess, no project script, no
   "just run the compiler to resolve macros", no network. If your language's
   literals are only knowable by evaluating something, the honest answer is that
   SWP-1 cannot protect this language safely, and `RefusalKind` has a variant for
@@ -365,9 +368,9 @@ passed unit tests tells you what its radii really are.
 * **An adapter cannot forge another project.** Every confirmation is keyed with
   the *verifying* project's secret; a hostile adapter's worst outcome is weak or
   wrong evidence about its own language, never a way to claim somebody else's
-  source. That is why "claims must match capabilities" (§2) is a correctness rule
+  source. That is why "claims must match capabilities" is a correctness rule
   rather than a politeness one.
-* **Do not fake unsupported support** (§13). Refusing a tree with a clear
+* **Do not fake unsupported support.** Refusing a tree with a clear
   `NO_SAFE_LOCATIONS` message is a correct outcome for an adapter. Returning an
   `Analysis` whose promises its `validate` cannot keep is not.
 
@@ -383,14 +386,15 @@ only when a real grammar covers it.
 
 The important part is where it is *not* used: both walks — the one that writes and
 the one that scans — admit a path only when `for_path` returns an adapter
-(`swp-embedding/src/walk.rs:400`), and name the omission otherwise. On a language
+(in `swp-embedding/src/walk.rs`, where `for_path` decides whether a path is source),
+and name the omission otherwise. On a language
 SWP-1 cannot re-parse, `validate` cannot prove the surrounding code unchanged, so
 an unsupported project is **refused outright rather than covered with weaker
 tools**, and the protocol's claim stays legible without a footnote about which
 half of a tree was guessed at. So "generic" in this build is a clean no, not a
-weak yes (`INTEGRATION.md` §5 quotes the refusal). The graded machinery is real
-and reachable from a caller that names a language; no product walk exercises it,
-and the ceiling holds whenever one does.
+weak yes ([`INTEGRATION.md` §5](INTEGRATION.md#5-a-tree-with-no-adapter) quotes
+the refusal). The graded machinery is real and reachable from a caller that names
+a language; no product walk exercises it, and the ceiling holds whenever one does.
 
 `Dialect::GENERIC` is the same story in miniature: every field takes the
 least-committal value, except `hex_escapes`, which is deliberately `true` — the
@@ -410,15 +414,16 @@ would lose real evidence to a technicality.
 2. **`Dialect` constant** — six facts, each one verifiable from your language's
    specification rather than from what the tool would find convenient.
 3. **One registry line** — `AstAdapter::new("<lang>", || &<LANG>)` in the `vec![]`
-   at `adapter.rs:347`. This is the only registration point in the system.
+   at `adapter.rs`. This is the only registration point in the system.
 4. **Tests and fixtures** — §8, in that order. Expect the canon and round-trip
    tests to find real bugs in step 1; that is what they are for.
 
 A language where literals cannot be classified without resolving types (a macro
 system, an evaluation-time metaprogram, an implicit conversion that changes what
-`+` means) does not need a bigger adapter. It needs the refusal in §9, or an
-adapter whose `analyze` records exactly which literals it could classify and
-refuses the rest with a reason a reader can act on.
+`+` means) does not need a bigger adapter. It needs
+[the refusal in §9](#9-security-requirements), or an adapter whose `analyze`
+records exactly which literals it could classify and refuses the rest with a
+reason a reader can act on.
 
 ---
 
@@ -447,10 +452,10 @@ registry: a support statement that cannot go stale cannot be checked.
 ## Contents
 
 * [The seam](#1-the-seam)
-* [Required interface](#2-required-interface-12s-nine-operations)
+* [Required interface](#2-required-interface)
 * [Parser expectations](#3-parser-expectations)
 * [Canonicalization requirements](#4-canonicalization-requirements)
-* [Safe embedding rules](#5-safe-embedding-rules-11-skipped-never-forced)
+* [Safe embedding rules](#5-safe-embedding-rules)
 * [Feature extraction](#6-feature-extraction)
 * [Detection rules](#7-detection-rules)
 * [Testing requirements](#8-testing-requirements)

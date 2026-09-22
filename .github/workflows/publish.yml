@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       dry_run:
-        description: Package and verify without uploading
+        description: Package without uploading (see the publish step: it cannot verify before the first publish)
         type: boolean
         default: true
 
@@ -27,8 +27,10 @@ jobs:
   publish:
     name: crates.io, in dependency order
     runs-on: ubuntu-latest
-    env:
-      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    # The token is deliberately not here at job level. Job `env` is exported to
+    # every step, including actions/checkout and the gate script, neither of which
+    # publishes anything — and the gate is the one step that runs a shell against
+    # the checked-out tree.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,6 +49,9 @@ jobs:
         shell: bash
         env:
           DRY_RUN: ${{ inputs.dry_run }}
+          # Here rather than at job level, so only the step that can upload the
+          # crates ever holds it.
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           set -euo pipefail
           # Order matters twice over: a crate cannot be published before the crates it
@@ -58,6 +63,14 @@ jobs:
           for c in $CRATES; do
             if [ "$DRY_RUN" = "true" ]; then
               echo "::notice::dry run — packaging $c, uploading nothing"
+              # --no-verify is not a shortcut here; it is the only option that works
+              # before the first publish. Verifying a package builds it from unpacked
+              # tarballs with its workspace dependencies rewritten to registry
+              # versions, so swp-crypto can only verify once swp-core 1.0.0 is
+              # actually on crates.io — which a dry run, by definition, never puts
+              # there. What this path does prove is the thing most often wrong: the
+              # manifest resolves, `Cargo.lock` is current, and the crate packages
+              # with the files its licence and metadata claim.
               cargo publish -p "$c" --dry-run --no-verify --locked
             else
               echo "::notice::publishing $c"

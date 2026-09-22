@@ -46,7 +46,7 @@ run() {
     fi
 }
 
-# An unprotected, unrelated tree: the §53 "second project" every example scans.
+# An unprotected, unrelated tree: the "second project" every example scans.
 rm -rf "$OUT/work/plain"
 mkdir -p "$OUT/work/plain"
 cp -r "$ROOT/examples/python/src" "$OUT/work/plain/"
@@ -137,11 +137,15 @@ for example in typescript python javascript generic; do
     rec=$(find "$work/.swp/public/releases" -name '*.json' | sort | tail -n 1)
     if [ -n "$rec" ]; then
         cp "$rec" "$OUT/record.bak"
+        # Written to a temp file and moved back, because `sed -i` takes an
+        # argument only GNU's does: `sed -i 's/…/'` on macOS reads `'s/…/'` as
+        # the backup suffix and refuses the script.
         if grep -q '"fingerprint": "0' "$rec"; then
-            sed -i 's/"fingerprint": "0/"fingerprint": "1/' "$rec"
+            flip='s/"fingerprint": "0/"fingerprint": "1/'
         else
-            sed -i 's/"fingerprint": "./"fingerprint": "0/' "$rec"
+            flip='s/"fingerprint": "./"fingerprint": "0/'
         fi
+        sed "$flip" "$rec" > "$rec.flipped" && mv "$rec.flipped" "$rec"
         # A tamper that silently did nothing would produce a transcript of an
         # ordinary `inspect releases` under a name that promises the opposite.
         if cmp -s "$rec" "$OUT/record.bak"; then

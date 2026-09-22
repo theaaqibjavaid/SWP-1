@@ -268,7 +268,7 @@ fn text_lines(d: &ProtectionDocument, mode: Mode) -> Vec<String> {
     }
     if !d.skip_reasons.is_empty() {
         out.push(String::new());
-        out.push("What was refused, and why (§11: skipped, never forced)".to_string());
+        out.push("What was refused, and why (skipped, never forced)".to_string());
         for (reason, n) in &d.skip_reasons {
             out.push(format!("  {reason:<24} {n}"));
         }

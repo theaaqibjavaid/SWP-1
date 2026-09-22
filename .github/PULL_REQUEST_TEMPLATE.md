@@ -1,7 +1,8 @@
 ## Before anything else
 
-* The checks passed locally: `cargo fmt --all --check`, `cargo clippy --workspace
-  --all-targets -- -D warnings`, `cargo test --workspace --no-fail-fast`.
+* The checks passed locally, with the same flags CI uses: `cargo fmt --all --check`,
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test
+  --workspace --locked --no-fail-fast`.
 * If behaviour changed, this pull request contains the test that fails without it.
   For a documentation change, that test is `docs_examples`.
 * If you are a new contributor, the Contributor Licence Agreement statement is in
@@ -25,9 +26,9 @@ touches one is reviewed differently from a change that touches none.
 
 ## If you touched a claim
 
-Which sentence in `docs/` changed, and which suite measures the number or the
-behind-it. A claim with no measurement is moved from "does" to "does not" rather
-than left standing.
+Which sentence in `docs/` changed, and which suite measures the number behind it.
+A claim that no suite measures gets weakened in the documentation rather than left
+standing — "does" becomes "does not", or the sentence goes.
 
 - [ ] No claim about detection strength, false positives, or removal resistance was
       added or strengthened in this pull request.

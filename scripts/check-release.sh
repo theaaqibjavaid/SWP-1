@@ -28,6 +28,8 @@ note() { printf '        %s\n' "$1"; }
 # deliberately absent: it is this project's own measurement harness, and it
 # says so in its manifest.
 PUBLISHABLE="swp-core swp-crypto swp-identity swp-manifest swp-adapters swp-embedding swp-detection swp-evidence swp-cli"
+TOTAL=0
+for c in $PUBLISHABLE; do TOTAL=$((TOTAL + 1)); done
 
 printf '\n== the version is one version ==\n'
 VERSION=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n 1)
@@ -46,12 +48,28 @@ else
             note "fix: $c = { path = \"crates/$c\", version = \"$VERSION\" }"
         fi
     done
-    # The lockfile is what a build actually resolves, so it has to agree too.
-    if grep -q "^version = \"$VERSION\"" Cargo.lock; then
-        ok "Cargo.lock carries $VERSION"
-    else
-        bad "Cargo.lock has no package at version $VERSION"
-    fi
+    # The lockfile is what a build actually resolves, so it has to agree too — and
+    # it has to agree *about this package*. `version = "1.0.0"` appears in
+    # Cargo.lock for third-party crates as well, so an unscoped grep for it is
+    # satisfied by an unrelated dependency and proves nothing.
+    for c in $PUBLISHABLE; do
+        # No `exit` here: awk's exit runs END, which would print the answer twice
+        # and make the comparison below fail on a lockfile that is perfectly right.
+        lv=$(awk -v want="$c" '
+            $0 == "[[package]]" { if (name == want && ver != "") found = ver; name = ""; ver = "" }
+            /^name = /    { name = $3; gsub(/"/, "", name) }
+            /^version = / { ver  = $3; gsub(/"/, "", ver) }
+            END { if (name == want && ver != "") found = ver; print found }
+        ' Cargo.lock)
+        if [ "$lv" = "$VERSION" ]; then
+            ok "Cargo.lock resolves $c at $VERSION"
+        elif [ -z "$lv" ]; then
+            bad "Cargo.lock has no package named $c"
+        else
+            bad "Cargo.lock resolves $c at \"$lv\", not $VERSION"
+            note "fix: cargo update -p $c --precise $VERSION, or commit the lockfile"
+        fi
+    done
 fi
 
 printf '\n== the licence is present and stated ==\n'
@@ -109,23 +127,33 @@ printf '\n== the sponsorship page and the paste sheet say the same thing ==\n'
 # SPONSORS.md is the promise and .github/sponsors/TIERS.md is what gets pasted into
 # GitHub's form. Two documents describing one arrangement will drift, and the way
 # they drift is the expensive kind: a tier whose price on GitHub does not match the
-# price in the repository. Both files carry `Tier N · Name · $X` on one line, in
-# their own punctuation, and this compares what is left after the punctuation.
-PAGE=$(sed -n 's/^### Tier \([0-9]\) — \(.*\) · \(\$[0-9]*\).*/\1 \2 \3/p' SPONSORS.md | sort)
-SHEET=$(sed -n 's/^## Tier \([0-9]\) · \(.*\) — US\(\$[0-9]*\).*/\1 \2 \3/p' .github/sponsors/TIERS.md | sort)
-if [ -z "$PAGE" ] || [ -z "$SHEET" ]; then
-    bad "neither file yielded any tiers; the headings changed shape"
-    note "SPONSORS.md wants '### Tier 1 — Builder · \$10 a month'"
-    note "TIERS.md wants    '## Tier 1 · Builder — US\$10 / month'"
-elif [ "$PAGE" = "$SHEET" ]; then
-    ok "the tiers match, name and price, in both files"
-    echo "$PAGE" | sed 's/^/        tier /'
+# price in the repository. Four levels are compared: three monthly tiers and the
+# one-time level, which is a row in both files and not a tier anywhere. Each page
+# writes them in its own punctuation — `### Tier 1 — Builder · $10 a month` there,
+# `## Tier 1 · Builder — US$10 / month` here — and this compares what is left
+# after the punctuation, failing if either side yields fewer than four.
+PAGE=$(
+    sed -n 's/^### Tier \([0-9]\) — \(.*\) · \(\$[0-9]*\) a month.*/tier \1 \2 \3/p' SPONSORS.md
+    sed -n 's/^### Supporter — \(\$[0-9]*\), once.*/supporter \1 once/p' SPONSORS.md
+)
+SHEET=$(
+    sed -n 's/^## Tier \([0-9]\) · \(.*\) — US\(\$[0-9]*\) \/ month.*/tier \1 \2 \3/p' .github/sponsors/TIERS.md
+    sed -n 's/^## Supporter — one-time, US\(\$[0-9]*\).*/supporter \1 once/p' .github/sponsors/TIERS.md
+)
+PAGE=$(printf '%s\n' "$PAGE" | sort)
+SHEET=$(printf '%s\n' "$SHEET" | sort)
+ROWS=$(printf '%s\n' "$PAGE" | grep -c . || true)
+if [ "$PAGE" != "$SHEET" ] || [ "$ROWS" -lt 4 ]; then
+    bad "the sponsorship page and the paste sheet do not agree on four levels"
+    echo "SPONSORS.md says:"; echo "$PAGE"   | sed 's/^/        /'
+    echo ".github/sponsors/TIERS.md says:"; echo "$SHEET" | sed 's/^/        /'
+    note "SPONSORS.md wants '### Tier 1 — Builder · \$10 a month' and"
+    note "'### Supporter — \$25, once'; TIERS.md wants"
+    note "'## Tier 1 · Builder — US\$10 / month' and '## Supporter — one-time, US\$25'"
+    note "the price a sponsor sees on GitHub has to be the price the page promises"
 else
-    bad "the sponsorship page and the paste sheet disagree"
-    echo "SPONSORS.md says:"; echo "$PAGE"   | sed 's/^/        tier /'
-    echo ".github/sponsors/TIERS.md says:"; echo "$SHEET" | sed 's/^/        tier /'
-    note "one file was edited and the other was not; the price a sponsor"
-    note "sees on GitHub has to be the price the repository promises"
+    ok "three monthly tiers and the one-time level match, name and price"
+    echo "$PAGE" | sed 's/^/        /'
 fi
 
 printf '\n== the sources contain no built artefacts ==\n'
@@ -138,15 +166,48 @@ else
     note "the scanner does not walk __pycache__ or target/, so neither belongs here"
 fi
 
+printf '\n== every publishable manifest is valid, and the graph resolves ==\n'
+# Two checks that are genuine offline, before the packaging loop that is not:
+# `verify-project` says every manifest in the workspace parses and is a manifest
+# cargo will accept, and `metadata --locked` says the dependency graph the
+# lockfile describes is the one the manifests ask for — which is the failure a
+# stale lockfile causes, and the one a publish would hit first.
+if cargo verify-project --offline >/dev/null 2>&1; then
+    ok "every manifest in the workspace parses"
+else
+    bad "cargo verify-project rejected a manifest"
+    cargo verify-project --offline 2>&1 | sed 's/^/        /'
+fi
+# `|| true` because a non-zero status here is the finding, not an accident: under
+# `set -e` the assignment alone would end the script before the branch below runs.
+META=$(cargo metadata --format-version 1 --locked --offline 2>&1 >/dev/null) || true
+if [ -z "$META" ]; then
+    ok "Cargo.lock matches the manifests; the graph resolves offline"
+elif printf '%s' "$META" | grep -q -- "--offline was specified"; then
+    printf '  unvrf the graph — this machine has never downloaded a crate the lockfile\n'
+    note "names. Not a defect in the tree: ci.yml, release.yml and publish.yml each"
+    note "run \`cargo fetch --locked\` before calling this, and there the check is real."
+else
+    bad "the graph does not resolve against the committed lockfile"
+    printf '%s\n' "$META" | head -n 3 | sed 's/^/        /'
+    note "fix: cargo metadata --format-version 1 >/dev/null, then commit Cargo.lock"
+fi
+
 printf '\n== every publishable manifest packages ==\n'
-# The leaf crate is the only one checkable offline: the others depend on a
-# sibling that is not in the index until it is published, and cargo is right to
-# say so. Order matters for the real publish, and this proves the order works.
+# The leaf crate is the only one provable offline: the others depend on a sibling
+# that is not in the index until it is published, and cargo is right to say so.
+# So the sibling case is reported as what it is — unverified — rather than as a
+# pass. A manifest error in one of those crates surfaces in `cargo metadata`
+# above, which covers every one of them; what stays unproven here is the
+# packaging step itself, and the count below says how many crates that is.
+UNVERIFIED=0
 for c in $PUBLISHABLE; do
     out=$(cargo package -p "$c" --no-verify --offline --allow-dirty 2>&1) || {
         case "$out" in
             *"no matching package named \`swp-"*)
-                ok "$c packages; its sibling dependency is unpublished (expected offline)" ;;
+                UNVERIFIED=$((UNVERIFIED + 1))
+                printf '  unvrf %s — not packaged: it depends on a sibling that is not in\n' "$c"
+                note "the index yet, which this run cannot reach. The publish packages it." ;;
             *)
                 bad "$c does not package"
                 printf '%s\n' "$out" | grep -A 3 'Caused by:' | sed 's/^/        /' ;;
@@ -155,6 +216,10 @@ for c in $PUBLISHABLE; do
     }
     ok "$c packages"
 done
+if [ "$UNVERIFIED" -gt 0 ]; then
+    note "$UNVERIFIED of the $TOTAL crates were never packaged by this check."
+    note "publish.yml's dry run is what packages them, in dependency order, with network."
+fi
 
 printf '\n'
 if [ "$fail" -ne 0 ]; then

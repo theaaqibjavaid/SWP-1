@@ -7,8 +7,7 @@ re-produces each one and a sentence about what it does *not* show.
 The rule that shaped the page: no figure here was typed in. Each came off a run on
 one machine, and each is reachable again by a named test. Where a run produced a
 result that weakens the product, it is on this page rather than omitted — a
-validation document that only carries the good rows is marketing, and §51 forbids
-this project from writing that.
+validation document that only carries the good rows is marketing.
 
 **One machine, one date.** 21–22 September 2026, Windows 11 x64 (build 26200), an
 8-logical-processor Intel laptop, `rustc 1.91.1`. Everything below was measured
@@ -17,8 +16,8 @@ that, which is the correct profile for counting and the wrong one for timing; th
 performance section says what is portable and what is not. The clean-environment
 run is the exception: it used a real `cargo install --release` binary.
 
-**Two transcripts, then tables.** §40 asks every page to quote output this build
-actually produced, so the two blocks below are from the fixture run the
+**Two transcripts, then tables.** The two blocks below quote output this build
+actually produced, from the fixture run the
 [documentation test](DEVELOPER-GUIDE.md#the-documentation-is-a-test) re-runs. The
 rest of the page is in tables because the numbers are what matters and a reader
 should be able to compare rows without unwinding a transcript.
@@ -71,12 +70,13 @@ the ladder that turns counts into a level is
 `PROVENANCE_DETECTED`, `INCONCLUSIVE`, `NO_PROVENANCE_DETECTED`, followed by the
 level.
 
-## 1. A clean environment (§53)
+## 1. A clean environment
 
-The brief asks for a run that starts by deleting build artifacts and ends with
-reports reviewed, to prove the system works outside its own fixtures. It was done
-that way, in a scratch directory, by the installed binary — not by `cargo run`, not
-by the test harness, and with no file copied out of this repository.
+A measurement taken only inside fixtures proves the fixtures; this run exists to
+prove the system works outside them. It starts by deleting build artifacts and
+ends with reports reviewed, in a scratch directory, by the installed binary — not
+by `cargo run`, not by the test harness, and with no file copied out of this
+repository.
 
 | # | step | what ran | result |
 | --- | --- | --- | --- |
@@ -99,7 +99,7 @@ copy *plus* a rewrite, so the finding there is mostly the copies. Scanning the
 rewrite alone — one file, the same behaviour, every name changed, the protected
 literals re-spelled as different expressions — gave
 `NO_PROVENANCE_DETECTED / NONE`, `0/6` confirmed, `3` sites showing the release's
-address without its code, and exit `0`. That is §51's boundary holding in the field:
+address without its code, and exit `0`. That is the boundary holding in the field:
 SWP-1 does not detect reimplementation, and the report for a reimplementation is a
 clean "nothing here" rather than a hedge.
 
@@ -139,14 +139,14 @@ operator would copy. The fixtures never noticed because they run from paths that
 canonicalize unchanged. `inspect store` and the `--target` refusal now normalize
 through the same helper `init` uses
 (`swp_core::text::display_path`), and the clean run re-done after the fix prints
-one form. Recorded here because §53's whole point is finding what the fixtures
-cannot see.
+one form. Recorded here because a clean run earns its place by finding what the
+fixtures cannot see.
 
-## 2. Partial copies (§24)
+## 2. Partial copies
 
 A 24-site release over 12 modules, copied to fractions of itself. `swp-test-suite
---test detection_matrix`. These are observations, not thresholds: §24 forbids
-inventing a number and calling it a detection limit.
+--test detection_matrix`. These are observations, not thresholds: no row is a
+detection limit, only what this run found.
 
 | kept | files in candidate | confirmed of 24 | probes | chance | guarantee | fingerprint | verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -163,7 +163,7 @@ MODERATE — a lead, not a claim. Below that, a single site is 1-in-16 by chance
 4 tag bits, which is why the ladder never treats one fragment as a finding
 ([SWP-1-SPEC.md](SWP-1-SPEC.md)).
 
-## 3. Normal refactoring (§25)
+## 3. Normal refactoring
 
 The same release, thirteen transformations applied to a copy. Each row is one form
 on its own, which is what a real refactor looks like.
@@ -191,14 +191,16 @@ it, fragment included. Both are honest losses and both are reported as fewer
 fragments rather than as a different kind of answer.
 
 `formatting` and `comment_removal` are the two rows whose fingerprint still
-matches. The §16 digest is taken at L1, where whitespace between tokens collapses
-to one space, comments are dropped, and a line break survives as exactly one
-newline — so re-indenting a file is invisible to it, while splitting a statement
-across two lines is not (§15). Every other row says `no-match` while keeping all 24
+matches. The [SWP-1-SPEC §9](SWP-1-SPEC.md#9-fingerprints) digest is taken at L1,
+where whitespace between tokens collapses to one space, comments are dropped, and
+a line break survives as exactly one newline ([SWP-1-SPEC
+§5](SWP-1-SPEC.md#5-canonicalization)) — so re-indenting a file is invisible to
+it, while splitting a statement across two lines is not. Every other row says
+`no-match` while keeping all 24
 fragments, which is the point of having both channels —
 [SWP-1-SPEC.md](SWP-1-SPEC.md) has the argument.
 
-## 4. Deliberate removal (§26)
+## 4. Deliberate removal
 
 Attacks whose only goal is taking the watermark out. The column that matters most
 here is the one a vendor would drop: how much of the fragment text is still
@@ -214,9 +216,8 @@ physically present after the attack.
 
 The watermark is not impossible to remove. `artifact_removal` — delete every
 artifact the tool leaves and the fragments with them — takes it to zero, and the
-report says so plainly. That is the design: §26 forbids claiming otherwise, and a
-reader who is told removal is impossible will eventually watch it happen and stop
-trusting the rest.
+report says so plainly. That is the design: a reader who is told removal is
+impossible will eventually watch it happen and stop trusting the rest.
 
 The two middle columns answer different questions and can disagree. "Renderings
 still in the text" asks whether the recorded byte string is somewhere in a file;
@@ -225,7 +226,7 @@ still in the text" asks whether the recorded byte string is somewhere in a file;
 the fragments are there, and six of them are no longer where the address says they
 are.
 
-## 5. Attacks composed (§43)
+## 5. Attacks composed
 
 Single attacks understate an adversary who tries several things. Twenty-four random
 chains, each applying transformations in a random order.
@@ -239,7 +240,7 @@ chains, each applying transformations in a random order.
 | longest refactoring chain that still produced a finding | 4 transformations deep |
 | verdict contract | held on all 48 chains: a chain that confirms nothing is reported `NO_PROVENANCE_DETECTED`, never as "this was rewritten" or "this is original" |
 
-## 6. Innocent projects (§27)
+## 6. Innocent projects
 
 The false-positive question, asked the way an auditor would ask it: take code that
 has nothing to do with any protected project, and scan it with real keys.
@@ -254,11 +255,12 @@ has nothing to do with any protected project, and scan it with real keys.
 | open-source project | 5 | 0 | 4–9 | 2 |
 | **total** | **30 scans** | **0** | **946 spans reached a tag comparison** | **455 files, 692 000 bytes, none left unexamined** |
 
-Across all 30 scans the bounds were `chance` 21.2 and `loose` 59.1 — the two
-figures §27 says must be printed rather than reconciled — and the largest single
-confirmation count was **0**. The `generated` corpus is the hardest: eighty modules
-of one template hand the matcher more spans at a site's address than the detector
-keeps (§45's memory bound), which is the shape that would manufacture evidence out
+Across all 30 scans the bounds were `chance` 21.2 and `loose` 59.1 — two figures
+printed as measured, not reconciled — and the largest single confirmation count
+was **0**. The `generated` corpus is the hardest: eighty modules
+of one template hand the matcher more spans at a site's address than the
+detector's per-file window cap (`MAX_WINDOWS_PER_FILE`) keeps, which is the shape
+that would manufacture evidence out
 of sheer volume if counting the same statement twice could do it. It cannot.
 
 | further case | result |
@@ -270,7 +272,7 @@ of sheer volume if counting the same statement twice could do it. It cannot.
 The positive control is what makes the zero rows mean something. Without it, "0 of
 30" could be a detector that never fires.
 
-## 7. Two identities, one tree (§28)
+## 7. Two identities, one tree
 
 | check | result |
 | --- | --- |
@@ -287,11 +289,11 @@ The 20-of-30 row deserves its reading rather than a softer one. Those six trees 
 *siblings* — the same fixture corpus, differently keyed — so shared idioms
 reproduce a handful of addresses by construction. Twenty scans saw a lead; none of
 them cleared its own coincidence bound, and all twenty printed `INCONCLUSIVE /
-WEAK` with exit `10`. Unrelated code (§6's 30 scans) did not even produce leads.
-That difference — a lead is not a finding, and the ladder is what keeps them
-apart — is the property §28 asks to be tested.
+WEAK` with exit `10`. Unrelated code (section 6's 30 scans) did not even produce
+leads. That difference — a lead is not a finding, and the ladder is what keeps
+them apart — is what `--test collision` establishes.
 
-## 8. As an attacker (§52)
+## 8. As an attacker
 
 Seven experiments, run as a suite named `adversarial_removal`.
 
@@ -352,7 +354,7 @@ proved to be a removal tool rather than a framing one in this run.
 | attack | confirmed of 24 | exact | moved | probes | verdict |
 | --- | --- | --- | --- | --- | --- |
 | unmodified copy | 24 | 24 | 0 | 159 | PROVENANCE_DETECTED / VERY_STRONG |
-| all 13 §25 forms applied at once | 3 | 3 | 0 | 51 | INCONCLUSIVE / WEAK |
+| all 13 section-3 forms applied at once | 3 | 3 | 0 | 51 | INCONCLUSIVE / WEAK |
 | every statement re-homed into a new enclosing function, files renamed | 24 | 24 | 24 | 159 | PROVENANCE_DETECTED / VERY_STRONG |
 | compound, then bundled | 3 | 3 | 3 | 51 | INCONCLUSIVE / WEAK |
 
@@ -366,7 +368,8 @@ into new files costs nothing, because no keyed address contains a file name.
 `dist/`, which the default exclude list removes from the walk: 0 files scanned,
 verdict `INCONCLUSIVE / NONE`, `partial: true`. The report says
 "contained no source this protocol can read, so there was nothing to match
-against" rather than "no watermark" — the distinction §24 requires.
+against" rather than "no watermark" — the distinction between finding nothing and
+looking at nothing.
 
 **Dilution by padding** — one stolen tree, three candidates differing only in what
 was added around it, fragments and bytes identical in all three (asserted by the
@@ -382,7 +385,7 @@ Padding does not dilute the evidence; it inflates the bound, and the grade absor
 that. The assumption-free bound nearly triples on the last row and the verdict drops
 one step, which is the ladder behaving as designed.
 
-## 9. Hostile input (§45)
+## 9. Hostile input
 
 Trees built to make a scanner hang, crash, over-read or escape its directory.
 
@@ -390,7 +393,7 @@ Trees built to make a scanner hang, crash, over-read or escape its directory.
 | --- | --- | --- |
 | directory tree 24 levels deep, `max_depth` 12 | walked 1 of 2 files, named the stopping directory (`src/d0/d1/…/d10: directory at max_depth (12), so its contents were not walked`), verdict `INCONCLUSIVE / NONE` | — |
 | one file of 8 388 609 bytes, ceiling 8 388 608 | refused mid-tree, still read the other file (100 bytes), `INCONCLUSIVE / NONE` | 10 |
-| a symlink pointing outside the tree | refused and named: `src/escape.js: symbolic link, never followed (§21)` | — |
+| a symlink pointing outside the tree | refused and named: `src/escape.js: symbolic link, never followed` | — |
 | 4 000 nested blocks in one file (74 910 bytes) | stopped before the stack: `a syntax tree past this scanner's bounds (max_depth=256, max_nodes_per_tree=2000000), so its site list is incomplete` | 10 |
 | 400 files, `max_files` 250 | refused the whole scan — a prefix of a tree is not the tree you asked about — `LIMIT_REACHED` | 7 |
 | 67 108 864-byte payload in 65 318 zipped bytes (ratio 1027) | measured before expanding: `expands 1029 times over its stored size, past max_archive_ratio (200)` | 7 |
@@ -401,7 +404,7 @@ Every row ends in either a refusal with a reason or a partial reading with the
 unread files named. None ends in a crash, and none ends in `NO_PROVENANCE_DETECTED`
 — an unexamined tree is never reported as a cleared one.
 
-## 10. The secret stays out (§29)
+## 10. The secret stays out
 
 Seven sweeps, run by `--test secret_leak`, all passing at the time of writing:
 
@@ -419,7 +422,7 @@ The clean-environment run swept its own 1 174-line transcript for the sealed key
 blob's base64 as well, and found none of it. That is a weaker check than the seven
 above and is listed only because it was performed.
 
-## 11. Performance (§44)
+## 11. Performance
 
 **Debug profile, one laptop, nothing else running.** The portable claim is the
 ratio between tiers and the shape of the columns; the milliseconds are what this
@@ -450,13 +453,13 @@ change. Tree-sitter's parser arenas are C allocations and are outside the heap
 columns, which is stated because a reader comparing against `heaptrack` output will
 otherwise think the numbers disagree.
 
-## 12. End-to-end acceptance (§57)
+## 12. End-to-end acceptance
 
 Three projects: A is 5 JavaScript files with 15 sites, B is 4 Python files with 10,
 C is 2 files of unrelated code that shares their shapes. Run by
 `--test acceptance_scenario`.
 
-| row | confirmed | probes | fingerprint | verdict | whose keys ran |
+| row | confirmed | probes¹ | fingerprint | verdict | whose keys ran |
 | --- | --- | --- | --- | --- | --- |
 | A → A | 15 | 20 | match | PROVENANCE_DETECTED / VERY_STRONG | A |
 | B → B | 10 | 15 | match | PROVENANCE_DETECTED / VERY_STRONG | B |
@@ -465,18 +468,35 @@ C is 2 files of unrelated code that shares their shapes. Run by
 | A-copy | 15 | 20 | match | PROVENANCE_DETECTED / VERY_STRONG | A |
 | A-refactored | 15 | 20 | no-match | PROVENANCE_DETECTED / VERY_STRONG | A |
 | A-partial | 10 | 15 | no-match | PROVENANCE_DETECTED / STRONG | A |
-| A-damaged | 13 | 20 | no-match | PROVENANCE_DETECTED / VERY_STRONG | A |
+| A-damaged | 11 | 20 | no-match | PROVENANCE_DETECTED / VERY_STRONG | A |
 | A's keys ↛ B | 0 | 0 | no-match | NO_PROVENANCE_DETECTED / NONE | B |
 | B's keys ↛ A | 0 | 0 | no-match | NO_PROVENANCE_DETECTED / NONE | A |
 
-`A-damaged` is the row that answers §57's hardest question — a tree with two sites
-stripped. 13 of 15 fragments survived, all 13 as exact renderings, 0 moved, 0
-canonical-only, across 3 files, and the grade stayed VERY_STRONG. The last column
-is the store each scan ran from, not a claim about the candidate: a scan only ever
-holds one project's keys, so what identifies a candidate is the confirmed count
-beside it.
+¹ This is the only column on the page that does not repeat. A probe is a candidate
+span that reproduced a manifest address and so reached a tag comparison, and which
+spans do that depends on where the protected sites sit — which is derived from the
+project's secret, and a run of this test mints a fresh secret. Five re-runs on the
+same machine gave 17–21 probes on A's rows and 11–15 on B's, with `confirmed`,
+`fingerprint` and `verdict` identical every time. The column is recorded because the
+evidence grade is computed from it; it is not a figure to compare your own run
+against.
 
-## 13. What none of this shows (§51)
+`A-damaged` is the scenario's hardest row. Every second site of A's constellation is
+rewritten into a spelling that carries the same value and a different tag, so the
+code survives and the watermark does not. 11 of 15 fragments were confirmed, all 11
+as exact renderings, 0 moved, 0 canonical-only, 4 stripped, across 3 files — and the
+grade stayed VERY_STRONG. That is the result to be uncomfortable about rather than
+proud of: 11 survivors clear VERY_STRONG's floor of 8 fragments across 3 files, so
+destroying a quarter of the sites did not move the tier. What the row shows is that
+the tier tracks *how much* confirms, not how much is missing, and a reader who needs
+the second question answered has to ask it of the stripped count in the JSON report
+rather than of the grade.
+
+The last column is the store each scan ran from, not a claim about the candidate: a
+scan only ever holds one project's keys, so what identifies a candidate is the
+confirmed count beside it.
+
+## 13. What none of this shows
 
 Stated as the limit on every table above. SWP-1 does not, and no row here supports
 its doing:
@@ -484,14 +504,16 @@ its doing:
 * **establish legal ownership** of anything;
 * **prove authorship by itself** — it reports that an artifact carries code derived
   from a project's secret; who typed it is outside the measurement;
-* **detect after arbitrary rewriting** — §52's fold row and §1's `delta` tree are
-  exactly this case, both correctly answered `NO_PROVENANCE_DETECTED`;
+* **detect after arbitrary rewriting** — section 8's fold row and section 1's
+  rewrite-only scan are exactly this case, both correctly answered
+  `NO_PROVENANCE_DETECTED`;
 * **detect a complete reimplementation** — the same rows;
 * **resist deliberate removal** — `artifact_removal` reaches 0 of 24, and the
-  composed chains in §5 delete everything they are pointed at;
-* **detect every possible copy** — §2's 10% row is a copy of three fragments and is
-  graded MODERATE, not STRONG;
-* **produce zero false positives** — §6 reports 0 of 30 on unrelated code and §7
+  composed chains in section 5 delete everything they are pointed at;
+* **detect every possible copy** — section 2's 10% row is a copy of three
+  fragments and is graded MODERATE, not STRONG;
+* **produce zero false positives** — section 6 reports 0 of 30 on unrelated code
+  and section 7
   reports 20 of 30 foreign scans producing at least one *lead*. Neither is a
   statement that no tree anywhere will ever confirm a site.
 
@@ -504,16 +526,16 @@ look.
 
 | section | command |
 | --- | --- |
-| §1 clean environment | the steps in the table, or the sequence in [GETTING-STARTED.md](GETTING-STARTED.md) against a scratch directory |
-| §2, §3, §4, §8's padding row | `cargo test -p swp-test-suite --test detection_matrix -- --nocapture` |
-| §5 | `cargo test -p swp-test-suite --test property_chains -- --nocapture` |
-| §6 | `cargo test -p swp-test-suite --test false_positive -- --nocapture` |
-| §7 | `cargo test -p swp-test-suite --test collision -- --nocapture` |
-| §8 | `cargo test -p swp-test-suite --test adversarial_removal -- --nocapture` |
-| §9 | `cargo test -p swp-test-suite --test resource_limits -- --nocapture` |
-| §10 | `cargo test -p swp-test-suite --test secret_leak` |
-| §11 | `cargo test -p swp-test-suite --test performance -- --nocapture` |
-| §12 | `cargo test -p swp-test-suite --test acceptance_scenario -- --nocapture` |
+| 1 — clean environment | the steps in the table, or the sequence in [GETTING-STARTED.md](GETTING-STARTED.md) against a scratch directory |
+| 2, 3, 4, and 8's padding row | `cargo test -p swp-test-suite --test detection_matrix -- --nocapture` |
+| 5 | `cargo test -p swp-test-suite --test property_chains -- --nocapture` |
+| 6 | `cargo test -p swp-test-suite --test false_positive -- --nocapture` |
+| 7 | `cargo test -p swp-test-suite --test collision -- --nocapture` |
+| 8 | `cargo test -p swp-test-suite --test adversarial_removal -- --nocapture` |
+| 9 | `cargo test -p swp-test-suite --test resource_limits -- --nocapture` |
+| 10 | `cargo test -p swp-test-suite --test secret_leak` |
+| 11 | `cargo test -p swp-test-suite --test performance -- --nocapture` |
+| 12 | `cargo test -p swp-test-suite --test acceptance_scenario -- --nocapture` |
 | the two transcripts | `cargo test -p swp-test-suite --test docs_examples` |
 
 Two of these are slow: `performance` is about three minutes, `false_positive` and
@@ -523,7 +545,8 @@ them runs project code from outside this workspace.
 ## Related
 
 * [THREAT-MODEL.md](THREAT-MODEL.md) — the same measurements read as attacks and residual limitations
-* [SECURITY.md](SECURITY.md) — the properties §29 and §45 defend
+* [SECURITY.md](SECURITY.md) — the properties the hostile-input and secret-leak
+  sweeps defend
 * [REPORTS.md](REPORTS.md) — what each number may be used for
 * [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md) — the suites above as targets you can edit
 * [FAQ.md](FAQ.md) — the short answers, for when you do not want a table

@@ -22,7 +22,7 @@ Work in the current cycle.
 | Adapter: C and C++ | the highest-asked language pair, and the hardest canonicalization here because of the preprocessor | scoping |
 | Adapter: Java | real demand, and a grammar with clean literal spans | scoping |
 | `swp diff` between two releases of one project | "what did protecting this release change, and did any site move" is asked in every adoption conversation | design |
-| Windows ARM64 and macOS ARM64 release artifacts | the published matrix is x64 on three systems; the ARM targets are untested here rather than assumed to work | needs a runner and a report from somebody who tried |
+| Windows ARM64 release artifact | the published matrix is `windows-x64`, `linux-x64`, `macos-x64` and `macos-aarch64`, and CI's lint and test jobs run on `macos-latest` — which is Apple Silicon — so an ARM Mac is built and exercised by configuration. Windows on ARM has no runner here at all, and it is the DPAPI sealing path that has never been executed on it | needs a runner, or a report from somebody who built there |
 
 ## Next
 

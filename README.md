@@ -6,7 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/theaaqibjavaid/SWP-1)](https://github.com/theaaqibjavaid/SWP-1/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-maintenance-ea4aaa)](https://github.com/sponsors/theaaqibjavaid)
-[![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](rust-toolchain.toml)
+[![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](CONTRIBUTING.md#getting-set-up)
 [![Platforms: Windows · Linux · macOS](https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux%20%C2%B7%20macos-lightgrey)](docs/GETTING-STARTED.md)
 
 SWP-1 embeds an owner-keyed watermark into the *literals* of a source tree — the
@@ -210,7 +210,7 @@ Around the protocol documentation sits the repository's own set:
 | [CLA.md](CLA.md) | the contributor licence agreement, including what it grants the maintainers |
 | [SECURITY.md](SECURITY.md) | how to report, what counts as a vulnerability here, the backport policy |
 | [SUPPORT.md](SUPPORT.md) | where to ask, and what to attach |
-| [SPONSORS.md](SPONSORS.md) | the tiers, and the four things sponsorship does not buy |
+| [SPONSORS.md](SPONSORS.md) | the tiers, and the five things sponsorship does not buy |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | the standard, and how it is enforced |
 | [MAINTAINERS.md](MAINTAINERS.md) | who answers for what |
 | [LICENSE](LICENSE) · [NOTICE](NOTICE) | Apache-2.0, and the third-party surface it is built against |
@@ -228,7 +228,7 @@ Around the protocol documentation sits the repository's own set:
 | `swp-detection` | scanning a candidate: fragments, exact renderings, fingerprint, structure |
 | `swp-evidence` | the ladder, the report document, the text renderer |
 | `swp-cli` | the seven commands, the parser, the help pages |
-| `swp-test-suite` | everything §42's matrix asks for, driven against the real product |
+| `swp-test-suite` | every measurement quoted in the documentation, driven against the real product |
 
 The dependency direction is one-way: `swp-cli` over the services over
 `swp-core`/`swp-crypto`, and only `swp-adapters` links a parser. Adding a
@@ -280,17 +280,18 @@ source.
   which five kinds of change get reviewed differently, and why a stale
   documentation example is a build failure on purpose.
 * **Contributions need the [CLA](CLA.md)**, and that agreement is written to be
-  read rather than clicked: §2 grants a perpetual, irrevocable, sublicensable
-  right to relicense a derivative, which is the entire reason it exists instead of
-  a `Signed-off-by:` line. Declining it is a legitimate position, and
-  [CONTRIBUTING.md](CONTRIBUTING.md#the-cla-and-the-dco) says what happens if you
-  hold it.
+  read rather than clicked: its §2 grants a perpetual, irrevocable,
+  sublicensable right to relicense a derivative, which is the entire reason it
+  exists instead of a `Signed-off-by:` line. Declining it is a legitimate
+  position, and [CONTRIBUTING.md](CONTRIBUTING.md#the-cla-and-the-dco) says what
+  happens if you hold it.
 * **Sponsorship funds maintenance; it does not unlock the tool.**
-  [SPONSORS.md](SPONSORS.md) has the tiers — $10, $100 and $500 a month, for
-  pre-release builds, a 48-hour acknowledgement on a support request plus backport
-  engineering for a fork of yours, and a direct engineering channel — and says
-  plainly that a security patch is never gated, because a provenance tool whose
-  unpaid users run a known-broken detector is not a tool worth buying.
+  [SPONSORS.md](SPONSORS.md) has the three monthly tiers and what each one is —
+  $10 for pre-release builds, $100 for a 48-hour acknowledgement on a support request
+  plus backport engineering for a fork of yours, $500 for a line to the person who
+  decides — and a one-time $25 that buys nothing at all. It also says plainly that a
+  security patch is never gated, because a provenance tool whose unpaid users run a
+  known-broken detector is not a tool worth buying.
 * **Report a security problem through [SECURITY.md](SECURITY.md)**, not an issue.
   What counts as a vulnerability here is narrower than it looks — removal by
   somebody who holds the source is documented behaviour — and the list of what

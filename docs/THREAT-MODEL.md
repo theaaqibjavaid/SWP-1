@@ -2,8 +2,7 @@
 
 Ten attacks, each with what it is, what it buys, what in this build stands in its
 way, and — the column that makes the other three worth reading — what still gets
-through. §50 asks for exactly those four headings; §51 forbids rounding the last
-one off.
+through.
 
 Two things before the first attack.
 
@@ -15,7 +14,7 @@ result and are what the surrounding text claims. The `probes` and `chance`
 columns move with the key, because which literal spellings exist in a candidate
 depends on which form families the key chose. Nothing in this page is a promise
 about your tree: [VALIDATION.md](VALIDATION.md) is where a run's full tables live,
-and §4 of it says how to reproduce them.
+and it names the command that printed each one.
 
 **The scale is 24 sites, not your repository.** A 4,000-file monorepo protected to
 200 sites has more redundancy per file and a different survival curve. Where a
@@ -80,8 +79,9 @@ copies is worth very little, because nobody copies byte-identically.
 
 **Mitigation.** Site identity is computed from the code *around* the literal at
 four radii — statement and scope, each with local names abstracted and each with
-them kept — and never from a path. §25 measures thirteen real refactoring forms
-against a 24-site release; thirteen of thirteen still produced a finding:
+them kept — and never from a path. `tests/detection/matrix.rs` measures thirteen
+real refactoring forms against a 24-site release; thirteen of thirteen still
+produced a finding:
 
 | form | confirmed of 24 | verdict |
 | --- | --- | --- |
@@ -100,22 +100,23 @@ it lives in changed and the keyed address did not care).
 24, because a site inside a statement nobody calls is a site nobody copies; and a
 variable rename that changes a statement's canonical text moves the *address* for
 the rename-tolerant keys, which is why that row is 22 and not 24. Anything that
-re-derives constants — `MAX = 200` becoming a computed expression — is a stronger
-attack than a refactoring, and belongs to §3.
+re-derives constants — `MAX = 200` becoming a computed expression — is a
+stronger attack than a refactoring, and belongs to
+[attack 3](#3-intentional-watermark-removal).
 
 ## 3. Intentional watermark removal
 
 **Threat.** An adversary who knows a watermark is present, knows it lives in
 literals, and is willing to break their own build discipline to get rid of it.
-§26's rule binds here: this tool does not claim the watermark is impossible to
-remove, and this row is the reason.
+This tool does not claim the watermark is impossible to remove, and this row is
+the reason.
 
 **Impact if unmitigated.** The copy is clean, and — worse than silence — a
 `NO_PROVENANCE_DETECTED` report would be an affirmative "not yours" about code
 that is.
 
 **Mitigation.** Removal is expensive, and every measured variant costs something
-specific. §26's four attacks, on the same 24-site release, with an attacker who
+specific. Four attacks on the same 24-site release, with an attacker who
 knows which literals are marked:
 
 | attack | what they do | confirmed of 24 | verdict |
@@ -125,7 +126,7 @@ knows which literals are marked:
 | `constant_normalization` | normalize *every* numeric literal in the tree to one style | 18 | VERY_STRONG |
 | `module_rebuild` | rebuild each module from an understanding of what it does | 2 | WEAK, `INCONCLUSIVE` |
 
-And two from the attacker's side, without the manifest at all (§52):
+And two from the attacker's side, without the manifest at all:
 
 ```text
 every located span folded        0 of 24 confirmed   NO_PROVENANCE_DETECTED / NONE
@@ -145,7 +146,7 @@ it is just not, by itself, proof of who did it.
 mark, or restoring the pre-`protect` version of the changed files, takes a 24-site
 release to zero confirmations. What the attack cannot buy is a clean tree that
 also looks untouched: reverting files is a diff, and normalizing constants means
-rewriting code that had nothing to do with the watermark. §11's rule cuts both
+rewriting code that had nothing to do with the watermark. The skip rule cuts both
 ways — the tool never forces a mark into a location that cannot hold it, so an
 owner who wants higher resilience adds files and literals, not fragility.
 
@@ -162,11 +163,11 @@ removable*: anyone with the source can find every site in minutes.
 one. The watermark is unobtrusive, not secret: `(2 - 2)`, `(98 + 2)`,
 `("uni" + "ts …")` are valid spellings that a formatter would not produce and a
 reviewer might not notice, and they are all that stands between a reader and the
-site list. §52.1 tested the claim by doing it — a search for the four rendering
-shapes, with no manifest, no key and no knowledge of which literal had been
-chosen, located **24 spans in 12 files**, and folding those located spans took the
-finding to zero. That test exists so that this row cannot be written any other
-way.
+site list. `a_shape_search_finds_the_sites_…` tested the claim by doing it — a
+search for the four rendering shapes, with no manifest, no key and no knowledge of
+which literal had been chosen, located **24 spans in 12 files**, and folding those
+located spans took the finding to zero. That test exists so that this row cannot
+be written any other way.
 
 **Residual limitation.** Total, by construction. What secrecy protects instead is
 the *key*, and that asymmetry is the whole protocol: knowing which literals carry
@@ -231,8 +232,9 @@ no longer be contradicted by your own artifacts.
   from keeping the artifact at all;
 * in transit, nothing: the tool has no network path, and there is no upload to
   lose a key through;
-* in every other hand, the key's absence — the §29 sweep, which installs a known
-  key and then reads back every byte every command printed and wrote, looking for
+* in every other hand, the key's absence — the secret-leak sweep, which installs
+  a known key and then reads back every byte every command printed and wrote,
+  looking for
   the key and for a raw MAC derived from it.
 
 **Residual limitation.** Anything running as you can read the secret; DPAPI does
@@ -254,8 +256,8 @@ should not.
 
 **Impact if unmitigated.** A provenance tool that fires on innocent input is
 worse than one that never fires — it trains its users to ignore it, and in a
-dispute the false positive is the example the other side leads with. §51 lists
-"zero false positives" among the claims this build must not make.
+dispute the false positive is the example the other side leads with. "Zero false
+positives" is among the claims this build does not make.
 
 **Mitigation.** The measurement comes before the argument, and the honest headline
 is that single coincidences **do** happen:
@@ -318,7 +320,7 @@ procedural and they are yours:
   never being considered;
 * the site budget is a ceiling, not a quota: 12 requested sites produced 10
   embedded and 21 refused on the JavaScript example, because a location that
-  cannot hold a mark safely is skipped rather than forced (§11).
+  cannot hold a mark safely is skipped rather than forced.
 
 **Residual limitation.** A marked statement in your release is your release's
 statement; SWP-1 cannot tell you which of your files were written by whom, and
@@ -340,7 +342,8 @@ at, or to make your own report say something false about their tree.
 runs their build hooks, or a scan that dies quietly and reports "no evidence" for
 a tree it never finished reading.
 
-**Mitigation.** §21's rule is enforced structurally rather than by convention:
+**Mitigation.** The never-execute rule is enforced structurally rather than by
+convention:
 **no process is spawned anywhere in `swp-detection`** — an archive is a source
 carrier, and the only operations performed on one are "list" and "copy out a
 regular file". Entry names are attacker content, so an entry is written only if
@@ -416,7 +419,8 @@ never fetched at run time.
 **Residual limitation.** Bounds are not memory safety. A defect inside
 `tree-sitter-javascript`, `-typescript` or `-python` is a defect in third-party C
 that this build cannot see, does not fuzz beyond its own hostile-input tests, and
-would be reached by exactly the input §45's bounds are designed to make expensive.
+would be reached by exactly the input the resource bounds are designed to make
+expensive.
 If you scan trees from parties you have reason to distrust, run the scan where a
 compromise buys nothing: an account with no access to any `root.key`, a read-only
 mount of the candidate, no secrets in the environment. That is an operational

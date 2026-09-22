@@ -24,10 +24,10 @@ is this project's measurement harness rather than something to depend on.
 | `swp-crypto` | key derivation, the secret type, sealing, Ed25519 signing, project ids | core |
 | `swp-identity` | the `.swp/` store: config, identity, release records, plans, manifests, reports | core, crypto |
 | `swp-manifest` | the private manifest document, the four site keys, the fingerprint, signing bytes | core, crypto, identity |
-| `swp-adapters` | tree-sitter grammars, parsing, literal forms, safety checks, the generic fallback | core, crypto, manifest |
+| `swp-adapters` | tree-sitter grammars, parsing, literal forms, safety checks, the generic fallback | core, crypto |
 | `swp-embedding` | the walk, candidate location, selection, plan, and the rewrite itself | everything above |
 | `swp-detection` | input sniffing, container extraction, the two-pass site search | everything above |
-| `swp-evidence` | evidence items, the level ladder, the coincidence bound, the report document | core, crypto, manifest, detection |
+| `swp-evidence` | evidence items, the level ladder, the coincidence bound, the report document | core, identity, manifest, detection |
 | `swp-cli` | argument parsing, the seven commands, rendering, exit codes | all of them |
 | `swp-test-suite` | fixtures, transforms, the measurement suites, the documentation test | used as a dev-dependency only |
 
@@ -47,7 +47,7 @@ they are load-bearing rather than stylistic:
 
 ## The rules a change cannot break
 
-These are the brief's absolutes, restated as engineering constraints. A pull
+These are the project's absolutes, restated as engineering constraints. A pull
 request that violates one is not a style problem.
 
 1. **No behavioral regression.** The rewrite path is allowed to edit a literal
@@ -55,11 +55,11 @@ request that violates one is not a style problem.
    site whose radius text changes is refused. The guard is
    `crates/swp-adapters/tests/token_stream.rs`, which re-canonicalizes the whole
    file after each edit and fails if anything outside the edited statement moved.
-2. **Skip, never force (§11).** Every refusal in `swp-embedding` is a `plan`
+2. **Skip, never force.** Every refusal in `swp-embedding` is a `plan`
    entry with a reason, and the reasons are printed by `swp protect` and by
    `swp inspect plan`. There is no flag that overrides a safety refusal, and adding
    one would need the whole skip taxonomy re-examined.
-3. **Never execute the candidate (§21).** No process is spawned anywhere in
+3. **Never execute the candidate.** No process is spawned anywhere in
    `swp-detection`, `swp-embedding` or `swp-evidence`; the only `Command::new` in
    the product is the one in `swp-crypto/src/seal.rs` that calls `icacls` on a
    file this program just wrote. Nothing installs, builds, imports or evaluates a
@@ -67,22 +67,22 @@ request that violates one is not a style problem.
 4. **No network.** There is no HTTP client and no socket library in the
    dependency graph. [SECURITY.md](SECURITY.md#offline-and-how-to-check-that-claim)
    prints the two commands that verify that claim and the firewall test.
-5. **The secret is never printable (§29).** `SecretBytes` has no `Display`, no
+5. **The secret is never printable.** `SecretBytes` has no `Display`, no
    `Serialize` and no `Clone`, and its `Debug` is `SecretBytes([REDACTED N
    bytes])`. Key material is derived, used, and dropped. The seven tests in
    `tests/leak/secret_scan.rs` install two known needles and sweep every artifact,
    every command's stdout and stderr, and every temporary file the write path can
    leave behind.
-6. **Every loop is bounded (§45).** Bounds live in `swp-core/src/limits.rs`, come
+6. **Every loop is bounded.** Bounds live in `swp-core/src/limits.rs`, come
    from `Limits` rather than a local constant, and are clamped to
    `Limits::ceiling()` — a repository's own config may lower a limit but cannot
    raise it past the hard ceiling, which is what stops a hostile `.swp/config.toml`
    from arguing the safety away.
-7. **Do not invent thresholds; document observed results (§24).** Every number in
+7. **Do not invent thresholds; document observed results.** Every number in
    this repository's prose is printed by a test. If you change a rule that moves a
    number, the suite that measures it has to be re-run and the documentation
    re-quoted in the same change.
-8. **Do not fake support, and do not use fake output in documentation (§40).** A
+8. **Do not fake support, and do not use fake output in documentation.** A
    language, form or flag that does not exist must not appear in a transcript, a
    table, or an example.
 
@@ -98,22 +98,22 @@ cargo fmt --all --check
 
 `cargo test --workspace` runs the unit tests inside each crate plus the eleven
 named suites in `swp-test-suite`. They are deliberately separate targets, because
-each one answers a different section of the brief and a measurement you cannot run
-by name is a measurement nobody re-runs:
+each one measures a different property of the product, and a measurement you
+cannot run by name is a measurement nobody re-runs:
 
 | suite | file | measures |
 | --- | --- | --- |
-| `secret_leak` | `tests/leak/secret_scan.rs` | §29 — the seven sweeps named above |
-| `detection_matrix` | `tests/detection/matrix.rs` | §24 the partial-copy ladder, §25 the thirteen refactoring forms, §26 the four removals, §51 an excluded directory, the §52 padded copy |
+| `secret_leak` | `tests/leak/secret_scan.rs` | the seven sweeps named above |
+| `detection_matrix` | `tests/detection/matrix.rs` | the partial-copy ladder, the thirteen refactoring forms, the four removals, an excluded directory, the padded copy |
 | `family_roundtrip` | `tests/detection/roundtrip.rs` | every literal form renders, re-parses and decodes back to its value |
-| `false_positive` | `tests/false_positive/corpora.rs` | §27 — 30 scans of six corpora, six generated siblings, shared constants |
-| `collision` | `tests/collision/identities.rs` | §28 — disjoint constellations, the id space, 800-symbol draw |
-| `property_chains` | `tests/property/chains.rs` | §43 — random attack and refactoring chains, and the verdict contract |
-| `resource_limits` | `tests/resource/hostile.rs` | §45 — depth, size, file count, archive bomb, malformed input |
-| `performance` | `tests/performance/scale.rs` | §44 — the size ladder, per-file cost, repeated protection |
-| `adversarial_removal` | `tests/adversarial/attacks.rs` | §52 — shape search and fold, revert, restructure, compound, two-project planting |
-| `acceptance_scenario` | `tests/acceptance/final_scenario.rs` | §57 — the end-to-end two-project scenario |
-| `docs_examples` | `tests/docs/examples.rs` | §41 — every documented transcript |
+| `false_positive` | `tests/false_positive/corpora.rs` | 30 scans of six corpora, six generated siblings, shared constants |
+| `collision` | `tests/collision/identities.rs` | disjoint constellations, the id space, 800-symbol draw |
+| `property_chains` | `tests/property/chains.rs` | random attack and refactoring chains, and the verdict contract |
+| `resource_limits` | `tests/resource/hostile.rs` | depth, size, file count, archive bomb, malformed input |
+| `performance` | `tests/performance/scale.rs` | the size ladder, per-file cost, repeated protection |
+| `adversarial_removal` | `tests/adversarial/attacks.rs` | shape search and fold, revert, restructure, compound, two-project planting |
+| `acceptance_scenario` | `tests/acceptance/final_scenario.rs` | the end-to-end two-project scenario |
+| `docs_examples` | `tests/docs/examples.rs` | every documented transcript |
 | *(library)* | `crates/*/src` | unit tests beside the code they test, including the pinned derivation vectors |
 
 Most of these suites print the table they measured, because a number nobody can
@@ -132,8 +132,8 @@ have to defend. Its guard is the ratio, not the time, for exactly that reason.
 
 ## The documentation is a test
 
-§41 asks that a documented command be one that was run, and that a stale example
-fail the build. That is what `tests/docs/examples.rs` does, and the convention the
+A documented command has to be one that was run, and a stale example has to fail
+the build. That is what `tests/docs/examples.rs` does, and the convention the
 pages obey is small:
 
 * a ` ```console ` block is verbatim tool output; the first line is
@@ -186,7 +186,7 @@ text and `--formt json` has to answer with `Did you mean --format?`.
 
 ## Adding a language adapter
 
-[LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md) is the full §39 contract: the
+[LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md) is the full adapter contract: the
 `Adapter` trait in `swp-adapters/src/adapter.rs`, the token and role model in
 `canon.rs`, the literal-form rules in `literal.rs` and `forms.rs`, and the safety
 gate in `safety.rs`. Three constraints decide whether an adapter is honest:
@@ -202,7 +202,7 @@ gate in `safety.rs`. Three constraints decide whether an adapter is honest:
 
 An adapter that cannot satisfy those is not added; the generic tokenizer in
 `generic.rs` handles the files instead, at a lower guarantee, and the report says
-which adapter ran. §14's fallback exists so that "unsupported" is a graded
+which adapter ran. The fallback exists so that "unsupported" is a graded
 condition rather than a crash.
 
 ## Adding an evidence kind or moving the ladder
@@ -218,7 +218,7 @@ is a schema discussion, not a commit.
 
 The coincidence arithmetic is `chance_of_coincidence` and its looser sibling, and
 both figures are printed in every report: `chance` for spans sharing an address,
-`loose` for counting every span separately. §23 forbids percentages, so the
+`loose` for counting every span separately. No percentage is printed, so the
 output is always a count of expected coincidences next to the count observed,
 never a confidence level.
 
@@ -234,11 +234,11 @@ label changes with it, and old stores keep being read the old way.
 
 ## Style, in three sentences
 
-Module docs quote the section of the brief they implement, because the shortest
-route to a wrong implementation is a forgotten requirement. Comments explain a
-constraint or a cost, never a mechanism the code already states. Error messages
-name a path, say what happened, and print a `next:` line — and no message ever
-quotes key material, which the leak suite enforces rather than trusts.
+Module docs state the constraint they implement, because the shortest route to a
+wrong implementation is a forgotten requirement. Comments explain a constraint or
+a cost, never a mechanism the code already states. Error messages name a path,
+say what happened, and print a `next:` line — and no message ever quotes key
+material, which the leak suite enforces rather than trusts.
 
 Before a change is finished: `cargo clippy --workspace --all-targets` clean,
 `cargo fmt --all` applied, the suites that touch it re-run, and the pages that

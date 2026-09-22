@@ -51,8 +51,8 @@ error [NO_SAFE_LOCATIONS]: nothing to protect under "…": 3 paths refused (no l
 exit 15
 ```
 
-`NO_SAFE_LOCATIONS`, exit `15`, and no source file opened for writing. This is not
-the §11 skip — that rule refuses a *location* inside a tree the tool can read. A
+`NO_SAFE_LOCATIONS`, exit `15`, and no source file opened for writing. This is not a
+skip — a skip refuses one *location* inside a tree the tool can read. A
 tree it cannot read is a different answer and gets a different code, because the
 next step is different: one is "ask for fewer sites", the other is "this language
 is not here".
@@ -118,9 +118,9 @@ The reason is the rule that leaves `pyproject.toml` in the Python page's Skipped
 list, applied to a whole language instead of one file: without a parser there is
 no way to re-read the file after rewriting it and prove the surrounding code
 unchanged, and an edit inside a `Makefile` recipe or a JSON value is precisely the
-behavioral change §11 forbids forcing. A weaker scan is a decision this build does
-not make on a user's behalf, because it is the kind of decision that changes what
-a report is worth.
+behavioral change this build refuses to force. A weaker scan is a decision this
+build does not make on a user's behalf, because it is the kind of decision that
+changes what a report is worth.
 
 So: adding a language is the extension point, and it is a real one — a grammar, a
 [`Dialect`](../../crates/swp-adapters/src/dialect.rs), and an extension list, with

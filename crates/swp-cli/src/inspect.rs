@@ -688,7 +688,7 @@ fn plan_view(project: &Ctx, parsed: &Parsed, limit: usize) -> Result<Rendering, 
             }
         ),
         String::new(),
-        "What was refused, and why (§11: skipped, never forced)".to_string(),
+        "What was refused, and why (skipped, never forced)".to_string(),
     ];
     if plan.skipped.is_empty() {
         out.push("  nothing was refused".to_string());

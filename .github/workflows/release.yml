@@ -20,8 +20,12 @@ on:
         required: true
         type: string
 
+# `checks` and `build` only read the tree, so only the job that creates a release
+# carries a write token. The build jobs compile and run third-party build scripts
+# from the tagged commit; giving them write access to the repository would make a
+# defect in one of them a defect with consequences.
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,10 +47,23 @@ jobs:
         id: agree
         env:
           REPO: ${{ github.repository }}
+          # The dispatch input is a string a human typed into a form. Interpolating
+          # it into the script below would let that string be shell rather than a
+          # tag name, so it arrives as a variable and is checked before use.
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          TAG="${{ inputs.tag || github.ref_name }}"
+          TAG="${INPUT_TAG:-$REF_NAME}"
+          case "$TAG" in
+            v[0-9]*) ;;
+            *)
+              echo "'$TAG' is not a release tag: a tag name is a v followed by digits."
+              echo "This value comes from the workflow's form, and it names the build"
+              echo "everything downstream is checked against."
+              exit 1 ;;
+          esac
           VERSION="${TAG#v}"
           MANIFEST=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n1)
 
@@ -83,15 +100,23 @@ jobs:
           fi
 
           # An unfilled field in a legal or policy page is the same class of bug as
-          # a placeholder URL: it reads as finished and is not. These are the exact
-          # bracketed labels those pages were drafted with.
-          if grep -rln "\[legal entity name\]\|\[contact email\]\|\[name · \|fill in before release\|\[GitHub organisation owner\]\|\[key fingerprint\]" \
-              --exclude-dir=.git --exclude-dir=target --exclude-dir=.github \
-              --exclude=check-release.sh .; then
-            echo "the files above still carry an unfilled bracketed field."
-            exit 1
-          fi
+          # a placeholder URL: it reads as finished and is not. That scan lives in
+          # `scripts/check-release.sh`, which runs as the next step — a checklist
+          # duplicated here would be a second checklist to fall out of agreement with
+          # the first, which is the failure this project keeps writing gates against.
           echo "v$VERSION is consistent, and it is this repository's."
+
+      # The same gate `ci.yml` runs on every pull request, run again against the
+      # tagged commit: a tag can be cut from a commit that never passed CI, and the
+      # thing it checks — licence files, publishable manifests, the published
+      # address, unfilled legal fields, tier drift — is exactly what a release makes
+      # public. Offline packaging needs the dependencies on disk, hence the fetch.
+      - name: the publication checklist, on the tagged tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fetch --locked
+          sh scripts/check-release.sh
 
   build:
     name: build (${{ matrix.artifact }})
@@ -119,10 +144,13 @@ jobs:
             artifact: macos-aarch64
             binary: swp
             archive: tar
-          - os: macos-13
-            # The last Intel runner. If GitHub retires it, delete this entry rather
-            # than re-pointing it at an ARM machine — an x86_64 macOS build has to be
-            # cross-compiled or built on Intel, and neither is assumed here.
+          - os: macos-15-intel
+            # The Intel runner: `macos-13`, the last one before it, is retired. If
+            # this label goes too, delete this entry and the row for it in the
+            # release notes below rather than re-pointing it at an ARM machine — an
+            # x86_64 macOS build has to be cross-compiled or built on Intel, and
+            # neither is assumed here. An unbuildable target is a missing artifact
+            # somebody can see; an ARM binary labelled x86_64 is not.
             artifact: macos-x64
             binary: swp
             archive: tar
@@ -189,6 +217,10 @@ jobs:
     name: publish the release
     needs: [checks, build]
     runs-on: ubuntu-latest
+    # The only job here that writes: it creates the Release and uploads to it. The
+    # build jobs stay read-only because they run third-party build scripts.
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ needs.checks.outputs.tag }}
