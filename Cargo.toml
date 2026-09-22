@@ -6,20 +6,33 @@ members = ["crates/*"]
 version = "1.0.0"
 edition = "2021"
 rust-version = "1.85"
-license = "LicenseRef-Proprietary"
-repository = ""
-publish = false
+license = "Apache-2.0"
+# OWNER is the one string in this repository that is not the product's to
+# choose: replace it with the account or organisation the public tree lives
+# under before the first `cargo publish`. It is a placeholder on purpose —
+# inventing an address here would put a URL nobody owns into a registry index.
+repository = "https://github.com/OWNER/swp"
+documentation = "https://github.com/OWNER/swp/tree/main/docs"
+keywords = ["watermarking", "provenance", "supply-chain", "code-analysis", "cli"]
+categories = ["command-line-utilities", "development-tools", "filesystem"]
+publish = ["crates.io"]
 
 [workspace.dependencies]
-swp-core = { path = "crates/swp-core" }
-swp-crypto = { path = "crates/swp-crypto" }
-swp-identity = { path = "crates/swp-identity" }
-swp-manifest = { path = "crates/swp-manifest" }
-swp-embedding = { path = "crates/swp-embedding" }
-swp-detection = { path = "crates/swp-detection" }
-swp-evidence = { path = "crates/swp-evidence" }
-swp-adapters = { path = "crates/swp-adapters" }
-swp-cli = { path = "crates/swp-cli" }
+# The internal crates carry a `version` as well as a `path` because a registry
+# release is built from the published tarball, where `path` does not exist: with
+# only a path, `cargo package` refuses to write a manifest whose dependencies
+# name no version. The two are kept in step by `scripts/check-release.sh`, which
+# fails if a `version` here ever disagrees with `[workspace.package]`.
+swp-core = { path = "crates/swp-core", version = "1.0.0" }
+swp-crypto = { path = "crates/swp-crypto", version = "1.0.0" }
+swp-identity = { path = "crates/swp-identity", version = "1.0.0" }
+swp-manifest = { path = "crates/swp-manifest", version = "1.0.0" }
+swp-embedding = { path = "crates/swp-embedding", version = "1.0.0" }
+swp-detection = { path = "crates/swp-detection", version = "1.0.0" }
+swp-evidence = { path = "crates/swp-evidence", version = "1.0.0" }
+swp-adapters = { path = "crates/swp-adapters", version = "1.0.0" }
+swp-cli = { path = "crates/swp-cli", version = "1.0.0" }
+# Never published, so it needs no version to be published under.
 swp-test-suite = { path = "crates/swp-test-suite" }
 
 # The product's whole third-party surface, and every line of it is a decision

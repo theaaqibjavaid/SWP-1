@@ -1,0 +1,30 @@
+# Line endings, stated rather than inherited from each clone's `core.autocrlf`.
+#
+# Without this file a Windows clone checks out CRLF and a Linux or macOS clone
+# LF, and the two disagree about the bytes of every file — which for this project
+# is not cosmetic. The documentation transcripts in `docs/` and `examples/` are
+# re-run and compared line by line by `swp-test-suite`'s `docs_examples` suite,
+# and a protected tree's fingerprint is computed over its source text. A
+# checkout that silently rewrites line endings is a checkout that can disagree
+# with itself.
+#
+# Everything text is stored and checked out as LF. `auto` lets git decide for
+# files it does not recognise; the explicit rules below are the ones that matter.
+* text=auto eol=lf
+
+# Shell scripts run on the CI runners and out of `scripts/`; a CRLF shebang line
+# is an interpreter that does not exist.
+*.sh text eol=lf
+
+# Binary: never subject to conversion, diffing or merge attempts.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.wasm binary
+*.pyc binary
+*.exe binary
+*.dll binary
+*.dylib binary
+*.so binary

@@ -5,7 +5,12 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish.workspace = true
+repository.workspace = true
+keywords.workspace = true
+# Not on the registry: this crate is the project's own measurement harness, its
+# fixtures are tuned to a single build, and nothing outside this workspace can
+# run them meaningfully. Every product crate is publishable; this one is not.
+publish = false
 
 [lib]
 name = "swp_test_suite"

@@ -1,10 +1,10 @@
 //! The command line, parsed by hand.
 //!
 //! There is no argument-parsing dependency in this build. That is a constraint
-//! the project accepted rather than a preference: SWP-1 is offline-first (§34)
-//! and proprietary, and a tool that cannot fetch a crate must not need one. The
-//! parser below is forty lines of matching rather than a library, and it is
-//! strict in the two ways that matter for a provenance tool —
+//! the project accepted rather than a preference: SWP-1 is offline-first (§34),
+//! and a tool that cannot fetch a crate must not need one. The parser below is
+//! written out rather than derived from a description, and it is strict in the
+//! two ways that matter for a provenance tool —
 //!
 //! * an unrecognized option is an error, never ignored. `--formt json` printing
 //!   human text where machine text was asked for is the kind of failure that

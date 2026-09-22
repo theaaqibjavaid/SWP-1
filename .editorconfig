@@ -1,0 +1,20 @@
+# The editor's copy of the rules the repository already enforces. `.gitattributes`
+# decides what git stores and checks out; this decides what a buffer looks like
+# before it is saved. Both say LF, so the two never disagree.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.md]
+# A hard-wrapped document: two spaces at the end of a line is a line break, and
+# trailing whitespace elsewhere is usually a wrapped paragraph, not sloppiness.
+trim_trailing_whitespace = false

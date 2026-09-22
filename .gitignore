@@ -1,6 +1,30 @@
+# Rust build output.
 /target
 **/target/
+
+# Measurement runs write here; the numbers they produce are quoted in
+# docs/VALIDATION.md only after they are reproduced by a named suite.
 /validation-results/
+
+# Scratch space for ad-hoc runs, including the clean-environment validation,
+# which installs into a prefix and protects trees under this directory.
 /tmp/
+
+# Release artifacts: the binaries and checksum files `release.yml` assembles.
+/dist/
+
+# Python bytecode caches. The scanner never walks these — `__pycache__` is in
+# the built-in exclusion list — and one once got committed by accident.
+__pycache__/
+*.pyc
+
+# Vim swap files.
 *.swp
+
+# ... which collides with the name of this tool's own store, `.swp/`, so the
+# store is re-included and then split by half: a project's public identity
+# document and release records are meant to be committed alongside the source
+# they describe, and only the private half — the root secret, the manifests
+# naming every embedded site — is kept out of the history.
+!/.swp/
 .swp/private/
