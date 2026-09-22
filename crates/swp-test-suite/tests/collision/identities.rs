@@ -80,7 +80,8 @@ fn assert_base32_id(id: &str, who: &str) {
         body.len()
     );
     assert!(
-        body.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
+        body.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
         "{who}: {id} left the base32 alphabet"
     );
 }
@@ -99,7 +100,11 @@ fn independently_minted_identities_never_repeat() {
             // The store's own view and the document must agree, or a scan that
             // loads one and a report that prints the other would be talking about
             // two different projects.
-            assert_eq!(project.project_id(), id, "identity.json disagrees with the store");
+            assert_eq!(
+                project.project_id(),
+                id,
+                "identity.json disagrees with the store"
+            );
             assert!(seen.insert(id.clone()), "identity {id} was minted twice");
             assert!(keys.insert(key), "verify key reused across identities");
             ids.push(id);
@@ -122,7 +127,11 @@ fn independently_minted_identities_never_repeat() {
          table is {collision_odds:.2e}"
     );
     assert_eq!(seen.len(), total, "a minted identity repeated");
-    assert_eq!(keys.len(), total, "two identities published the same verify key");
+    assert_eq!(
+        keys.len(),
+        total,
+        "two identities published the same verify key"
+    );
 }
 
 /// §28's "sufficient entropy", read off the sample rather than off the design.
@@ -133,10 +142,7 @@ fn independently_minted_identities_never_repeat() {
 #[test]
 fn the_id_distribution_looks_like_a_random_draw() {
     let projects = mint("col-dist", IDENTITIES * 2);
-    let ids: Vec<String> = projects
-        .iter()
-        .map(|p| public_identity(p).0)
-        .collect();
+    let ids: Vec<String> = projects.iter().map(|p| public_identity(p).0).collect();
     let payloads: Vec<&str> = ids.iter().map(|id| &id["swp1-".len()..]).collect();
 
     let mut counts = [0usize; ID_SYMBOLS];
@@ -201,12 +207,8 @@ fn the_id_distribution_looks_like_a_random_draw() {
 fn one_projects_watermark_is_anothers_nothing() {
     let projects: Vec<Project> = (0..PROJECTS)
         .map(|v| {
-            let project = Project::synthetic_wide_variant(
-                &format!("col-x{v}"),
-                MODULES,
-                TARGET_SITES,
-                v,
-            );
+            let project =
+                Project::synthetic_wide_variant(&format!("col-x{v}"), MODULES, TARGET_SITES, v);
             project.protect();
             project
         })
@@ -264,8 +266,7 @@ fn one_projects_watermark_is_anothers_nothing() {
 /// A foreign tree may produce a coincidence and must not produce an accusation.
 fn assert_foreign_clean(name: &str, v: &Verdict) {
     assert_ne!(
-        v.result,
-        "PROVENANCE_DETECTED",
+        v.result, "PROVENANCE_DETECTED",
         "{name}: §28 collision — one identity's keys found its watermark in another identity's \
          tree.\n{}",
         v.run.out

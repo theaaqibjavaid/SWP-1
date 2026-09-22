@@ -282,7 +282,11 @@ fn save(
         &crate::help::banner(),
     );
     let stem = format!("verify-{}", now.filename_stem());
-    Ok(Some(project.store.save_report(&stem, report.to_json().as_bytes())?))
+    Ok(Some(
+        project
+            .store
+            .save_report(&stem, report.to_json().as_bytes())?,
+    ))
 }
 
 fn limitations(verdict: Verdict) -> Vec<String> {
@@ -403,7 +407,9 @@ fn text_lines(
     } else {
         format!("Sites (first {} of {})", shown.len(), d.sites.len())
     });
-    out.push("  status        site  file:line                  family  width  keys hit".to_string());
+    out.push(
+        "  status        site  file:line                  family  width  keys hit".to_string(),
+    );
     for row in shown {
         out.push(format!(
             "  {:<13} {:>4}  {:<26} {:<8} {:>5}  {}",
@@ -538,13 +544,20 @@ mod tests {
         let doc = serde_json::to_value(&row).unwrap();
         assert_eq!(doc["status"], "tag-confirmed");
         assert_eq!(doc["slots"], serde_json::json!(["statement+identifiers"]));
-        for forbidden in ["locations", "original", "rendered", "primary", "tag", "secret"] {
-            assert!(
-                doc.get(forbidden).is_none(),
-                "the row printed {forbidden}"
-            );
+        for forbidden in [
+            "locations",
+            "original",
+            "rendered",
+            "primary",
+            "tag",
+            "secret",
+        ] {
+            assert!(doc.get(forbidden).is_none(), "the row printed {forbidden}");
         }
-        assert_eq!(SLOT_COUNT, 4, "four radii per site; `slots` lists which hit");
+        assert_eq!(
+            SLOT_COUNT, 4,
+            "four radii per site; `slots` lists which hit"
+        );
     }
 
     #[test]
@@ -554,7 +567,11 @@ mod tests {
         let r = dir.run(&["verify"]);
         assert_eq!(r.code, ErrorCode::NotProtected.exit_code());
         assert!(r.err.contains("swp init"), "{}", r.err);
-        assert!(r.out.is_empty(), "a failure writes no document: {:?}", r.out);
+        assert!(
+            r.out.is_empty(),
+            "a failure writes no document: {:?}",
+            r.out
+        );
     }
 
     #[test]
@@ -563,11 +580,9 @@ mod tests {
         let r = dir.run(&["verify", "--format", "json"]);
         let doc = r.json();
         assert_eq!(
-            r.code,
-            0,
+            r.code, 0,
             "a fresh release must verify against itself:\n{}{}",
-            r.out,
-            r.err
+            r.out, r.err
         );
         assert_eq!(doc["schema"], SCHEMA);
         assert_eq!(doc["verdict"], "INTACT");
@@ -575,7 +590,10 @@ mod tests {
         assert!(doc["sites_expected"].as_u64().unwrap() >= 4);
         assert_eq!(doc["sites_confirmed"], doc["sites_expected"]);
         assert_eq!(doc["sites_absent"], 0);
-        assert_eq!(doc["fingerprint"], "match", "the tree is the tree it hashed");
+        assert_eq!(
+            doc["fingerprint"], "match",
+            "the tree is the tree it hashed"
+        );
         assert!(doc["release_created_at"].as_str().unwrap().ends_with('Z'));
         assert_eq!(doc["exit_code"], 0);
     }
@@ -594,10 +612,7 @@ mod tests {
         assert_eq!(r.code, ErrorCode::ReleaseMismatch.exit_code(), "{}", r.out);
         assert_eq!(doc["verdict"], "INCOMPLETE");
         assert_eq!(doc["partial"], false);
-        assert!(
-            doc["sites_confirmed"].as_u64().unwrap()
-                < doc["sites_expected"].as_u64().unwrap()
-        );
+        assert!(doc["sites_confirmed"].as_u64().unwrap() < doc["sites_expected"].as_u64().unwrap());
         // The four counts are a partition of the release's sites, and this is
         // where that is pinned: a site that stopped carrying its code is either
         // gone or an address without a code, and the two are never conflated.
@@ -620,7 +635,13 @@ mod tests {
             t.out
         );
         assert!(t.err.contains("warning:"), "{}", t.err);
-        assert!(t.out.contains("nothing about the tree being otherwise unchanged") || t.out.contains("cannot say"), "{}", t.out);
+        assert!(
+            t.out
+                .contains("nothing about the tree being otherwise unchanged")
+                || t.out.contains("cannot say"),
+            "{}",
+            t.out
+        );
     }
 
     #[test]
@@ -634,7 +655,11 @@ mod tests {
         let bytes = dir.store().read_report(&names[0]).unwrap();
         let saved = Report::from_json(&String::from_utf8(bytes).unwrap()).unwrap();
         assert_eq!(saved.run.command, "verify");
-        assert!(r.out.contains(&names[0]), "the text says where it went:\n{}", r.out);
+        assert!(
+            r.out.contains(&names[0]),
+            "the text says where it went:\n{}",
+            r.out
+        );
     }
 
     #[test]
@@ -658,11 +683,19 @@ mod tests {
         let j = dir.run(&["verify", "--format", "json"]);
         let doc = j.json();
         assert_eq!(t.code, j.code);
-        assert!(t
-            .out
-            .contains(doc["sites_confirmed"].as_u64().unwrap().to_string().as_str()));
+        assert!(t.out.contains(
+            doc["sites_confirmed"]
+                .as_u64()
+                .unwrap()
+                .to_string()
+                .as_str()
+        ));
         assert!(t.out.contains(doc["release_id"].as_str().unwrap()));
         // The text window counts what it left out rather than hiding it.
-        assert!(t.out.contains("Sites (all") || t.out.contains("first"), "{}", t.out);
+        assert!(
+            t.out.contains("Sites (all") || t.out.contains("first"),
+            "{}",
+            t.out
+        );
     }
 }

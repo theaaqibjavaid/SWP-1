@@ -333,7 +333,9 @@ fn every_family_the_writer_emits_the_reader_finds() {
             .join(" ");
         println!(
             "  {:<12} {:>7}  {}  {mix}",
-            trip.label, trip.written, trip.plan.ceiling()
+            trip.label,
+            trip.written,
+            trip.plan.ceiling()
         );
     }
     println!(
@@ -450,9 +452,7 @@ fn note_kind(note: &str) -> &str {
 /// same code that tests them proves nothing. `the_form_corpus_keeps_every_family_
 /// reachable` fails if the two ever disagree, which is the point of writing the
 /// literals twice.
-const CORPUS_NUMBERS: &[i128] = &[
-    720720, 1441440, 48879, 57005, 65535, 2400, 3600, 12, 90, 2,
-];
+const CORPUS_NUMBERS: &[i128] = &[720720, 1441440, 48879, 57005, 65535, 2400, 3600, 12, 90, 2];
 /// `(text, quote)` for every string literal over sixteen characters in the
 /// corpus, which is the width's modulus and therefore the shortest literal that
 /// can carry a tag at all.
@@ -471,8 +471,11 @@ const CORPUS_STRINGS: &[(&str, char)] = &[
 #[test]
 fn the_form_corpus_keeps_every_family_reachable() {
     let width = swp_core::site::TagWidth::new(4).expect("4 bits is a protocol width");
-    let dialects: [(&str, &Dialect); 3] =
-        [("javascript", &Dialect::JS), ("typescript", &Dialect::TS), ("python", &Dialect::PY)];
+    let dialects: [(&str, &Dialect); 3] = [
+        ("javascript", &Dialect::JS),
+        ("typescript", &Dialect::TS),
+        ("python", &Dialect::PY),
+    ];
 
     let mut reach: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
     for (language, dialect) in dialects {
@@ -490,10 +493,11 @@ fn the_form_corpus_keeps_every_family_reachable() {
                 quote: *quote,
             };
             for family in available_string_families(&site, width, dialect) {
-                reach
-                    .entry(family.as_str())
-                    .or_default()
-                    .push(format!("{language}:{:?} ({} chars)", inner, inner.chars().count()));
+                reach.entry(family.as_str()).or_default().push(format!(
+                    "{language}:{:?} ({} chars)",
+                    inner,
+                    inner.chars().count()
+                ));
             }
         }
     }
@@ -544,10 +548,8 @@ fn a_standalone_protect_of_a_fixture_is_reproducible() {
     );
     let verdict = project.verify();
     assert_eq!(
-        verdict.code,
-        0,
+        verdict.code, 0,
         "`swp verify` on the documented example tree exited {}:\n{}",
-        verdict.code,
-        verdict.out
+        verdict.code, verdict.out
     );
 }

@@ -7,10 +7,12 @@
 //! identical for every language and are the only thing that location ids and
 //! fingerprints are computed from.
 //!
-//! - **L1 formatting-insensitive.** Whitespace, indentation, comments and line
-//!   endings vanish. Token spellings are preserved exactly. Used for the exact
-//!   release fingerprint, where "same code, different formatting" must still
-//!   match but "different code" must not.
+//! - **L1 formatting-insensitive.** Whitespace between tokens collapses to one
+//!   space, comments are dropped, and a line break survives as exactly one
+//!   newline character. Token spellings are preserved otherwise. So re-indenting
+//!   and re-wrapping a statement is invisible here, while splitting one line into
+//!   two changes the text — the deliberate cost of a level that must not merge
+//!   different programs. Used for the release fingerprint.
 //! - **L2 identifier-insensitive.** L1 plus every identifier that the adapter
 //!   reports as locally bound is renamed by first occurrence to `#lN`. Imports,
 //!   globals, property keys and member names are preserved verbatim, because
@@ -18,7 +20,8 @@
 //!   matching.
 //! - **L3 structural.** L2 plus literal value normalization and adapter-declared
 //!   synonym classes, so `0x1F400`, `1_00_000` and `128000` all become
-//!   `<n:128000>`. Used for location ids and structural region digests.
+//!   `<n:128000>`. Used for the two name-abstracted location keys, which is the
+//!   only reason a reflowed, renamed copy can still hit its site address.
 //!   Deliberate losses are documented in docs/SWP-1-SPEC.md.
 
 use sha2::{Digest as _, Sha256};
@@ -318,9 +321,10 @@ pub fn canonicalize(tokens: &[Token], level: CanonLevel, site: Option<ByteSpan>)
             TokKind::Comment => {}
         }
     }
-    // Record how many identifiers were abstracted away; two regions that
-    // differ only by local names must not collide with one that differs in
-    // binding count.
+    // Nothing extra is counted here: because a locally bound identifier is renamed
+    // by first occurrence, two texts that differ in how many names they bind
+    // already differ in the bytes, so a region renamed beyond its own count cannot
+    // collide with one that merely changed formatting.
     CanonicalText::new(out)
 }
 
@@ -332,8 +336,7 @@ pub fn canonicalize(tokens: &[Token], level: CanonLevel, site: Option<ByteSpan>)
 /// `swp-adapters`' validation both go through it, so the text a location id is
 /// digested from and the text an embedding proves unchanged are the same text.
 pub fn tokens_within(tokens: &[Token], span: ByteSpan) -> &[Token] {
-    let start =
-        tokens.partition_point(|t| t.span.end <= span.start || t.span.start < span.start);
+    let start = tokens.partition_point(|t| t.span.end <= span.start || t.span.start < span.start);
     let end = tokens.partition_point(|t| t.span.end <= span.end);
     &tokens[start.min(end)..end]
 }

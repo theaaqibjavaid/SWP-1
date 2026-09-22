@@ -405,9 +405,7 @@ fn no_temporary_or_backup_file_survives_a_write() {
 fn every_command_prints_and_writes_nothing_searchable() {
     let tmp = TempDir::new("cli").sensitive();
     let sources = fixtures::javascript_project(tmp.path());
-    let store = Store::init(tmp.path(), &root())
-        .expect("store init")
-        .store;
+    let store = Store::init(tmp.path(), &root()).expect("store init").store;
     let needles = needles();
     let mut cli = Cli::new(tmp.path(), &needles);
     // Where the `-o` documents go: deliberately outside the project, because that
@@ -447,9 +445,12 @@ fn every_command_prints_and_writes_nothing_searchable() {
     // The private manifest is the densest concentration of keyed material the
     // project holds, and `inspect manifest` prints it. Read it here so the sweep
     // can be checked against it rather than against a hope.
-    let manifest: Value =
-        serde_json::from_slice(&store.read_private_manifest(&ids[0]).expect("private manifest"))
-            .expect("the manifest is JSON");
+    let manifest: Value = serde_json::from_slice(
+        &store
+            .read_private_manifest(&ids[0])
+            .expect("private manifest"),
+    )
+    .expect("the manifest is JSON");
     let addresses: Vec<String> = manifest["sites"]
         .as_array()
         .into_iter()
@@ -507,7 +508,10 @@ fn every_command_prints_and_writes_nothing_searchable() {
     // --- scan: a copy that carries the watermark, and copies that do not ------
     let stolen = TempDir::new("cli-candidate");
     for rel in &sources {
-        stolen.write(rel, &std::fs::read(tmp.child(rel)).expect("protected source"));
+        stolen.write(
+            rel,
+            &std::fs::read(tmp.child(rel)).expect("protected source"),
+        );
     }
     let lookalike = TempDir::new("cli-lookalike");
     fixtures::lookalike_project(lookalike.path());
@@ -759,7 +763,8 @@ impl Cli {
         // 70 is `INTERNAL`, which is never a correct answer — and a panic caught
         // there tends to be one that was about to print something.
         assert_ne!(
-            run.code, 70,
+            run.code,
+            70,
             "`swp {}` exited INTERNAL:\n{}{}",
             argv.join(" "),
             run.out,
@@ -768,7 +773,9 @@ impl Cli {
         let verb = argv.first().copied().unwrap_or_default().to_string();
         self.verbs.push(verb.clone());
         self.runs += 1;
-        let label = format!("`swp {verb} {}`", argv[1..].join(" ")).trim_end().to_string();
+        let label = format!("`swp {verb} {}`", argv[1..].join(" "))
+            .trim_end()
+            .to_string();
         sweep_bytes(
             &format!("{label} stdout"),
             run.out.as_bytes(),
@@ -796,7 +803,8 @@ impl Cli {
     fn ok(&mut self, argv: &[&str]) -> Run {
         let run = self.run(argv);
         assert_eq!(
-            run.code, 0,
+            run.code,
+            0,
             "`swp {}` exited {}: {}{}",
             argv.join(" "),
             run.code,

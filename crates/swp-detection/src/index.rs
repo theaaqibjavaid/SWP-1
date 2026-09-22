@@ -145,7 +145,10 @@ impl<'k> ReleaseIndex<'k> {
         if !TagWidth::is_supported(manifest.tag_bits) {
             return Err(SwpError::new(
                 ErrorCode::InvalidWatermark,
-                format!("manifest declares an unsupported tag width of {}", manifest.tag_bits),
+                format!(
+                    "manifest declares an unsupported tag width of {}",
+                    manifest.tag_bits
+                ),
             ));
         }
         if manifest.sites.len() as u64 > u64::from(limits.max_locations_per_manifest) {
@@ -411,12 +414,15 @@ mod tests {
             for (slot, id) in entry.locations.iter().enumerate() {
                 let hits = idx.lookup(id);
                 assert!(
-                    hits.iter().any(|h| h.site == slot_of(&m, entry) && h.slot.code() as usize == slot),
+                    hits.iter()
+                        .any(|h| h.site == slot_of(&m, entry) && h.slot.code() as usize == slot),
                     "every stored id must address its own site"
                 );
             }
         }
-        assert!(idx.lookup(&LocationId::from_bytes(&[9u8; 16]).unwrap()).is_empty());
+        assert!(idx
+            .lookup(&LocationId::from_bytes(&[9u8; 16]).unwrap())
+            .is_empty());
     }
 
     fn slot_of(m: &PrivateManifest, entry: &SiteEntry) -> usize {
@@ -441,20 +447,21 @@ mod tests {
         let mut retargeted = honest.clone();
         retargeted.fingerprint = Digest([8u8; 32]);
         retargeted.sign(&sk).unwrap();
-        let e = ReleaseIndex::build(
-            &retargeted,
-            &published,
-            &k,
-            &vk,
-            &Limits::default(),
-        )
-        .unwrap_err();
+        let e =
+            ReleaseIndex::build(&retargeted, &published, &k, &vk, &Limits::default()).unwrap_err();
         assert_eq!(e.code(), ErrorCode::ReleaseMismatch, "{e:?}");
         // And the same edited document paired with a record edited to match it is
         // refused for the same reason one more step out: the caller's copy of the
         // record is what the index trusts, so the guard has to be the disagreement,
         // not a hash of something this crate could recompute.
-        assert!(ReleaseIndex::build(&retargeted, &record(&retargeted), &k, &vk, &Limits::default()).is_ok());
+        assert!(ReleaseIndex::build(
+            &retargeted,
+            &record(&retargeted),
+            &k,
+            &vk,
+            &Limits::default()
+        )
+        .is_ok());
     }
 
     #[test]
@@ -558,8 +565,16 @@ mod tests {
         let newer = manifest_full(&k, &[2, 3], &sk, "rel-bbbbbbbbbbbb", at(100));
         let (rec_old, rec_new) = (record(&older), record(&newer));
         let releases = [
-            CandidateRelease { manifest: older, record: rec_old, keys: keys_for("rel-aaaaaaaaaaaa") },
-            CandidateRelease { manifest: newer, record: rec_new, keys: keys_for("rel-aaaaaaaaaaaa") },
+            CandidateRelease {
+                manifest: older,
+                record: rec_old,
+                keys: keys_for("rel-aaaaaaaaaaaa"),
+            },
+            CandidateRelease {
+                manifest: newer,
+                record: rec_new,
+                keys: keys_for("rel-aaaaaaaaaaaa"),
+            },
         ];
         let idx = build_indexes(&releases, &vk, &Limits::default()).unwrap();
         assert_eq!(idx.len(), 2);
@@ -569,7 +584,10 @@ mod tests {
         // A site of the older release is still addressed by its own ids, and not
         // by the newer one's — the two indexes do not share a lookup table.
         let old_only = idx[1].sites()[0].locations[0];
-        assert!(!idx[0].lookup(&old_only).iter().any(|h| idx[0].site(h.site).line_hint == 10));
+        assert!(!idx[0]
+            .lookup(&old_only)
+            .iter()
+            .any(|h| idx[0].site(h.site).line_hint == 10));
     }
 
     /// A timestamp far enough in the past to order two releases unambiguously.

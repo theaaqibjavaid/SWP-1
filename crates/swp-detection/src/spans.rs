@@ -158,7 +158,10 @@ pub fn form_windows(analysis: &Analysis) -> (Vec<Window>, bool) {
 
 /// A token a rendering could be spelled out of.
 fn is_material(kind: TokKind) -> bool {
-    matches!(kind, TokKind::Number | TokKind::String | TokKind::Operator | TokKind::Punct)
+    matches!(
+        kind,
+        TokKind::Number | TokKind::String | TokKind::Operator | TokKind::Punct
+    )
 }
 
 fn is_literal(kind: TokKind) -> bool {
@@ -193,10 +196,7 @@ fn is_escape_prefix(token: &Token) -> bool {
         return false;
     }
     let text = token.text.as_str();
-    let Some(body) = text
-        .strip_prefix('"')
-        .or_else(|| text.strip_prefix('\''))
-    else {
+    let Some(body) = text.strip_prefix('"').or_else(|| text.strip_prefix('\'')) else {
         return false;
     };
     body.starts_with("\\x")
@@ -246,7 +246,10 @@ mod tests {
         let text = "function calc(base) {\n  return base * (995 + 5);\n}\n";
         let found = windows_of("a.js", text);
         assert!(found.contains(&"(995 + 5)".to_string()), "{found:?}");
-        assert!(found.contains(&"995 + 5".to_string()), "the unparenthesised spelling is a plausible re-rendering of the same site");
+        assert!(
+            found.contains(&"995 + 5".to_string()),
+            "the unparenthesised spelling is a plausible re-rendering of the same site"
+        );
         assert!(
             !found.iter().any(|w| w.starts_with('*') || w.ends_with(';')),
             "a window may not begin at an operator or end at punctuation: {found:?}"
@@ -257,13 +260,25 @@ mod tests {
     fn string_concatenation_and_adjacency_shapes_are_both_found() {
         let js = "const label = (\"hello\" + \"world\");\n";
         let found = windows_of("a.js", js);
-        assert!(found.contains(&"(\"hello\" + \"world\")".to_string()), "{found:?}");
-        assert!(found.contains(&"\"hello\" + \"world\"".to_string()), "{found:?}");
+        assert!(
+            found.contains(&"(\"hello\" + \"world\")".to_string()),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&"\"hello\" + \"world\"".to_string()),
+            "{found:?}"
+        );
 
         let py = "label = (\"hello\" \"world\")\n";
         let found = windows_of("a.py", py);
-        assert!(found.contains(&"(\"hello\" \"world\")".to_string()), "{found:?}");
-        assert!(found.contains(&"\"hello\" \"world\"".to_string()), "{found:?}");
+        assert!(
+            found.contains(&"(\"hello\" \"world\")".to_string()),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&"\"hello\" \"world\"".to_string()),
+            "{found:?}"
+        );
     }
 
     #[test]
@@ -294,7 +309,10 @@ mod tests {
         for (text, why) in [
             ("const s = \"a\\nb\";\n", "short escape first"),
             ("const s = \"a\\x62\";\n", "escape not a prefix"),
-            ("const s = '\\x68ello';\n", "single quote is fine, so expect a window"),
+            (
+                "const s = '\\x68ello';\n",
+                "single quote is fine, so expect a window",
+            ),
         ] {
             let found = windows_of("a.js", text);
             let starts_with_escape = found

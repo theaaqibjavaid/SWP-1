@@ -50,14 +50,7 @@ fn report(heading: &str, rows: &[(String, Verdict)]) {
     for (name, v) in rows {
         println!(
             "  {:<26} {:>9} {:>7} {:>6.1} {:>13} {:>9.1}  {} / {}",
-            name,
-            v.fragments,
-            v.probes,
-            v.chance,
-            v.fingerprint,
-            v.guarantee,
-            v.result,
-            v.level,
+            name, v.fragments, v.probes, v.chance, v.fingerprint, v.guarantee, v.result, v.level,
         );
     }
 }
@@ -96,7 +89,10 @@ fn an_exact_copy_is_found_and_no_copy_is_not() {
         "a byte-for-byte copy of the protected tree was not found:\n{}",
         v.run.out
     );
-    assert_eq!(v.fingerprint, "match", "the copy lost the fingerprint: {v:?}");
+    assert_eq!(
+        v.fingerprint, "match",
+        "the copy lost the fingerprint: {v:?}"
+    );
 
     // The control: a candidate with none of this project in it. §27's cheapest
     // case, and the reason a "0% of the project" row is in the table at all.
@@ -106,13 +102,19 @@ fn an_exact_copy_is_found_and_no_copy_is_not() {
     assert_never_accuses_on_no_evidence("empty candidate", &empty);
     // Not "clean". A scan that read no file cannot tell an unprotected copy from
     // an absent one, and §51 says the difference is the point of `INCONCLUSIVE`.
-    assert_eq!(empty.result, "INCONCLUSIVE", "an empty tree got a verdict:\n{}", empty.run.out);
+    assert_eq!(
+        empty.result, "INCONCLUSIVE",
+        "an empty tree got a verdict:\n{}",
+        empty.run.out
+    );
     assert!(empty.partial, "the report did not say it examined nothing");
-    assert_eq!(empty.run.code, 10, "cannot-say must exit 10:\n{}", empty.run.out);
+    assert_eq!(
+        empty.run.code, 10,
+        "cannot-say must exit 10:\n{}",
+        empty.run.out
+    );
     let listed = |key: &str| {
-        empty
-            .run
-            .json()[key]
+        empty.run.json()[key]
             .as_array()
             .unwrap_or(&Vec::new())
             .iter()
@@ -165,7 +167,10 @@ fn the_partial_copy_ladder_is_measured() {
         rows.push((label.to_string(), v));
     }
     report(
-        &format!("§24 partial copy of a {total}-site release ({} modules)", MODULES),
+        &format!(
+            "§24 partial copy of a {total}-site release ({} modules)",
+            MODULES
+        ),
         &rows,
     );
 
@@ -206,7 +211,11 @@ fn each_refactoring_form_is_measured() {
         let candidate = project.copy_whole(&format!("refac-{}", t.slug()));
         let mut tree = read_tree(candidate.path());
         let changed = t.apply(&mut tree, &site_texts(&release));
-        assert!(changed > 0, "{} changed nothing, so it measures nothing", t.slug());
+        assert!(
+            changed > 0,
+            "{} changed nothing, so it measures nothing",
+            t.slug()
+        );
         write_tree(candidate.path(), &tree);
         let v = judge(&project, &candidate);
         assert_never_accuses_on_no_evidence(t.slug(), &v);
@@ -224,7 +233,12 @@ fn each_refactoring_form_is_measured() {
     // abstracted one are computed from *structure*, so renaming and reformatting
     // cannot be the thing that loses every site. That is what this asserts; how
     // many sites each form actually cost is printed above, not demanded here.
-    for name in ["variable_rename", "function_rename", "class_rename", "formatting"] {
+    for name in [
+        "variable_rename",
+        "function_rename",
+        "class_rename",
+        "formatting",
+    ] {
         let v = &rows.iter().find(|(n, _)| n == name).expect("row missing").1;
         assert!(
             v.fragments > 0,
@@ -335,7 +349,11 @@ fn removal_attacks_take_sites_away_and_say_so() {
         rebuilt.fragments,
         untouched.fragments,
         sites.len(),
-        if rebuilt.detected() { "found" } else { "not found" },
+        if rebuilt.detected() {
+            "found"
+        } else {
+            "not found"
+        },
     );
 }
 

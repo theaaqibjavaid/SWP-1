@@ -85,10 +85,13 @@ impl RootSecret {
         crate::derive::constant_time_eq(self.as_slice(), other.as_slice())
     }
 
-    /// A short, non-secret handle for a key: `HMAC(key, "swp1/check-value/v1")`
-    /// truncated to 40 bits. Lets `swp inspect` and `swp init` say "this store
-    /// uses key 3fqz2-…" so a restored backup can be recognised as the right
-    /// one, without any path from the printed value back to the key.
+    /// A short, non-secret handle for a key: the first 40 bits of
+    /// `HMAC(key = CHECK_VALUE_LABEL, message = secret)`. The public label is the
+    /// HMAC key and the secret is the message, so this is a check value of the
+    /// secret rather than a MAC of a constant under it. Lets `swp inspect` and
+    /// `swp init` say "this store uses key 3fqz2-…" so a restored backup can be
+    /// recognised as the right one, without any path from the printed value back
+    /// to the key.
     pub fn fingerprint(&self) -> String {
         use hmac::{Hmac, Mac};
         use sha2::Sha256;

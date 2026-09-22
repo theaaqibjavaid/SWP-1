@@ -135,21 +135,33 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
     }
 
     let measurement = measure(&store)?;
+    if measurement.files == 0 {
+        sink.warn(&format!(
+            "no file under the default scope has a language adapter, so `swp protect` will \
+             refuse this tree. This build parses {}; point [protect] targets at part of it \
+             that does, or add an adapter.",
+            Registry::standard()
+                .parsed_languages()
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
     let suggestion = suggest_sites(measurement.files);
     let settings = write_settings(&store, &measurement, suggestion, existed)?;
     // The handle of a key this run did not create comes off the store's own copy,
     // because the freshly drawn one is discarded in that case.
     let handle = if init.pre_existing {
         drop(root);
-        store
-            .load_root()
-            .map(|k| k.fingerprint())
-            .map_err(|e| {
-                SwpError::new(
-                    e.code(),
-                    format!("the store exists but its secret cannot be read: {}", e.message()),
-                )
-            })?
+        store.load_root().map(|k| k.fingerprint()).map_err(|e| {
+            SwpError::new(
+                e.code(),
+                format!(
+                    "the store exists but its secret cannot be read: {}",
+                    e.message()
+                ),
+            )
+        })?
     } else {
         let h = root.fingerprint();
         drop(root);
@@ -160,7 +172,8 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
     let doc = InitDocument {
         schema: "SWP-1-init-v1",
         protocol: swp_core::SWP_PROTOCOL_NAME,
-        project_root: store.project_root().display().to_string(),
+        project_root: swp_core::text::display_path(&store.project_root().display().to_string())
+            .to_string(),
         project_id: identity.project_id.to_string(),
         display_name: identity.display_name.clone(),
         secret: if init.pre_existing { "kept" } else { "created" },
@@ -196,7 +209,11 @@ fn text_lines(d: &InitDocument, renamed: bool) -> Vec<String> {
         format!(
             "  name       {}{}",
             d.display_name,
-            if renamed { " (renamed by this run)" } else { "" }
+            if renamed {
+                " (renamed by this run)"
+            } else {
+                ""
+            }
         ),
         format!(
             "  secret     {} · handle {} · permissions {}",
@@ -263,9 +280,15 @@ fn text_lines(d: &InitDocument, renamed: bool) -> Vec<String> {
         d.settings.target_sites
     ));
     if d.settings.written && d.settings.suggestion != DEFAULT_TARGET_SITES {
-        out.push(format!("    measured suggestion for a {}-file tree", d.measurement.files));
+        out.push(format!(
+            "    measured suggestion for a {}-file tree",
+            d.measurement.files
+        ));
     }
-    out.push(format!("  [protect] tag_bits       {}", d.settings.tag_bits));
+    out.push(format!(
+        "  [protect] tag_bits       {}",
+        d.settings.tag_bits
+    ));
     out.push(format!(
         "    a site carries a {}-bit code, so one site is 1-in-{} by chance; that is \
          why a single fragment is never a finding on its own",
@@ -276,30 +299,18 @@ fn text_lines(d: &InitDocument, renamed: bool) -> Vec<String> {
         "  [protect] embed_strings {}",
         d.settings.embed_strings
     ));
-    out.extend([
-        String::new(),
-        "Where the private data lives".to_string(),
-    ]);
+    out.extend([String::new(), "Where the private data lives".to_string()]);
     out.extend(d.never_commit.iter().map(|p| format!("  {p}")));
     out.extend([
         String::new(),
         "Back these up. Losing them loses every release you have already made.".to_string(),
     ]);
     out.extend(d.back_up.iter().map(|p| format!("  {p}")));
-    out.extend([
-        String::new(),
-        "You may commit".to_string(),
-    ]);
+    out.extend([String::new(), "You may commit".to_string()]);
     out.extend(d.commit.iter().map(|p| format!("  {p}")));
-    out.extend([
-        String::new(),
-        "You must never commit".to_string(),
-    ]);
+    out.extend([String::new(), "You must never commit".to_string()]);
     out.extend(d.never_commit.iter().map(|p| format!("  {p}")));
-    out.extend([
-        String::new(),
-        "Next".to_string(),
-    ]);
+    out.extend([String::new(), "Next".to_string()]);
     out.extend(d.next.iter().map(|n| format!("  {n}")));
     out.push(String::new());
     out.push(
@@ -315,9 +326,15 @@ fn text_lines(d: &InitDocument, renamed: bool) -> Vec<String> {
 /// No file is parsed: this measures the tree's shape, not its literals, and
 /// `swp protect` is where the expensive pass happens. The walk is the scanner's
 /// own scope, so the count printed here is the count a later scan would report.
+///
+/// It is also the scanner's *tolerance* of an empty result. `swp protect` must
+/// fail a tree it cannot watermark; `swp init` must not, because initializing is
+/// how you get the `.swp/config.toml` that fixes the problem — and a project
+/// whose first commit has no source in it yet is a project that wants a store.
+/// The zero count is reported as a warning instead (§49).
 fn measure(store: &Store) -> Result<Measurement, SwpError> {
     let limits = store.config().map(|c| c.limits).unwrap_or_default();
-    let walked = walk::walk(store.project_root(), &ProtectConfig::scan_scope(), &limits)?;
+    let walked = walk::walk_for_scan(store.project_root(), &ProtectConfig::scan_scope(), &limits)?;
     let registry = Registry::standard();
     let mut languages: BTreeMap<String, u32> = BTreeMap::new();
     let mut tops: BTreeMap<String, u32> = BTreeMap::new();
@@ -379,7 +396,8 @@ pub fn suggest_sites(files: u32) -> u32 {
     // fewer files than that, the smaller number is the honest suggestion, and a
     // project of two files protected at 48 sites would put 24 sites in each.
     let spread_bound = files.saturating_mul(6).max(MIN_TARGET_SITES);
-    step.min(spread_bound).clamp(MIN_TARGET_SITES, MAX_TARGET_SITES)
+    step.min(spread_bound)
+        .clamp(MIN_TARGET_SITES, MAX_TARGET_SITES)
 }
 
 /// Write `[protect]` for a project that has just been initialized; leave an
@@ -459,13 +477,18 @@ mod tests {
     #[test]
     fn the_ladder_is_monotonic_and_inside_the_protocol_range() {
         let mut last = 0;
-        for files in [0u32, 1, 3, 4, 8, 15, 16, 40, 60, 61, 200, 250, 251, 5000, 100_000] {
+        for files in [
+            0u32, 1, 3, 4, 8, 15, 16, 40, 60, 61, 200, 250, 251, 5000, 100_000,
+        ] {
             let s = suggest_sites(files);
             assert!(
                 (MIN_TARGET_SITES..=MAX_TARGET_SITES).contains(&s),
                 "{files} → {s}"
             );
-            assert!(s >= last, "{files} suggested {s}, below the smaller tree's {last}");
+            assert!(
+                s >= last,
+                "{files} suggested {s}, below the smaller tree's {last}"
+            );
             last = s;
         }
         // A two-file project does not get a 48-site constellation dumped on it.
@@ -527,12 +550,8 @@ mod tests {
         let parsed = crate::args::parse(&argv).unwrap();
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let mut sink = crate::output::Sink::new(
-            crate::output::Format::Text,
-            true,
-            &mut out,
-            &mut err,
-        );
+        let mut sink =
+            crate::output::Sink::new(crate::output::Format::Text, true, &mut out, &mut err);
         assert_eq!(run(&parsed, &dir.root, &mut sink).unwrap(), 0);
         let first = String::from_utf8(out).unwrap();
         assert!(first.contains("What was generated"), "{first}");
@@ -559,12 +578,8 @@ mod tests {
         // A second `init` must not draw a second secret.
         let mut out2 = Vec::new();
         let mut err2 = Vec::new();
-        let mut sink2 = crate::output::Sink::new(
-            crate::output::Format::Text,
-            true,
-            &mut out2,
-            &mut err2,
-        );
+        let mut sink2 =
+            crate::output::Sink::new(crate::output::Format::Text, true, &mut out2, &mut err2);
         run(&parsed, &dir.root, &mut sink2).unwrap();
         let again = Store::open(&dir.root).unwrap();
         assert_eq!(again.identity().unwrap().project_id, identity.project_id);
@@ -582,12 +597,8 @@ mod tests {
         let p3 = crate::args::parse(&argv3).unwrap();
         let mut out3 = Vec::new();
         let mut err3 = Vec::new();
-        let mut sink3 = crate::output::Sink::new(
-            crate::output::Format::Text,
-            true,
-            &mut out3,
-            &mut err3,
-        );
+        let mut sink3 =
+            crate::output::Sink::new(crate::output::Format::Text, true, &mut out3, &mut err3);
         let e = run(&p3, &dir.root, &mut sink3).unwrap_err();
         assert_eq!(e.code(), ErrorCode::Usage);
         assert!(e.message().contains("--force"), "{e}");
@@ -606,16 +617,15 @@ mod tests {
         let p4 = crate::args::parse(&argv4).unwrap();
         let mut out4 = Vec::new();
         let mut err4 = Vec::new();
-        let mut sink4 = crate::output::Sink::new(
-            crate::output::Format::Text,
-            true,
-            &mut out4,
-            &mut err4,
-        );
+        let mut sink4 =
+            crate::output::Sink::new(crate::output::Format::Text, true, &mut out4, &mut err4);
         run(&p4, &dir.root, &mut sink4).unwrap();
         let renamed = Store::open(&dir.root).unwrap().identity().unwrap();
         assert_eq!(renamed.display_name, "Renamed");
-        assert_eq!(renamed.project_id, identity.project_id, "a rename moved the id");
+        assert_eq!(
+            renamed.project_id, identity.project_id,
+            "a rename moved the id"
+        );
     }
 
     #[test]
@@ -626,12 +636,8 @@ mod tests {
         let parsed = crate::args::parse(&argv).unwrap();
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let mut sink = crate::output::Sink::new(
-            crate::output::Format::Json,
-            true,
-            &mut out,
-            &mut err,
-        );
+        let mut sink =
+            crate::output::Sink::new(crate::output::Format::Json, true, &mut out, &mut err);
         run(&parsed, &dir.root, &mut sink).unwrap();
         let text = String::from_utf8(out).unwrap();
         let doc: serde_json::Value = serde_json::from_str(&text).unwrap();
@@ -640,7 +646,10 @@ mod tests {
         assert_eq!(doc["secret"], "created");
         assert!(doc["modified_source"].as_array().unwrap().is_empty());
         for field in ["commit", "never_commit", "back_up"] {
-            assert!(!doc[field].as_array().unwrap().is_empty(), "{field} is empty");
+            assert!(
+                !doc[field].as_array().unwrap().is_empty(),
+                "{field} is empty"
+            );
         }
         assert!(doc["never_commit"]
             .as_array()
@@ -650,7 +659,8 @@ mod tests {
         // The handle is a 40-bit base32 label; nothing in the document is a key.
         assert_eq!(doc["secret_handle"].as_str().unwrap().len(), 8);
         assert!(
-            !text.contains("PRIVATE KEY") && !text.contains("\"key\": \"")
+            !text.contains("PRIVATE KEY")
+                && !text.contains("\"key\": \"")
                 && !text.contains("root.key\n-----"),
             "the document printed key material"
         );
@@ -663,10 +673,8 @@ mod tests {
 
     impl Scratch {
         fn new(label: &str) -> Self {
-            let root = std::env::temp_dir().join(format!(
-                "swp-cli-init-{}-{label}",
-                std::process::id()
-            ));
+            let root =
+                std::env::temp_dir().join(format!("swp-cli-init-{}-{label}", std::process::id()));
             let _ = std::fs::remove_dir_all(&root);
             std::fs::create_dir_all(&root).unwrap();
             Scratch { root }

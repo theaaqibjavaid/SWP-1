@@ -23,7 +23,7 @@
 //! This is the single definition of that computation. `swp-embedding` uses it to
 //! write a manifest and `swp-detection` uses it to read one; if the two ever
 //! disagreed, every site in every copy would look like a tamper, so neither is
-//! allowed its own copy of these twelve lines. The cross-check that they still
+//! allowed its own copy of it. The cross-check that they still
 //! agree with the adapter's own radius queries lives in
 //! `crates/swp-adapters/tests/token_stream.rs`.
 
@@ -51,12 +51,7 @@ pub fn radius_digest(
         RadiusKind::StatementId | RadiusKind::StatementRaw => statement,
         RadiusKind::ScopeId | RadiusKind::ScopeRaw => scope,
     };
-    canonicalize(
-        tokens_within(tokens, radius),
-        level_for(kind),
-        Some(site),
-    )
-    .digest()
+    canonicalize(tokens_within(tokens, radius), level_for(kind), Some(site)).digest()
 }
 
 /// All four keys, indexed by [`RadiusKind::all`] — which is also the order a
@@ -194,8 +189,12 @@ mod tests {
 
     #[test]
     fn hiding_the_site_keeps_everything_else() {
-        let visible = canonicalize(&stream(), CanonLevel::L1, None).as_str().to_string();
-        let hidden = canonicalize(&stream(), CanonLevel::L1, Some(SITE)).as_str().to_string();
+        let visible = canonicalize(&stream(), CanonLevel::L1, None)
+            .as_str()
+            .to_string();
+        let hidden = canonicalize(&stream(), CanonLevel::L1, Some(SITE))
+            .as_str()
+            .to_string();
         assert!(visible.contains("1000"), "{visible}");
         assert!(!hidden.contains("1000"), "{hidden}");
         assert!(hidden.contains("<SITE>"), "{hidden}");

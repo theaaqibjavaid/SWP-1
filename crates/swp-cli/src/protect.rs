@@ -81,12 +81,7 @@ struct ProtectionDocument {
     next: Vec<String>,
 }
 
-pub fn run(
-    parsed: &Parsed,
-    cwd: &Path,
-    sink: &mut Sink<'_>,
-    mode: Mode,
-) -> Result<i32, SwpError> {
+pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>, mode: Mode) -> Result<i32, SwpError> {
     let project = Ctx::open(parsed, cwd)?;
     for warning in &project.warnings {
         sink.warn(warning);
@@ -223,7 +218,10 @@ fn text_lines(d: &ProtectionDocument, mode: Mode) -> Vec<String> {
             d.project_id,
             d.release_id
         ),
-        format!("  sites       {}/{} embedded, {} refused", d.sites_embedded, d.target_sites, d.sites_skipped),
+        format!(
+            "  sites       {}/{} embedded, {} refused",
+            d.sites_embedded, d.target_sites, d.sites_skipped
+        ),
         format!("  tag         {} bits per site", d.tag_bits),
         format!("  fingerprint {} ({})", d.fingerprint, d.fingerprint_level),
         format!(
@@ -250,10 +248,10 @@ fn text_lines(d: &ProtectionDocument, mode: Mode) -> Vec<String> {
     });
     if d.modified.is_empty() {
         out.push(match mode {
-            Mode::Plan => "  no source file. The plan is saved; `swp protect` applies it."
-                .to_string(),
-            Mode::DryRun => "  nothing. This run wrote no artifact and edited no file."
-                .to_string(),
+            Mode::Plan => {
+                "  no source file. The plan is saved; `swp protect` applies it.".to_string()
+            }
+            Mode::DryRun => "  nothing. This run wrote no artifact and edited no file.".to_string(),
             Mode::Release => "  nothing, which cannot happen for a release.".to_string(),
         });
     }
@@ -275,7 +273,7 @@ fn text_lines(d: &ProtectionDocument, mode: Mode) -> Vec<String> {
             out.push(format!("  {reason:<24} {n}"));
         }
         out.push(format!(
-            "  read them with: swp inspect fragments --release {}",
+            "  one line each, with its file and reason: swp inspect plan --release {}",
             d.release_id
         ));
     }
@@ -324,7 +322,10 @@ mod tests {
     /// Every source file and its exact bytes, which is what "changed nothing" has
     /// to be measured against.
     fn snapshot(dir: &Scratch) -> Vec<(String, String)> {
-        dir.sources().into_iter().map(|f| (f.clone(), dir.read(&f))).collect()
+        dir.sources()
+            .into_iter()
+            .map(|f| (f.clone(), dir.read(&f)))
+            .collect()
     }
 
     /// The keyed addresses one release published privately — the strings that must
@@ -338,7 +339,10 @@ mod tests {
                 out.push(id.as_str().unwrap_or_default().to_string());
             }
         }
-        assert!(out.len() >= 4, "the manifest published no keyed addresses: {raw}");
+        assert!(
+            out.len() >= 4,
+            "the manifest published no keyed addresses: {raw}"
+        );
         out
     }
 
@@ -358,7 +362,11 @@ mod tests {
             "You may commit",
             "Next",
         ] {
-            assert!(r.out.contains(heading), "no {heading:?} section:\n{}", r.out);
+            assert!(
+                r.out.contains(heading),
+                "no {heading:?} section:\n{}",
+                r.out
+            );
         }
         // Naming the categories is not answering them: the private list has to
         // point at the file that can rebuild every tag.
@@ -379,21 +387,35 @@ mod tests {
             // §35 list is about the source.
             .filter(|file| file.contains('/'))
             .collect();
-        assert!(!edited.is_empty(), "protect wrote a release and edited no source");
+        assert!(
+            !edited.is_empty(),
+            "protect wrote a release and edited no source"
+        );
         assert_eq!(before.len(), after.len(), "protect added or deleted a file");
         let claimed: Vec<String> = r
             .out
             .split("What was modified")
             .nth(1)
-            .unwrap_or_else(|| panic!("no modification section:
-{}", r.out))
+            .unwrap_or_else(|| {
+                panic!(
+                    "no modification section:
+{}",
+                    r.out
+                )
+            })
             .split("How the constellation is built")
             .next()
             .unwrap()
             .lines()
-            .filter_map(|line| line.split_once(" — ").map(|(file, _)| file.trim().to_string()))
+            .filter_map(|line| {
+                line.split_once(" — ")
+                    .map(|(file, _)| file.trim().to_string())
+            })
             .collect();
-        assert_eq!(claimed, edited, "the modification list is not the tree's diff");
+        assert_eq!(
+            claimed, edited,
+            "the modification list is not the tree's diff"
+        );
     }
 
     #[test]
@@ -424,11 +446,10 @@ mod tests {
         );
         // Where it does live, stated as a path the operator can back up.
         assert!(
-            doc["artifacts"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|a| a.as_str().unwrap_or_default().contains(".swp/private/manifests/")),
+            doc["artifacts"].as_array().unwrap().iter().any(|a| a
+                .as_str()
+                .unwrap_or_default()
+                .contains(".swp/private/manifests/")),
             "{doc:#}"
         );
     }
@@ -443,7 +464,11 @@ mod tests {
         let r = dir.run(&["protect", "--dry-run"]);
         assert_eq!(r.code, 0, "{}\n{}", r.out, r.err);
         assert_eq!(snapshot(&dir), before, "a dry run edited the source");
-        assert_eq!(dir.store_files(), store_before, "a dry run wrote into the store");
+        assert_eq!(
+            dir.store_files(),
+            store_before,
+            "a dry run wrote into the store"
+        );
         assert!(r.out.contains("A dry run records nothing"), "{}", r.out);
         assert!(r.out.contains("nothing on disk"), "{}", r.out);
     }
@@ -491,13 +516,22 @@ mod tests {
         let r = dir.run(&["protect", "--revision", "  v2.3-beta  ", "--format", "json"]);
         assert_eq!(r.code, 0, "{}\n{}", r.out, r.err);
         let doc = r.json();
-        assert_eq!(doc["revision"], "v2.3-beta", "the label should be trimmed: {doc:#}");
+        assert_eq!(
+            doc["revision"], "v2.3-beta",
+            "the label should be trimmed: {doc:#}"
+        );
         for file in dir.sources() {
-            assert!(!dir.read(&file).contains("v2.3-beta"), "{file} carries the label");
+            assert!(
+                !dir.read(&file).contains("v2.3-beta"),
+                "{file} carries the label"
+            );
         }
         let release = doc["release_id"].as_str().unwrap();
         let record = dir.read(&format!(".swp/public/releases/{release}.json"));
-        assert!(record.contains("v2.3-beta"), "the release record lost the revision: {record}");
+        assert!(
+            record.contains("v2.3-beta"),
+            "the release record lost the revision: {record}"
+        );
         assert!(
             record.contains(doc["fingerprint"].as_str().unwrap()),
             "the record's fingerprint is the one the command printed: {record}"

@@ -18,7 +18,6 @@
 use base64::Engine as _;
 use serde::Serialize;
 
-
 use swp_core::cjson;
 use swp_core::error::SwpError;
 use swp_crypto::{ManifestSigningKey, VerifyingKey};
@@ -78,8 +77,19 @@ pub fn sign_release_record(
 }
 
 /// Check a release record against a project's public verification key.
+///
+/// The record is what `swp inspect release` prints and what a report names as the
+/// release that was found, so every field in it is a claim. The cross-checks in
+/// `swp-detection` cover the four the detector compares against the private
+/// manifest; this covers the rest, and covers them against the same key that
+/// signed the manifest, which is what makes the two agree rather than merely
+/// fail to contradict each other.
 pub fn verify_release_record(record: &ReleaseRecord, key: &VerifyingKey) -> Result<(), SwpError> {
+    if record.signature.is_empty() {
+        return Err(SwpError::invalid_manifest("release record is unsigned"));
+    }
     verify_json_document(record, &record.signature, key)
+        .map_err(|e| SwpError::new(e.code(), format!("release record: {}", e.message())))
 }
 
 #[cfg(test)]

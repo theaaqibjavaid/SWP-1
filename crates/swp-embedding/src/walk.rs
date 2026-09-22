@@ -101,8 +101,20 @@ fn container_extension(path: &Path) -> bool {
     };
     matches!(
         ext.to_ascii_lowercase().as_str(),
-        "zip" | "tar" | "gz" | "tgz" | "bz2" | "xz" | "7z" | "jar" | "war" | "whl" | "vsix"
-            | "apk" | "epub" | "nupkg"
+        "zip"
+            | "tar"
+            | "gz"
+            | "tgz"
+            | "bz2"
+            | "xz"
+            | "7z"
+            | "jar"
+            | "war"
+            | "whl"
+            | "vsix"
+            | "apk"
+            | "epub"
+            | "nupkg"
     )
 }
 
@@ -138,21 +150,42 @@ impl Walk {
 pub fn walk(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Result<Walk, SwpError> {
     let out = walk_tree(root, cfg, limits)?;
     if out.files.is_empty() {
-        return Err(SwpError::new(
+        let unsupported = out
+            .omissions
+            .iter()
+            .all(|o| o.reason.starts_with("no language adapter"));
+        let hint = if unsupported {
+            let languages = Registry::standard()
+                .parsed_languages()
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "Nothing under [protect] targets has a language adapter, so this tree is not \
+                 source to SWP-1 and nothing was written. This build parses {languages}; \
+                 another language needs an adapter, which is the extension point the \
+                 documentation describes. Point [protect] targets at the part of the tree \
+                 that is one of them, if there is one."
+            )
+        } else {
+            String::new()
+        };
+        let error = SwpError::new(
             ErrorCode::NoSafeLocations,
             format!(
-                "nothing to protect under {:?}: {} path{} refused ({}). Check [protect] targets \
-                 and excludes in .swp/config.toml",
-                root.display(),
+                "nothing to protect under \"{}\": {} path{} refused ({}). Check [protect] \
+                 targets and excludes in .swp/config.toml",
+                swp_core::text::display_path(&root.display().to_string()),
                 out.omissions.len(),
-                if out.omissions.len() == 1 {
-                    ""
-                } else {
-                    "s"
-                },
+                if out.omissions.len() == 1 { "" } else { "s" },
                 summarize_omissions(&out.omissions)
             ),
-        ));
+        );
+        return Err(if hint.is_empty() {
+            error
+        } else {
+            error.with_next(hint)
+        });
     }
     Ok(out)
 }
@@ -173,6 +206,13 @@ fn walk_tree(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Result<Walk, 
     }
     let registry = Registry::standard();
     let excludes = Excludes::build(cfg)?;
+    // `swp scan ../suspect/copy` is the protocol's main use of this function, and
+    // a caller-written `..` in that path would otherwise make every file on the
+    // candidate look like it sits outside the walked root: `join_target` below
+    // resolves `.` and `..` lexically, so the walk has to compare against the
+    // same spelling it walks from.
+    let root = normalize(root);
+    let root = root.as_path();
 
     let mut out = Walk::default();
     let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
@@ -182,7 +222,15 @@ fn walk_tree(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Result<Walk, 
             // A single named file is a legitimate target: a one-script project
             // should be protectable, and a user who lists `src/main.js` means
             // exactly that file.
-            admit(root, &target_root, &excludes, &registry, limits, &mut out, &mut seen);
+            admit(
+                root,
+                &target_root,
+                &excludes,
+                &registry,
+                limits,
+                &mut out,
+                &mut seen,
+            );
             continue;
         }
         if !target_root.is_dir() {
@@ -225,7 +273,7 @@ fn walk_tree(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Result<Walk, 
             let Some(rel) = relpath(root, path) else {
                 out.omissions.push(Omission {
                     path: path.display().to_string(),
-                    reason: "path is not valid text".to_string(),
+                    reason: relpath_failure(root, path).to_string(),
                     kind: OmissionKind::NotExamined,
                 });
                 continue;
@@ -279,7 +327,9 @@ fn walk_tree(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Result<Walk, 
             found.push((path.to_path_buf(), bytes));
         }
         for (path, bytes) in found {
-            admit_with(root, &path, bytes, &excludes, &registry, limits, &mut out, &mut seen);
+            admit_with(
+                root, &path, bytes, &excludes, &registry, limits, &mut out, &mut seen,
+            );
         }
     }
     out.files.sort_by(|a, b| a.rel.cmp(&b.rel));
@@ -325,7 +375,7 @@ fn admit_with(
     let Some(rel) = relpath(root, abs) else {
         out.omissions.push(Omission {
             path: abs.display().to_string(),
-            reason: "path is not valid text".to_string(),
+            reason: relpath_failure(root, abs).to_string(),
             kind: OmissionKind::NotExamined,
         });
         return;
@@ -344,7 +394,10 @@ fn admit_with(
     if bytes > limits.max_file_bytes {
         out.omissions.push(Omission {
             path: rel,
-            reason: format!("{} bytes, above max_file_bytes ({})", bytes, limits.max_file_bytes),
+            reason: format!(
+                "{} bytes, above max_file_bytes ({})",
+                bytes, limits.max_file_bytes
+            ),
             kind: OmissionKind::NotExamined,
         });
         return;
@@ -448,6 +501,18 @@ fn relpath(root: &Path, path: &Path) -> Option<String> {
     let text = rel.to_str()?;
     let canon = canonical_relpath(text);
     (!canon.is_empty()).then_some(canon)
+}
+
+/// Why [`relpath`] produced nothing, in the words an operator can act on. The two
+/// causes are different failures and a report that named the wrong one would send
+/// someone hunting for an encoding problem in a path that simply is not inside
+/// the tree being walked.
+fn relpath_failure(root: &Path, path: &Path) -> &'static str {
+    if path.strip_prefix(root).is_err() {
+        "path is outside the walked root"
+    } else {
+        "path is not valid text"
+    }
 }
 
 /// The merged exclusion set: the always-excluded trees plus the project's own.
@@ -577,7 +642,10 @@ impl Pattern {
 }
 
 fn segments(rel: &str) -> Vec<String> {
-    canonical_relpath(rel).split('/').map(|s| s.to_string()).collect()
+    canonical_relpath(rel)
+        .split('/')
+        .map(|s| s.to_string())
+        .collect()
 }
 
 fn match_segs(pattern: &[Seg], path: &[String]) -> bool {
@@ -736,7 +804,10 @@ mod tests {
         };
         let e = Excludes::build(&cfg).unwrap();
         assert!(e.matches("src/generated/api.js"));
-        assert!(e.matches("node_modules/x/y.js"), "defaults must still apply");
+        assert!(
+            e.matches("node_modules/x/y.js"),
+            "defaults must still apply"
+        );
     }
 
     #[test]
@@ -772,6 +843,47 @@ mod tests {
         assert!(!covered("README"));
     }
 
+    /// `swp scan ../suspect/copy` is the shape a real investigation takes, and a
+    /// `..` in the caller's path used to make every file in the candidate look
+    /// like it sat outside the walked root — so the scan examined nothing, called
+    /// the result inconclusive, and looked like it had looked hard.
+    #[test]
+    fn a_root_written_with_a_parent_segment_walks_the_same_files() {
+        let dir = temp("parent-segment");
+        std::fs::create_dir_all(dir.join("here/src")).unwrap();
+        std::fs::create_dir_all(dir.join("there/src")).unwrap();
+        std::fs::write(dir.join("there/src/a.js"), "const x = 1;\n").unwrap();
+        std::fs::write(dir.join("there/src/b.js"), "const y = 2;\n").unwrap();
+
+        let cfg = ProtectConfig {
+            targets: vec![".".to_string()],
+            ..ProtectConfig::default()
+        };
+        let limits = Limits::default();
+        let plain = walk_for_scan(&dir.join("there"), &cfg, &limits).unwrap();
+        let roundabout =
+            walk_for_scan(&dir.join("here").join("..").join("there"), &cfg, &limits).unwrap();
+        let rels = |w: &Walk| {
+            w.files
+                .iter()
+                .map(|f| f.rel.clone())
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        assert_eq!(plain.files.len(), 2, "{:?}", plain.omissions);
+        assert_eq!(
+            rels(&plain),
+            rels(&roundabout),
+            "the same tree spelled two ways yielded two different walks"
+        );
+        assert!(
+            roundabout.omissions.is_empty(),
+            "a spelling mistake in the walk is being reported as a candidate's problem: {:?}",
+            roundabout.omissions
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     fn temp(label: &str) -> PathBuf {
         let mut dir = std::env::temp_dir();
         dir.push(format!("swp-walk-{label}-{}", std::process::id()));
@@ -799,7 +911,12 @@ mod tests {
         touch(&root.join("src/a.js"), "const a = 1;\n");
         touch(&root.join("src/sub/c.js"), "const c = 1;\n");
         touch(&root.join("tools/d.js"), "const d = 1;\n");
-        let w = walk(&root, &cfg(&["src", "src/sub", "tools"]), &Limits::default()).unwrap();
+        let w = walk(
+            &root,
+            &cfg(&["src", "src/sub", "tools"]),
+            &Limits::default(),
+        )
+        .unwrap();
         let rels: Vec<&str> = w.files.iter().map(|f| f.rel.as_str()).collect();
         assert_eq!(rels, ["src/a.js", "src/b.js", "src/sub/c.js", "tools/d.js"]);
         std::fs::remove_dir_all(&root).unwrap();
@@ -809,15 +926,13 @@ mod tests {
     fn excluded_directories_are_pruned_and_reported_as_such() {
         let root = temp("prune");
         touch(&root.join("src/app.js"), "const a = 1;\n");
-        touch(&root.join("src/node_modules/dep/index.js"), "const d = 1;\n");
+        touch(
+            &root.join("src/node_modules/dep/index.js"),
+            "const d = 1;\n",
+        );
         touch(&root.join("src/dist/bundle.js"), "const b = 1;\n");
         let w = walk(&root, &cfg(&["src"]), &Limits::default()).unwrap();
-        assert_eq!(
-            w.files.len(),
-            1,
-            "only app.js is in scope: {:?}",
-            w.files
-        );
+        assert_eq!(w.files.len(), 1, "only app.js is in scope: {:?}", w.files);
         assert!(w.dirs_pruned >= 2, "both trees should have been pruned");
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -828,7 +943,10 @@ mod tests {
         touch(&root.join("src/app.js"), "const a = 1;\n");
         touch(&root.join("src/other.js"), "const b = 1;\n");
         let w = walk(&root, &cfg(&["src/app.js"]), &Limits::default()).unwrap();
-        assert_eq!(w.files.iter().map(|f| f.rel.as_str()).collect::<Vec<_>>(), ["src/app.js"]);
+        assert_eq!(
+            w.files.iter().map(|f| f.rel.as_str()).collect::<Vec<_>>(),
+            ["src/app.js"]
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -866,7 +984,10 @@ mod tests {
         let root = temp("big");
         touch(&root.join("src/app.js"), "const a = 1;\n");
         touch(&root.join("src/huge.js"), &"x".repeat(4096));
-        let limits = Limits { max_file_bytes: 64, ..Limits::default() };
+        let limits = Limits {
+            max_file_bytes: 64,
+            ..Limits::default()
+        };
         let w = walk(&root, &cfg(&["src"]), &limits).unwrap();
         assert_eq!(w.files.len(), 1);
         assert!(w
@@ -882,7 +1003,10 @@ mod tests {
         for i in 0..5 {
             touch(&root.join(format!("src/f{i}.js")), "const a = 1;\n");
         }
-        let limits = Limits { max_files: 3, ..Limits::default() };
+        let limits = Limits {
+            max_files: 3,
+            ..Limits::default()
+        };
         let e = walk(&root, &cfg(&["src"]), &limits).unwrap_err();
         assert_eq!(e.code(), ErrorCode::LimitExceeded);
         assert!(e.message().contains("narrow"), "{}", e.message());
@@ -895,7 +1019,10 @@ mod tests {
         touch(&root.join("src/app.js"), "const a = 1;\n");
         touch(&root.join("src/nothing.js"), "");
         let w = walk(&root, &cfg(&["src"]), &Limits::default()).unwrap();
-        assert_eq!(w.files.iter().map(|f| f.rel.as_str()).collect::<Vec<_>>(), ["src/app.js"]);
+        assert_eq!(
+            w.files.iter().map(|f| f.rel.as_str()).collect::<Vec<_>>(),
+            ["src/app.js"]
+        );
         assert!(w
             .omissions
             .iter()

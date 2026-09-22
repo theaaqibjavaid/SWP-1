@@ -9,12 +9,15 @@ use crate::error::{ErrorCode, SwpError};
 /// Which slice of context identifies a site, and whether local names were
 /// abstracted away.
 ///
-/// Four keys are computed for every site and every one is stored in the private
-/// manifest. A copy that was reformatted still matches the `*Id` keys; a copy
-/// whose local names were rewritten still matches... both, because `*Id` keys
-/// are name-insensitive; a copy where an ancestor function was extracted or
-/// inlined can still match the statement-radius key. The detector counts a site
-/// once however many of its four keys hit.
+/// Four keys are computed for every site and all four are stored in the private
+/// manifest: the innermost statement and the enclosing scope, each canonicalized
+/// with local names abstracted and with them preserved. A copy that was only
+/// reformatted hits the statement-radius keys; one whose local names were
+/// rewritten hits the two `*Id` keys, which are name-insensitive by construction;
+/// one where an enclosing function was extracted or inlined can still hit a
+/// scope-radius key. The detector counts a site once however many of its four
+/// keys hit, and reports which kinds were seen, because a site confirmed through
+/// one key and one confirmed through four are not equally strong claims.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RadiusKind {
     /// Innermost enclosing statement/expression-statement, local names abstracted.

@@ -67,10 +67,11 @@ use crate::select::{self, Selection};
 use crate::walk::{self, ScannedFile, Walk};
 
 /// The level a release fingerprint is taken at. Always `L1`: it is the only
-/// canonicalization level that is stable under reformatting *and* defined for
-/// every language including the lexical fallback, so a whole-tree hash of it
-/// always exists and always means the same thing on both sides. See §16 and
-/// [`swp_manifest::LEVELS`].
+/// canonicalization level that is stable under reformatting while keeping every
+/// token's own spelling, so a whole-tree hash of it always exists and always
+/// means the same thing on both sides of a comparison. L2 and L3 abstract names
+/// and values away, which is what a *site* needs and what a claim of an exact
+/// copy must not have. See §16 and [`swp_manifest::LEVELS`].
 pub const FINGERPRINT_LEVEL: &str = "L1";
 
 /// Whether a run writes source or only records what it would have done.
@@ -193,7 +194,14 @@ pub fn protect(req: &Request<'_>) -> Result<Protection, SwpError> {
     }
 
     let walked = walk::walk(req.root, &req.config.protect, &limits)?;
-    let scan = candidates::scan(req.root, &walked, &keys, &req.config.protect, width, &limits)?;
+    let scan = candidates::scan(
+        req.root,
+        &walked,
+        &keys,
+        &req.config.protect,
+        width,
+        &limits,
+    )?;
     let selection = select::select(&scan, req.config.protect.target_sites, &limits)?;
     let applied = apply::apply(req.root, &scan, &selection, &keys, width, &limits)?;
     if applied.entries.is_empty() {
@@ -260,7 +268,8 @@ pub fn protect(req: &Request<'_>) -> Result<Protection, SwpError> {
         Mode::Plan => {
             // The plan is the whole output of `swp generate`, and it is private for
             // the same reason the manifest is: it names files and literals.
-            req.store.write_plan(&req.release_id, &plan.to_json_bytes())?;
+            req.store
+                .write_plan(&req.release_id, &plan.to_json_bytes())?;
             artifacts.push(req.store.relabel(&req.store.plan_path(&req.release_id)));
             notes.push(
                 "plan mode: no source file was modified, and no release record or manifest \
@@ -325,7 +334,8 @@ fn write_release(
     artifacts.push(req.store.relabel(&manifest_path));
 
     let plan_path = req.store.plan_path(&req.release_id);
-    req.store.write_plan(&req.release_id, &plan.to_json_bytes())?;
+    req.store
+        .write_plan(&req.release_id, &plan.to_json_bytes())?;
     artifacts.push(req.store.relabel(&plan_path));
 
     let record_path = req.store.release_path(&req.release_id);
@@ -367,11 +377,7 @@ fn write_release(
         notes.push(format!(
             "{} source file{} modified in place",
             applied.files.len(),
-            if applied.files.len() == 1 {
-                ""
-            } else {
-                "s"
-            }
+            if applied.files.len() == 1 { "" } else { "s" }
         ));
     }
     Ok(())
@@ -489,11 +495,7 @@ fn release_record(
     created_at: Timestamp,
     generator: &GeneratorInfo,
 ) -> Result<ReleaseRecord, SwpError> {
-    let families: BTreeSet<&str> = manifest
-        .sites
-        .iter()
-        .map(|e| e.family.as_str())
-        .collect();
+    let families: BTreeSet<&str> = manifest.sites.iter().map(|e| e.family.as_str()).collect();
     let joined = families.into_iter().collect::<Vec<_>>().join(",");
     let hex = sha256(joined.as_bytes()).hex();
     Ok(ReleaseRecord {
@@ -553,8 +555,7 @@ fn refuse_replaced_release(req: &Request<'_>) -> Result<(), SwpError> {
                  release record: it is the evidence, and the sources of that release carry \
                  the sites only it describes. Run `swp protect` without --release to mint a \
                  new id, or `swp verify --release {}` to check the existing one.",
-                existing.created_at,
-                req.release_id
+                existing.created_at, req.release_id
             ),
         ));
     }
@@ -677,12 +678,7 @@ mod tests {
 
     const STAMP: &str = "2026-09-20T10:00:00Z";
 
-    fn request<'a>(
-        t: &'a Tree,
-        cfg: &'a SwpConfig,
-        id: &str,
-        mode: Mode,
-    ) -> Request<'a> {
+    fn request<'a>(t: &'a Tree, cfg: &'a SwpConfig, id: &str, mode: Mode) -> Request<'a> {
         Request {
             root: &t.root,
             store: &t.store,
@@ -713,7 +709,10 @@ mod tests {
 
     #[test]
     fn a_release_lands_its_records_before_its_sources() {
-        let t = tree("order", &[("src/a.js", &module(8)), ("src/b.js", &module(8))]);
+        let t = tree(
+            "order",
+            &[("src/a.js", &module(8)), ("src/b.js", &module(8))],
+        );
         let cfg = config(8);
         let req = request(&t, &cfg, "rel-aaaaaaaaaaaa", Mode::Release);
         let out = protect(&req).unwrap();
@@ -747,7 +746,10 @@ mod tests {
         assert_eq!(manifest.fingerprint, out.fingerprint);
         assert_eq!(
             manifest.content_digest(),
-            t.store.read_release(&out.release_id).unwrap().private_manifest_digest,
+            t.store
+                .read_release(&out.release_id)
+                .unwrap()
+                .private_manifest_digest,
             "the record must point at the manifest that was actually written"
         );
         let record = t.store.read_release(&out.release_id).unwrap();
@@ -773,7 +775,11 @@ mod tests {
         let first = protect(&request(&t, &cfg, "rel-aaaaaaaaaaaa", Mode::Release)).unwrap();
         assert_eq!(read(&t, "tools/b.js"), before, "targets are a boundary");
         assert!(
-            !first.plan.sites.iter().any(|s| s.file.starts_with("tools/")),
+            !first
+                .plan
+                .sites
+                .iter()
+                .any(|s| s.file.starts_with("tools/")),
             "{:?}",
             first.plan.sites
         );
@@ -788,7 +794,10 @@ mod tests {
 
     #[test]
     fn a_tree_with_nothing_to_embed_modifies_nothing() {
-        let t = tree("empty", &[("src/a.js", "function f(base, scale) {\n  return base;\n}\n")]);
+        let t = tree(
+            "empty",
+            &[("src/a.js", "function f(base, scale) {\n  return base;\n}\n")],
+        );
         let cfg = config(8);
         let err = protect(&request(&t, &cfg, "rel-cccccccccccc", Mode::Release)).unwrap_err();
         assert_eq!(err.code(), ErrorCode::NoSafeLocations, "{err}");
@@ -832,7 +841,11 @@ mod tests {
             planned.artifacts,
             vec![format!(".swp/private/plans/{id}.json")]
         );
-        assert_eq!(read(&t, "src/a.js"), module(8), "plan mode rewrites nothing");
+        assert_eq!(
+            read(&t, "src/a.js"),
+            module(8),
+            "plan mode rewrites nothing"
+        );
         assert!(!t.store.release_path(&release(id)).exists());
         assert!(!t.store.manifest_path(&release(id)).exists());
         assert!(planned.notes.iter().any(|n| n.starts_with("plan mode")));
@@ -840,7 +853,8 @@ mod tests {
         // The point of `swp generate`: the plan is the constellation the release
         // would write, so the two must agree site for site.
         let shipped = protect(&request(&t, &cfg, id, Mode::Release)).unwrap();
-        let from_plan = Plan::from_json_bytes(&t.store.read_plan(&shipped.release_id).unwrap()).unwrap();
+        let from_plan =
+            Plan::from_json_bytes(&t.store.read_plan(&shipped.release_id).unwrap()).unwrap();
         assert_eq!(
             serde_json::to_string(&planned.plan).unwrap(),
             serde_json::to_string(&from_plan).unwrap()
@@ -858,10 +872,7 @@ mod tests {
         let cfg = config(8);
         let out = protect(&request(&t, &cfg, "rel-gggggggggggg", Mode::Release)).unwrap();
         let raw = KEY.to_vec();
-        let hex = KEY
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>();
+        let hex = KEY.iter().map(|b| format!("{b:02x}")).collect::<String>();
         let mut haystacks: Vec<(String, Vec<u8>)> = vec![(
             "protection.json".to_string(),
             serde_json::to_vec(&out).unwrap(),
@@ -872,7 +883,10 @@ mod tests {
         }
         assert!(haystacks.len() > 3, "{:?}", out.artifacts);
         for (name, bytes) in haystacks {
-            assert!(!bytes.windows(32).any(|w| w == raw), "{name} holds the root secret");
+            assert!(
+                !bytes.windows(32).any(|w| w == raw),
+                "{name} holds the root secret"
+            );
             let text = String::from_utf8_lossy(&bytes);
             assert!(!text.contains(&hex), "{name} holds the root secret in hex");
             assert!(!text.contains(&t.secret.fingerprint()), "{name}");

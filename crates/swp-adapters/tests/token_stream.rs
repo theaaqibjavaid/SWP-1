@@ -509,15 +509,12 @@ fn an_unsupported_language_lands_on_the_fallback_and_says_so() {
             source.path
         );
     }
-    // And the list of what is not supported is answerable, because a scan that
-    // quietly used a weaker analysis is the failure mode §14 warns about.
+    // And the set of what *is* supported is enumerable, because that is the
+    // sentence the CLI has to tell an operator whose tree is in another language.
     assert_eq!(
-        registry.unparsed_languages(&["java", "go", "rust", "javascript"]),
-        ["java", "go", "rust"]
+        registry.parsed_languages(),
+        ["javascript", "typescript", "python"]
     );
-    assert!(registry
-        .unparsed_languages(&["python", "typescript"])
-        .is_empty());
 }
 
 #[test]
@@ -626,10 +623,12 @@ fn the_radius_keys_use_the_same_text_the_adapters_validate() {
         // an adapter for a candidate whose extension it has never seen.
         let adapter = registry.for_language(&a.language);
         for site in &a.sites {
-            let digests = swp_core::radius_digests(&a.tokens, site.statement, site.scope, site.span);
+            let digests =
+                swp_core::radius_digests(&a.tokens, site.statement, site.scope, site.span);
             for (i, kind) in RadiusKind::all().iter().enumerate() {
                 let radius = site.radius(*kind);
-                let text = adapter.canonicalize(a.tokens_in(radius), level_for(*kind), Some(site.span));
+                let text =
+                    adapter.canonicalize(a.tokens_in(radius), level_for(*kind), Some(site.span));
                 assert_eq!(
                     digests[i],
                     text.digest(),

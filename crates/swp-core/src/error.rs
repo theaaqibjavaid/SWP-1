@@ -90,7 +90,11 @@ impl ErrorCode {
     pub fn next_step(self) -> &'static str {
         match self {
             ErrorCode::UnsupportedLanguage => {
-                "Scan will still report exact-copy and structural evidence for this file. To get keyed watermark evidence, add an adapter (docs/LANGUAGE-ADAPTERS.md) or protect the project with a supported language."
+                "The grammar this adapter compiles in could not be installed into the parser, so \
+                 no file of this language can be read. This is a property of the build rather \
+                 than of your project: check `swp --version`, and if it persists report the \
+                 language and platform. To protect a language no adapter claims, see \
+                 docs/LANGUAGE-ADAPTERS.md."
             }
             ErrorCode::InvalidManifest => {
                 "Re-run with --release <id> naming an intact release under .swp/public/releases/. If the file is genuinely corrupt, restore it from your provenance backup; a manifest cannot be regenerated without the root secret."
@@ -102,13 +106,20 @@ impl ErrorCode {
                 "Watermark verification needs the root secret. Check .swp/private/root.key exists and is readable, and that you are running as the same Windows account that created it (the secret is sealed per-user). Recovery from backup is documented in docs/GETTING-STARTED.md."
             }
             ErrorCode::MalformedSource => {
-                "The file is not decodable text or is truncated. SWP-1 skips it and continues; see the skipped_files section of the report."
+                "The file is not decodable text or is truncated. SWP-1 will not guess at it: it is \
+                 listed under the report's omissions, and a scan that could not examine it says \
+                 so rather than reporting a clean result."
             }
             ErrorCode::ParserFailure => {
-                "The language parser rejected this file. Detection falls back to the generic adapter, which reports weaker evidence. Check the parser_version recorded for this language in docs/VALIDATION.md if you expect AST evidence."
+                "The language parser gave up on this file, which is a result about the parser and \
+                 the file together, not a statement that the file is innocent. Re-run on the \
+                 files around it; if one file always fails, that file is the thing to look at."
             }
             ErrorCode::UnsafeEmbedding => {
-                "This location was refused because a rewrite there could change program behavior. Run `swp inspect fragments` for the recorded reason, and raise target_fragments in .swp/config.toml if the constellation came out too small."
+                "This location was refused because a rewrite there could change program behavior. \
+                 Run `swp inspect plan --release <id>` for the recorded reason, and aim \
+                 [protect].targets at more files if the constellation came out too small — a \
+                 smaller constellation is the correct outcome, not one to force."
             }
             ErrorCode::ProtocolVersionUnsupported => {
                 "Do not read this as a non-match. Install a build of SWP-1 that declares support for the artifact's protocol version, or verify it with the generator version recorded in its release record."
@@ -126,7 +137,11 @@ impl ErrorCode {
                 "The protected tree has changed since this release. Run `swp protect` to record a new release, or `swp verify --release <id>` to list the fragments that were lost."
             }
             ErrorCode::NoSafeLocations => {
-                "Every candidate location failed a safety precondition, so nothing was embedded and the source is unchanged. Raise target_sites, widen [protect].targets, or enable embed_strings in .swp/config.toml; `swp inspect fragments` lists each refusal and its reason."
+                "Every candidate location failed a safety precondition, so nothing was embedded and \
+                 the source is unchanged. Run `swp generate` to see what was offered and what was \
+                 refused, widen [protect].targets to more files, or turn [protect] embed_strings \
+                 on if it is off. A tree with no safe location is a real answer, not a failure to \
+                 work around."
             }
             ErrorCode::PathRejected => {
                 "An input path escaped the extraction directory, was absolute, or traversed a symlink. The archive or tree was refused rather than partially extracted; re-run on a source you produced yourself if you believe the check is too strict."
@@ -136,7 +151,9 @@ impl ErrorCode {
                 "Check that the path exists, is not locked by another process, and that you have write permission."
             }
             ErrorCode::Internal => {
-                "This is a defect in SWP-1. Re-run with SWP_LOG=debug and report the message; include the command but never your secret files."
+                "This is a defect in SWP-1: an invariant the code believed held did not. Report \
+                 the message and the command that printed it; include no secret file, and no \
+                 more of your source than the one file the `at:` line names."
             }
         }
     }
@@ -195,6 +212,14 @@ impl fmt::Display for SwpFailure {
 pub struct SwpError {
     pub failure: SwpFailure,
     pub cause: Option<String>,
+    /// Advice that replaces [`ErrorCode::next_step`] for this one failure.
+    ///
+    /// The table is keyed by code, and a code can have more than one cause worth
+    /// acting on: `NO_SAFE_LOCATIONS` means either "every candidate literal failed
+    /// a safety precondition" or "nothing here is source at all", and telling
+    /// someone to raise `target_sites` when their tree holds no JavaScript,
+    /// TypeScript or Python is a dead end printed as a next step.
+    pub next: Option<String>,
 }
 
 impl SwpError {
@@ -206,12 +231,26 @@ impl SwpError {
                 path: None,
             },
             cause: None,
+            next: None,
         }
     }
 
     pub fn with_path(mut self, path: impl Into<String>) -> Self {
         self.failure.path = Some(path.into());
         self
+    }
+
+    pub fn with_next(mut self, next: impl Into<String>) -> Self {
+        self.next = Some(next.into());
+        self
+    }
+
+    /// The step to tell this caller to take, which is the code's unless the site
+    /// that raised the error knew better.
+    pub fn next_step(&self) -> &str {
+        self.next
+            .as_deref()
+            .unwrap_or_else(|| self.failure.code.next_step())
     }
 
     pub fn caused_by(mut self, cause: impl std::fmt::Display) -> Self {
@@ -237,7 +276,7 @@ impl SwpError {
         if let Some(c) = &self.cause {
             s.push_str(&format!("\n  caused by: {c}"));
         }
-        s.push_str(&format!("\n  next step: {}", self.failure.code.next_step()));
+        s.push_str(&format!("\n  next step: {}", self.next_step()));
         s
     }
 

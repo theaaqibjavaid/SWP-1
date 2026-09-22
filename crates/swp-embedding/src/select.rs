@@ -78,7 +78,6 @@ impl SkipReason {
             SkipReason::LimitReached => "location-limit-reached",
         }
     }
-
 }
 
 /// One refused candidate, in the shape a report and a plan print.
@@ -147,11 +146,7 @@ impl Selection {
 }
 
 /// Choose up to `target` sites from `scan`.
-pub fn select(
-    scan: &Scan,
-    cfg_target: u32,
-    limits: &Limits,
-) -> Result<Selection, SwpError> {
+pub fn select(scan: &Scan, cfg_target: u32, limits: &Limits) -> Result<Selection, SwpError> {
     if scan.total_candidates() == 0 {
         return Err(SwpError::new(
             ErrorCode::NoSafeLocations,
@@ -281,8 +276,14 @@ pub fn select(
     }
 
     sel.chosen.sort_by(|a, b| {
-        let ka = (a.file, scan.files[a.file].candidates[a.candidate].span.start);
-        let kb = (b.file, scan.files[b.file].candidates[b.candidate].span.start);
+        let ka = (
+            a.file,
+            scan.files[a.file].candidates[a.candidate].span.start,
+        );
+        let kb = (
+            b.file,
+            scan.files[b.file].candidates[b.candidate].span.start,
+        );
         ka.cmp(&kb)
     });
     // A request the tree could not satisfy says so in one line, rather than
@@ -486,10 +487,13 @@ export const B = 2000;
         }
         let mut many = String::new();
         for s in 0..9 {
-            many.push_str(&format!("function f{s}(v) {{
+            many.push_str(&format!(
+                "function f{s}(v) {{
   return v + {};
 }}
-", 3000 + s));
+",
+                3000 + s
+            ));
         }
         write(&root, "src/busy.js", &many);
         let scan = scan_of(&root);
@@ -654,7 +658,9 @@ export const B = 2000;
         let sel = select(&scan, 20, &Limits::default()).unwrap();
         assert_eq!(sel.chosen.len(), 1);
         assert!(
-            sel.skipped.iter().any(|s| s.note.contains("1 of 20 requested")),
+            sel.skipped
+                .iter()
+                .any(|s| s.note.contains("1 of 20 requested")),
             "{:?}",
             sel.skipped
         );
@@ -675,7 +681,10 @@ export const B = 2000;
     fn a_ceiling_trimmed_request_says_which_limit_applied() {
         let root = tree("trimmed", 6, 6);
         let scan = scan_of(&root);
-        let limits = Limits { max_locations_per_manifest: 4, ..Limits::default() };
+        let limits = Limits {
+            max_locations_per_manifest: 4,
+            ..Limits::default()
+        };
         let sel = select(&scan, 30, &limits).unwrap();
         assert_eq!(sel.chosen.len(), 4);
         assert!(
@@ -692,7 +701,10 @@ export const B = 2000;
     fn the_manifest_ceiling_caps_the_constellation() {
         let root = tree("ceiling", 6, 6);
         let scan = scan_of(&root);
-        let limits = Limits { max_locations_per_manifest: 5, ..Limits::default() };
+        let limits = Limits {
+            max_locations_per_manifest: 5,
+            ..Limits::default()
+        };
         let sel = select(&scan, 30, &limits).unwrap();
         assert_eq!(sel.chosen.len(), 5);
         assert_eq!(sel.target, 5, "the ceiling is what the run asked for");
@@ -723,7 +735,12 @@ export const B = 2000;
         let flat: Vec<(usize, u32)> = sel
             .chosen
             .iter()
-            .map(|c| (c.file, scan.files[c.file].candidates[c.candidate].span.start))
+            .map(|c| {
+                (
+                    c.file,
+                    scan.files[c.file].candidates[c.candidate].span.start,
+                )
+            })
             .collect();
         let mut sorted = flat.clone();
         sorted.sort();
@@ -741,8 +758,15 @@ export const B = 2000;
         assert!(share_ladder(0, 0).iter().all(|n| *n >= 1));
         for (target, files) in [(1, 1), (2, 8), (30, 2), (7, 7)] {
             let ladder = share_ladder(target, files);
-            assert_eq!(ladder.last(), Some(&target.max(1)), "{target}/{files}: {ladder:?}");
-            assert!(ladder.windows(2).all(|w| w[0] < w[1]), "monotonic: {ladder:?}");
+            assert_eq!(
+                ladder.last(),
+                Some(&target.max(1)),
+                "{target}/{files}: {ladder:?}"
+            );
+            assert!(
+                ladder.windows(2).all(|w| w[0] < w[1]),
+                "monotonic: {ladder:?}"
+            );
         }
     }
 }

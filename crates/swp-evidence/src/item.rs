@@ -97,7 +97,12 @@ pub struct EvidenceItem {
 }
 
 impl EvidenceItem {
-    fn new(kind: EvidenceKind, release: &ReleaseDetection, basis: String, strength: EvidenceLevel) -> Self {
+    fn new(
+        kind: EvidenceKind,
+        release: &ReleaseDetection,
+        basis: String,
+        strength: EvidenceLevel,
+    ) -> Self {
         EvidenceItem {
             id: String::new(),
             kind,
@@ -158,7 +163,10 @@ impl EvidenceKind {
     /// is what an innocent copy of unprotected code looks like, and the second is a
     /// statement about absence.
     pub fn asserts_provenance(self) -> bool {
-        !matches!(self, EvidenceKind::StructuralMatch | EvidenceKind::NegativeControl)
+        !matches!(
+            self,
+            EvidenceKind::StructuralMatch | EvidenceKind::NegativeControl
+        )
     }
 
     /// Every category, so the tests can assert the table is exhaustive.
@@ -298,10 +306,11 @@ fn site_items(release: &ReleaseDetection, site: &SiteMatch) -> Vec<EvidenceItem>
 
     let mut out = Vec::new();
     let exact = site.status == SiteStatus::ExactRendering;
-    out.push(EvidenceItem::new(
-        EvidenceKind::WatermarkFragmentMatch,
-        release,
-        format!(
+    out.push(
+        EvidenceItem::new(
+            EvidenceKind::WatermarkFragmentMatch,
+            release,
+            format!(
             "the {} literal at {}:{} decodes under the {} family to the {} code this project's \
              key derives for this address{}",
             site.class.as_str(),
@@ -315,44 +324,49 @@ fn site_items(release: &ReleaseDetection, site: &SiteMatch) -> Vec<EvidenceItem>
                 ""
             }
         ),
-        // An exact rendering is a stronger statement than a decoding one: the first
-        // says our bytes are sitting there, the second says a code is.
-        if exact {
-            EvidenceLevel::Strong
-        } else if site.slots.len() > 1 {
-            EvidenceLevel::Moderate
-        } else {
-            EvidenceLevel::Weak
-        },
-    )
-    .at(found.clone(), source.clone()));
+            // An exact rendering is a stronger statement than a decoding one: the first
+            // says our bytes are sitting there, the second says a code is.
+            if exact {
+                EvidenceLevel::Strong
+            } else if site.slots.len() > 1 {
+                EvidenceLevel::Moderate
+            } else {
+                EvidenceLevel::Weak
+            },
+        )
+        .at(found.clone(), source.clone()),
+    );
 
     // The two channels below describe *how* a confirmed site was reached, and are
     // reported separately because each is a different thing to check by hand.
     if site.found_tokens > 1 {
-        out.push(EvidenceItem::new(
-            EvidenceKind::TokenMatch,
-            release,
-            format!(
+        out.push(
+            EvidenceItem::new(
+                EvidenceKind::TokenMatch,
+                release,
+                format!(
                 "the matched span is {} tokens wide, so it is a rendering rather than a source \
                  literal: our writer's expansion shape is present at this address",
                 site.found_tokens
             ),
-            EvidenceLevel::Moderate,
-        )
-        .at(found, source));
+                EvidenceLevel::Moderate,
+            )
+            .at(found, source),
+        );
     } else if site.refactored() {
-        out.push(EvidenceItem::new(
-            EvidenceKind::CanonicalMatch,
-            release,
-            format!(
+        out.push(
+            EvidenceItem::new(
+                EvidenceKind::CanonicalMatch,
+                release,
+                format!(
                 "the address was reproduced only through the rename-tolerant radii ({}), so the \
                  surrounding statement matches this release canonically while differing as text",
                 site.slots.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", ")
             ),
-            EvidenceLevel::Moderate,
-        )
-        .at(found, source));
+                EvidenceLevel::Moderate,
+            )
+            .at(found, source),
+        );
     }
     out
 }
@@ -467,7 +481,10 @@ mod tests {
             FingerprintCheck::NotMatched,
         )]));
         let kinds: Vec<_> = items.iter().map(|i| i.kind).collect();
-        assert!(kinds.contains(&EvidenceKind::WatermarkFragmentMatch), "{kinds:?}");
+        assert!(
+            kinds.contains(&EvidenceKind::WatermarkFragmentMatch),
+            "{kinds:?}"
+        );
         assert!(kinds.contains(&EvidenceKind::TokenMatch), "{kinds:?}");
         assert_eq!(items[0].location.as_ref().unwrap().tokens, Some(5));
     }
@@ -481,7 +498,10 @@ mod tests {
         let first = collect(&d);
         let second = collect(&d);
         assert_eq!(first, second);
-        assert!(first.iter().enumerate().all(|(n, i)| i.id == format!("EV-{n:03}")));
+        assert!(first
+            .iter()
+            .enumerate()
+            .all(|(n, i)| i.id == format!("EV-{n:03}")));
         assert_eq!(first[0].kind, EvidenceKind::ExactSourceMatch);
     }
 }

@@ -34,7 +34,7 @@ pub mod private;
 pub mod sig;
 
 pub use classify::{
-    classify, ArtifactClass, PRIVATE_ARTIFACTS, PUBLIC_ARTIFACTS, BACKUP_ARTIFACTS,
+    classify, ArtifactClass, BACKUP_ARTIFACTS, PRIVATE_ARTIFACTS, PUBLIC_ARTIFACTS,
 };
 pub use fingerprint::{fingerprint_bytes, project_fingerprint, sha256, FileCanonical, LEVELS};
 pub use keys::{ManifestKeys, SLOTS};

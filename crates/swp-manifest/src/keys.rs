@@ -7,9 +7,15 @@
 //!
 //! | key | domain | inputs | answers |
 //! |---|---|---|---|
-//! | site key | `project` | project id | "which site is this?" |
+//! | site key | `project` | project id, canonicalizer version | "which site is this?" |
 //! | tag key | `location` | project id | "what value must this site carry?" |
-//! | selection key | `selection` | project id, release id | "which sites does this release use?" |
+//! | selection key | `selection` | project id, release id, canonicalizer version | "which sites does this release use?" |
+//!
+//! The canonicalizer version is an input to two of the three, for the reason
+//! [`ManifestKeys::derive`] gives: a canonicalizer change is meant to rename
+//! every site. The tag key takes no version because its message already carries
+//! a location id, and that id is a keyed digest of text canonicalized under one
+//! version — the version reaches the tag through it rather than beside it.
 //!
 //! The asymmetry is deliberate. Location ids and fragment tags are keyed by the
 //! *project* only, so re-protecting a project keeps every unchanged site's
@@ -129,10 +135,10 @@ impl ManifestKeys {
         out
     }
 
-    /// The value a site must carry: the low `width` bits of a keyed MAC over its
-    /// primary location id. This is the §8 `F = HMAC(project_key, location)`,
-    /// with a truncation wide enough to be a fragment and narrow enough that a
-    /// literal can hold it.
+    /// The value a site must carry: `width` bits taken off a keyed MAC over its
+    /// primary location id, by [`truncate_bits`]. This is the §8
+    /// `F = HMAC(project_key, location)`, with a truncation wide enough to be a
+    /// fragment and narrow enough that a literal can hold it.
     ///
     /// The width is inside the MAC input, so a project that later raises its
     /// tag width gets an *independent* value per site rather than a wider view
@@ -212,12 +218,7 @@ mod tests {
     }
 
     fn keys() -> ManifestKeys {
-        ManifestKeys::derive(
-            &root(),
-            &project(),
-            &release(1),
-            CanonicalizerVersion::V1,
-        )
+        ManifestKeys::derive(&root(), &project(), &release(1), CanonicalizerVersion::V1)
     }
 
     fn digest(b: u8) -> Digest {
@@ -227,13 +228,8 @@ mod tests {
     #[test]
     fn derivation_is_reproducible() {
         let a = keys().location_id(RadiusKind::StatementId, &digest(1));
-        let b = ManifestKeys::derive(
-            &root(),
-            &project(),
-            &release(1),
-            CanonicalizerVersion::V1,
-        )
-        .location_id(RadiusKind::StatementId, &digest(1));
+        let b = ManifestKeys::derive(&root(), &project(), &release(1), CanonicalizerVersion::V1)
+            .location_id(RadiusKind::StatementId, &digest(1));
         assert_eq!(a, b);
     }
 
@@ -244,24 +240,15 @@ mod tests {
     fn location_ids_and_tags_are_release_independent() {
         for id in [digest(2), digest(3)] {
             let a = keys().location_id(RadiusKind::ScopeId, &id);
-            let b = ManifestKeys::derive(
-                &root(),
-                &project(),
-                &release(9),
-                CanonicalizerVersion::V1,
-            )
-            .location_id(RadiusKind::ScopeId, &id);
+            let b =
+                ManifestKeys::derive(&root(), &project(), &release(9), CanonicalizerVersion::V1)
+                    .location_id(RadiusKind::ScopeId, &id);
             assert_eq!(a, b);
             let w = TagWidth::DEFAULT;
             assert_eq!(
                 keys().fragment_tag(&a, w),
-                ManifestKeys::derive(
-                    &root(),
-                    &project(),
-                    &release(9),
-                    CanonicalizerVersion::V1,
-                )
-                .fragment_tag(&b, w)
+                ManifestKeys::derive(&root(), &project(), &release(9), CanonicalizerVersion::V1,)
+                    .fragment_tag(&b, w)
             );
         }
     }
@@ -295,12 +282,7 @@ mod tests {
     #[test]
     fn canonicalizer_version_is_part_of_the_identity() {
         let v1 = keys();
-        let v2 = ManifestKeys::derive(
-            &root(),
-            &project(),
-            &release(1),
-            CanonicalizerVersion(2),
-        );
+        let v2 = ManifestKeys::derive(&root(), &project(), &release(1), CanonicalizerVersion(2));
         assert_ne!(
             v1.location_id(RadiusKind::StatementId, &digest(5)),
             v2.location_id(RadiusKind::StatementId, &digest(5))
@@ -310,12 +292,7 @@ mod tests {
     #[test]
     fn different_projects_do_not_share_ids_or_tags() {
         let other = ProjectId::new("swp1-bbbbbbbbbbbbbbbb").unwrap();
-        let k = ManifestKeys::derive(
-            &root(),
-            &other,
-            &release(1),
-            CanonicalizerVersion::V1,
-        );
+        let k = ManifestKeys::derive(&root(), &other, &release(1), CanonicalizerVersion::V1);
         let own = keys();
         let d = digest(6);
         assert_ne!(
@@ -388,12 +365,8 @@ mod tests {
             assert!(constant_time_eq(&p, &k.selection_priority(&ids)));
         }
         assert_eq!(set.len(), 64);
-        let release2 = ManifestKeys::derive(
-            &root(),
-            &project(),
-            &release(2),
-            CanonicalizerVersion::V1,
-        );
+        let release2 =
+            ManifestKeys::derive(&root(), &project(), &release(2), CanonicalizerVersion::V1);
         let ids = site_ids(&k, 0);
         assert_ne!(
             k.selection_priority(&ids),
@@ -419,7 +392,8 @@ mod tests {
             1,
             "the twin is the same site at every radius"
         );
-        twin[RadiusKind::ScopeRaw.code() as usize] = k.location_id(RadiusKind::ScopeRaw, &digest(200));
+        twin[RadiusKind::ScopeRaw.code() as usize] =
+            k.location_id(RadiusKind::ScopeRaw, &digest(200));
         assert_ne!(
             k.selection_priority(&site_ids(&k, 0)),
             k.selection_priority(&twin)

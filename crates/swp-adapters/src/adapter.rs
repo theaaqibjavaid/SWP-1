@@ -332,8 +332,9 @@ fn shorten(text: &str) -> String {
 /// The adapters this build ships with.
 ///
 /// Ordered by preference so the registry consults real parsers before the
-/// fallback, and closed: a language not in this list is not supported, and
-/// `swp scan --languages` says so rather than guessing.
+/// fallback, and closed: a language not in this list has no parser here. The
+/// walk refuses such a file outright rather than handing it to the fallback, so
+/// `swp protect` and `swp scan` only ever deal with the languages above.
 pub struct Registry {
     adapters: Vec<Box<dyn LanguageAdapter>>,
     fallback: GenericAdapter,
@@ -391,18 +392,6 @@ impl Registry {
     /// Names of the languages with a real parser.
     pub fn parsed_languages(&self) -> Vec<&'static str> {
         self.adapters.iter().map(|a| a.name()).collect()
-    }
-
-    /// Languages named by a caller that have no parser here. Empty means every
-    /// requested language is covered; non-empty must appear in a report, because
-    /// a scan that quietly used a weaker analysis is the failure mode §14 warns
-    /// about.
-    pub fn unparsed_languages(&self, requested: &[&str]) -> Vec<String> {
-        requested
-            .iter()
-            .filter(|r| !self.adapters.iter().any(|a| a.name() == **r))
-            .map(|r| r.to_string())
-            .collect()
     }
 }
 

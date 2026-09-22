@@ -256,11 +256,7 @@ impl Project {
     /// directory. This is the leaked tree a candidate is: §21 says the scanner
     /// supplies the keys, so a copy that carried `.swp/` would be a different
     /// experiment.
-    pub fn copy_to_candidate(
-        &self,
-        label: &str,
-        mut keep: impl FnMut(&str) -> bool,
-    ) -> Candidate {
+    pub fn copy_to_candidate(&self, label: &str, mut keep: impl FnMut(&str) -> bool) -> Candidate {
         let dir = TempDir::new(label);
         for rel in self.sources() {
             if keep(&rel) {
@@ -355,10 +351,7 @@ impl Release {
             tag_bits: record.watermark.tag_bits,
             fingerprint: record.fingerprint.to_string(),
             fingerprint_level: record.fingerprint_level.clone(),
-            sites: manifest["sites"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default(),
+            sites: manifest["sites"].as_array().cloned().unwrap_or_default(),
         }
     }
 
@@ -472,12 +465,8 @@ impl Verdict {
                 .to_string(),
             chance: real("chance"),
             guarantee: real("guarantee"),
-            tag_bits: top
-                .and_then(|t| t["tag_bits"].as_u64())
-                .unwrap_or(0) as u8,
-            probes: top
-                .and_then(|t| t["probes"].as_u64())
-                .unwrap_or(0) as u32,
+            tag_bits: top.and_then(|t| t["tag_bits"].as_u64()).unwrap_or(0) as u8,
+            probes: top.and_then(|t| t["probes"].as_u64()).unwrap_or(0) as u32,
             run,
         }
     }
@@ -549,7 +538,8 @@ impl Run {
     /// Assert the command succeeded, and return it for further reading.
     pub fn ok(self) -> Self {
         assert_eq!(
-            self.code, 0,
+            self.code,
+            0,
             "`swp {}` exited {}:\n{}{}",
             self.argv.join(" "),
             self.code,
@@ -603,10 +593,7 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<String>) {
 /// is left behind on purpose — the caller removes it — because a `TempDir` that
 /// cleaned itself up would take the path with it.
 pub fn bare_dir(label: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "swp1-bare-{label}-{}",
-        std::process::id()
-    ));
+    let path = std::env::temp_dir().join(format!("swp1-bare-{label}-{}", std::process::id()));
     std::fs::create_dir_all(&path).expect("cannot create a bare directory");
     path
 }

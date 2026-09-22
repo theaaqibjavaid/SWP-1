@@ -110,9 +110,17 @@ pub struct ReleaseRecord {
     /// Level the fingerprint was taken at, so a future L3 fingerprint cannot be
     /// silently compared against an L1 one.
     pub fingerprint_level: String,
-    /// Digest of the *private* manifest bytes. Lets the owner confirm a restored
-    /// backup is the manifest this release was shipped with. Reveals nothing:
-    /// the manifest it hashes is keyed throughout.
+    /// Digest of the *private* manifest bytes, so the owner can confirm a
+    /// restored backup is the manifest this release was shipped with, and so
+    /// `swp verify` can say the public record and the private one agree.
+    ///
+    /// Publishing it is safe because a digest is one-way; it is not safe in the
+    /// sense of "reveals nothing about the manifest", because the manifest lists
+    /// this project's file paths and the literal text at each site, and an
+    /// attacker who already has a candidate tree can test a guessed manifest
+    /// against this digest in one hash. The manifest's confidentiality comes
+    /// from `.swp/private/` being ACLed and gitignored, not from its contents
+    /// being keyed.
     pub private_manifest_digest: Digest,
     pub watermark: WatermarkParams,
     pub generator: GeneratorInfo,

@@ -282,10 +282,8 @@ impl Transform {
                     if !body.contains("return Math.round(sum * 100) / 100;") {
                         continue;
                     }
-                    *body = body.replace(
-                        "return Math.round(sum * 100) / 100;",
-                        "return round2(sum);",
-                    );
+                    *body =
+                        body.replace("return Math.round(sum * 100) / 100;", "return round2(sum);");
                     if !body.contains("function round2(") {
                         body.push_str(ROUND);
                     }
@@ -537,7 +535,11 @@ fn canonical_decimal(run: &str) -> String {
     let frac = frac.trim_end_matches('0');
     let whole = whole.trim_start_matches('0');
     if frac.is_empty() {
-        return if whole.is_empty() { "0".into() } else { whole.into() };
+        return if whole.is_empty() {
+            "0".into()
+        } else {
+            whole.into()
+        };
     }
     if whole.is_empty() {
         format!(".{frac}")
@@ -846,9 +848,8 @@ mod tests {
             );
             // The whole of what a formatting change is allowed to be: whitespace.
             // Anything else in this file would be an edit to the program.
-            let tight = |text: &str| -> String {
-                text.chars().filter(|c| !c.is_whitespace()).collect()
-            };
+            let tight =
+                |text: &str| -> String { text.chars().filter(|c| !c.is_whitespace()).collect() };
             assert_eq!(
                 tight(&source),
                 tight(&after),
@@ -860,7 +861,8 @@ mod tests {
     }
 
     #[test]
-    fn every_refactoring_changes_the_tree() {        // The assertion the measurement suites depend on: a transform that
+    fn every_refactoring_changes_the_tree() {
+        // The assertion the measurement suites depend on: a transform that
         // matched nothing would report "detection survived `class_rename`" about
         // a tree nobody renamed anything in.
         //
@@ -1047,10 +1049,7 @@ mod tests {
                 body.contains("function ") || body.contains("class "),
                 "{rel} lost every declaration it had, which is deletion rather than rebuild"
             );
-            assert!(
-                body.contains("void 0;"),
-                "{rel} lost no statement at all"
-            );
+            assert!(body.contains("void 0;"), "{rel} lost no statement at all");
             assert!(
                 body.contains("module.exports") || body.contains("exports."),
                 "{rel} lost the interface the module publishes"
@@ -1061,7 +1060,10 @@ mod tests {
     #[test]
     fn the_two_attack_lists_are_disjoint_and_together_everything() {
         assert_eq!(Transform::ALL.len(), 17);
-        assert_eq!(Transform::REFACTORING.len() + Transform::ADVERSARIAL.len(), 17);
+        assert_eq!(
+            Transform::REFACTORING.len() + Transform::ADVERSARIAL.len(),
+            17
+        );
         let mut slugs: Vec<&str> = Transform::ALL.iter().map(|t| t.slug()).collect();
         let unique = slugs.len();
         slugs.sort();
@@ -1099,7 +1101,8 @@ mod tests {
         assert!(!hexed.is_empty(), "nothing was re-spelled in hex");
         let respelled = numeric_values(&copy);
         assert_eq!(
-            before, respelled,
+            before,
+            respelled,
             "hex changed a value: {:?} vs {:?}",
             before.iter().take(8).collect::<Vec<_>>(),
             respelled.iter().take(8).collect::<Vec<_>>(),
@@ -1111,7 +1114,10 @@ mod tests {
             .filter(|t| t.contains("0x") || t.contains("0X"))
             .map(str::to_string)
             .collect();
-        assert!(left.is_empty(), "normalization left hexadecimal behind: {left:?}");
+        assert!(
+            left.is_empty(),
+            "normalization left hexadecimal behind: {left:?}"
+        );
         assert_eq!(
             before,
             numeric_values(&copy),
@@ -1142,7 +1148,8 @@ mod tests {
                 let free = i == 0 || !(chars[i - 1].is_alphanumeric() || chars[i - 1] == '_');
                 let starts = free
                     && (chars[i].is_ascii_digit()
-                        || (chars[i] == '.' && matches!(chars.get(i + 1), Some(d) if d.is_ascii_digit())));
+                        || (chars[i] == '.'
+                            && matches!(chars.get(i + 1), Some(d) if d.is_ascii_digit())));
                 if !starts {
                     i += 1;
                     continue;
@@ -1150,16 +1157,18 @@ mod tests {
                 let start = i;
                 let hex = chars[i] == '0' && matches!(chars.get(i + 1), Some('x') | Some('X'));
                 i += if hex { 2 } else { 1 };
-                while i < chars.len() && (chars[i].is_ascii_hexdigit() || (chars[i] == '.' && !hex)) {
+                while i < chars.len() && (chars[i].is_ascii_hexdigit() || (chars[i] == '.' && !hex))
+                {
                     i += 1;
                 }
                 let run: String = chars[start..i].iter().collect();
                 let run = run.trim_end_matches('.');
-                let value = if let Some(digits) = run
-                    .strip_prefix("0x")
-                    .or_else(|| run.strip_prefix("0X"))
+                let value = if let Some(digits) =
+                    run.strip_prefix("0x").or_else(|| run.strip_prefix("0X"))
                 {
-                    u64::from_str_radix(digits, 16).ok().map(|v| format!("{v}.0"))
+                    u64::from_str_radix(digits, 16)
+                        .ok()
+                        .map(|v| format!("{v}.0"))
                 } else {
                     run.parse::<f64>().ok().map(|v| format!("{v:?}"))
                 };

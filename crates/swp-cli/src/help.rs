@@ -76,13 +76,19 @@ pub fn overview(sink: &mut Sink<'_>) -> Result<(), SwpError> {
         lines.push(format!("  {:<10} {}", c.name(), c.blurb()));
     }
     lines.push(format!("  {:<10} {}", "help", Command::Help.blurb()));
-    lines.push(format!("  {:<10} {}", "--version", Command::Version.blurb()));
+    lines.push(format!(
+        "  {:<10} {}",
+        "--version",
+        Command::Version.blurb()
+    ));
     lines.push(String::new());
     lines.push("The normal sequence in a project you own:".to_string());
     lines.push("  swp init                 once; creates .swp/ and the project secret".to_string());
     lines.push("  swp generate             see the constellation, change nothing".to_string());
     lines.push("  swp protect              embed it and record a release".to_string());
-    lines.push("  swp verify               confirm this tree still carries that release".to_string());
+    lines.push(
+        "  swp verify               confirm this tree still carries that release".to_string(),
+    );
     lines.push("  swp scan ./copy          look at somebody else's tree".to_string());
     lines.push(String::new());
     lines.push("Every command takes --help. Machine-readable output is --format json.".to_string());
@@ -108,10 +114,7 @@ pub fn command(cmd: Command, sink: &mut Sink<'_>) -> Result<(), SwpError> {
     for f in cmd.flags() {
         lines.push(format!("  {:<24} {}", render_flag(*f), f.summary()));
     }
-    lines.push(format!(
-        "  {:<24} {}",
-        "-h, --help", "this text"
-    ));
+    lines.push(format!("  {:<24} {}", "-h, --help", "this text"));
     if let Some(extra) = detail(cmd) {
         lines.push(String::new());
         lines.push("Notes".to_string());
@@ -267,15 +270,24 @@ fn detail(cmd: Command) -> Option<Vec<String>> {
 /// The stable exit-code contract, in the order a reader wants it.
 pub fn exit_codes() -> Vec<(i32, &'static str)> {
     vec![
-        (0, "success; for scan, no watermark evidence found in a fully examined candidate"),
-        (1, "scan: watermark evidence found; the candidate carries one of your releases"),
+        (
+            0,
+            "success; for scan, no watermark evidence found in a fully examined candidate",
+        ),
+        (
+            1,
+            "scan: watermark evidence found; the candidate carries one of your releases",
+        ),
         (2, ErrorCode::Usage.as_str()),
         (3, ErrorCode::SecretUnavailable.as_str()),
         (4, ErrorCode::NotProtected.as_str()),
         (5, ErrorCode::ReleaseMismatch.as_str()),
         (6, ErrorCode::ProtocolVersionUnsupported.as_str()),
         (7, ErrorCode::LimitExceeded.as_str()),
-        (10, "INCONCLUSIVE / INSUFFICIENT_EVIDENCE — part of the candidate was not examined"),
+        (
+            10,
+            "INCONCLUSIVE / INSUFFICIENT_EVIDENCE — part of the candidate was not examined",
+        ),
         (14, ErrorCode::Io.as_str()),
         (15, ErrorCode::NoSafeLocations.as_str()),
         (70, ErrorCode::Internal.as_str()),
@@ -359,8 +371,7 @@ pub fn print(parsed: &Parsed, sink: &mut Sink<'_>) -> Result<(), SwpError> {
 /// Where a command's words go when `--output` names a file: stdout stays the
 /// document's home unless the operator asks for it elsewhere.
 pub fn write_document(path: &str, text: &str) -> Result<(), SwpError> {
-    std::fs::write(path, text)
-        .map_err(|e| SwpError::io(format!("cannot write {path:?}: {e}")))
+    std::fs::write(path, text).map_err(|e| SwpError::io(format!("cannot write {path:?}: {e}")))
 }
 
 /// The format a `--format` value asked for, shared by the commands that write a
@@ -440,7 +451,11 @@ mod tests {
                     f.long()
                 );
             }
-            assert!(opts.contains("-h, --help"), "{} help has no --help line", cmd.name());
+            assert!(
+                opts.contains("-h, --help"),
+                "{} help has no --help line",
+                cmd.name()
+            );
             // The same page from the other direction, because §32 asks for both.
             let (alias_code, alias_text, _) = say(&["help", cmd.name()]);
             assert_eq!(alias_code, 0);
@@ -481,8 +496,16 @@ mod tests {
         let (code, text, _) = say(&["help"]);
         assert_eq!(code, 0);
         for cmd in Command::ALL {
-            assert!(text.contains(cmd.name()), "the overview lost {}", cmd.name());
-            assert!(text.contains(cmd.blurb()), "the overview lost {}'s summary", cmd.name());
+            assert!(
+                text.contains(cmd.name()),
+                "the overview lost {}",
+                cmd.name()
+            );
+            assert!(
+                text.contains(cmd.blurb()),
+                "the overview lost {}'s summary",
+                cmd.name()
+            );
         }
         for (n, meaning) in exit_codes() {
             assert!(
@@ -520,7 +543,9 @@ mod tests {
         let codes = doc["exit_codes"].as_array().unwrap();
         assert_eq!(codes.len(), exit_codes().len());
         assert!(
-            codes.iter().any(|e| e["code"] == 1 && e["meaning"].is_string()),
+            codes
+                .iter()
+                .any(|e| e["code"] == 1 && e["meaning"].is_string()),
             "the table is not self-describing: {codes:?}"
         );
         // A command page carries the same three sections the text page has.
@@ -552,7 +577,12 @@ mod tests {
             seen.sort_unstable();
             seen.dedup();
             assert_eq!(seen.len(), count, "{} lists an exit code twice", cmd.name());
-            assert_eq!(seen.first().copied(), Some(0), "{} has no success code", cmd.name());
+            assert_eq!(
+                seen.first().copied(),
+                Some(0),
+                "{} has no success code",
+                cmd.name()
+            );
             for expected in [2, ErrorCode::Io.exit_code(), 70] {
                 assert!(
                     seen.contains(&expected),
@@ -577,7 +607,10 @@ mod tests {
         assert_eq!(names.len(), 8, "inspect grew or lost a view");
         let (_, text, _) = say(&["inspect", "--help"]);
         for name in &names {
-            assert!(text.contains(name), "inspect's help omits the {name:?} view");
+            assert!(
+                text.contains(name),
+                "inspect's help omits the {name:?} view"
+            );
         }
         // The parser's own refusal lists them too, so a reader who guesses wrong
         // is told the alternatives without leaving the terminal.
@@ -587,7 +620,10 @@ mod tests {
         let mut sink = Sink::new(Format::Text, false, &mut out, &mut err);
         let e = crate::inspect::run(&parsed, Path::new("."), &mut sink).unwrap_err();
         for name in &names {
-            assert!(e.message().contains(name), "the refusal omits {name:?}: {e}");
+            assert!(
+                e.message().contains(name),
+                "the refusal omits {name:?}: {e}"
+            );
         }
         assert_eq!(e.code(), ErrorCode::Usage);
     }
@@ -596,7 +632,10 @@ mod tests {
     fn a_command_that_does_not_exist_is_named_and_the_alternatives_are_offered() {
         let (code, _, err) = say(&["protec"]);
         assert_eq!(code, ErrorCode::Usage.exit_code(), "{err}");
-        assert!(err.contains("protect"), "a near-miss should point at it: {err}");
+        assert!(
+            err.contains("protect"),
+            "a near-miss should point at it: {err}"
+        );
         assert!(err.contains("swp help"), "{err}");
     }
 }

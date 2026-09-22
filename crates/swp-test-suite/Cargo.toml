@@ -75,3 +75,9 @@ path = "tests/adversarial/attacks.rs"
 [[test]]
 name = "acceptance_scenario"
 path = "tests/acceptance/final_scenario.rs"
+
+# §41's documentation rule: every `console` block the examples quote is re-run and
+# re-matched, so a transcript that has gone stale fails the build.
+[[test]]
+name = "docs_examples"
+path = "tests/docs/examples.rs"

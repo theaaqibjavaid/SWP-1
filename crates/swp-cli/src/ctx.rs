@@ -49,19 +49,30 @@ impl Ctx {
         let store = match parsed.value(Flag::Project) {
             Some(path) => {
                 let dir = resolve(path, cwd)?;
+                // `--project` names one directory exactly, so the store's own
+                // marker is tested there rather than by walking up from it.
+                if !Store::exists(&dir) && dir.join(".swp").is_dir() {
+                    return Err(incomplete_store(&dir));
+                }
                 Store::open(&dir)?
             }
             None => Store::discover(cwd)?.ok_or_else(|| {
-                SwpError::new(
-                    ErrorCode::NotProtected,
-                    format!(
-                        "no {dot_swp} directory here or above {cwd}; run `swp init` in the \
-                         project, or name one with --project <path>",
-                        dot_swp = ".swp/",
-                        cwd = cwd.display(),
-                    ),
-                )
-                .with_path(cwd.display().to_string())
+                match enclosing_swp_dir(cwd) {
+                    // A tree with a `.swp/` and no config is reported as an
+                    // incomplete store rather than an unprotected directory, because
+                    // `swp init` is the one thing that must not be recommended here.
+                    Some(dir) => incomplete_store(&dir),
+                    None => SwpError::new(
+                        ErrorCode::NotProtected,
+                        format!(
+                            "no {dot_swp} directory here or above {cwd}; run `swp init` in the \
+                             project, or name one with --project <path>",
+                            dot_swp = ".swp/",
+                            cwd = cwd.display(),
+                        ),
+                    )
+                    .with_path(cwd.display().to_string()),
+                }
             })?,
         };
         let identity = store.identity()?;
@@ -100,7 +111,9 @@ impl Ctx {
                         .map_err(|_| {
                             SwpError::usage(format!(
                                 "--target {t:?} is outside the project at {}",
-                                self.store.project_root().display()
+                                swp_core::text::display_path(
+                                    &self.store.project_root().display().to_string()
+                                )
                             ))
                         })?
                         .to_string_lossy()
@@ -134,15 +147,20 @@ impl Ctx {
         }
         if let Some(bits) = parsed.number(Flag::Bits)? {
             let bits = u8::try_from(bits).map_err(|_| {
-                SwpError::usage(format!("--bits {bits} is outside the range this build supports"))
+                SwpError::usage(format!(
+                    "--bits {bits} is outside the range this build supports"
+                ))
             })?;
             self.config.protect.tag_bits = bits;
         }
         // Re-validate rather than trusting the pieces: `--sites 1` and a
         // `--target ../elsewhere` are both things a person has typed.
-        self.config
-            .validate()
-            .map_err(|e| SwpError::new(e.code(), format!("the resulting settings are invalid: {}", e.message())))
+        self.config.validate().map_err(|e| {
+            SwpError::new(
+                e.code(),
+                format!("the resulting settings are invalid: {}", e.message()),
+            )
+        })
     }
 
     pub fn root(&self) -> &Path {
@@ -209,7 +227,7 @@ impl Ctx {
     pub fn release_history(&self) -> Result<Vec<swp_identity::ReleaseRecord>, SwpError> {
         let mut out = Vec::new();
         for id in self.store.releases()? {
-            out.push(self.store.read_release(&id)?);
+            out.push(self.release(&id)?);
         }
         out.sort_by(|a, b| {
             a.created_at
@@ -228,6 +246,8 @@ impl Ctx {
     /// * the manifest is **authenticated** against the project's own public verify
     ///   key before a single site of it is trusted (§31) — an edited manifest would
     ///   report a clean copy as tampered with;
+    /// * so is the **public record** beside it, which is the file a repository
+    ///   carries and the one a report quotes its numbers from;
     /// * the keys are derived from **this** project's secret and **this** identity's
     ///   canonicalizer version, so a release from a tree whose `.swp/` was partly
     ///   restored fails the index's own agreement check rather than reporting "no
@@ -262,7 +282,7 @@ impl Ctx {
                     ),
                 ));
             }
-            let record = self.store.read_release(id)?;
+            let record = self.release(id)?;
             let keys = swp_manifest::ManifestKeys::derive(
                 &secret,
                 &self.identity.project_id,
@@ -313,6 +333,62 @@ impl Ctx {
         };
         swp_manifest::PrivateManifest::load(&bytes, &verify_key)
     }
+
+    /// Read and authenticate one release's public record.
+    ///
+    /// The record is the document a report quotes — the release id, the fingerprint
+    /// it compared, how many sites it claimed, when it was published — and unlike
+    /// the manifest it is committed, so it is the one file in the store a stranger
+    /// can edit without touching anything private. Checking it against the same key
+    /// that signed the manifest is what stops those two from being made to disagree
+    /// by editing the half that is public (§31).
+    pub fn release(&self, id: &ReleaseId) -> Result<swp_identity::ReleaseRecord, SwpError> {
+        let record = self.store.read_release(id)?;
+        swp_manifest::sig::verify_release_record(&record, &self.identity.verify_key()?)?;
+        Ok(record)
+    }
+}
+
+/// The nearest project that has a `.swp/` directory, at or above `start`, whether
+/// or not it is a store. Only the error path uses it, to tell "this project was
+/// never initialized" apart from "this project's store is incomplete".
+fn enclosing_swp_dir(start: &Path) -> Option<PathBuf> {
+    let mut cur: Option<&Path> = Some(start);
+    while let Some(dir) = cur {
+        if dir.join(".swp").is_dir() {
+            return Some(dir.to_path_buf());
+        }
+        cur = dir.parent();
+    }
+    None
+}
+
+/// A `.swp/` directory with no `config.toml` in it.
+///
+/// Discovery uses that one file as the store's marker, so this tree is not a store
+/// to this build even though it plainly was one. Saying only "not protected" would
+/// send the reader to `swp init`, which is the wrong advice twice over: it is the
+/// command that rotates a secret when somebody runs it believing the project still
+/// has its releases, and the file that is missing here holds settings only.
+fn incomplete_store(project: &Path) -> SwpError {
+    let missing = project.join(".swp").join("config.toml");
+    SwpError::new(
+        ErrorCode::NotProtected,
+        format!(
+            "there is a .swp/ directory at {}, but it has no config.toml for this command to \
+             read, so it is not treated as a store. Restore that one file (settings only — \
+             `swp init` writes the defaults again); do not re-initialize a project whose \
+             releases you still need to verify.",
+            project.display(),
+        ),
+    )
+    .with_path(missing.display().to_string())
+    .with_next(
+        "Copy .swp/config.toml back from version control and the store opens again. `swp init` \
+         will also rewrite it, in a project that still has its private/ directory — which is \
+         the case this message is warning against confusing with the other one, where the whole \
+         store is gone.",
+    )
 }
 
 /// The release with the latest recorded time, ties broken by id so the answer is
@@ -355,14 +431,36 @@ fn name_list(ids: &[ReleaseId]) -> String {
 /// reason — the report must say what was typed.
 pub(crate) fn resolve(path: &str, cwd: &Path) -> Result<PathBuf, SwpError> {
     if path.trim().is_empty() {
-        return Err(SwpError::usage("a path was asked for and nothing was given"));
+        return Err(SwpError::usage(
+            "a path was asked for and nothing was given",
+        ));
     }
     let p = Path::new(path);
-    Ok(if p.is_absolute() {
+    let joined = if p.is_absolute() {
         p.to_path_buf()
     } else {
         cwd.join(p)
-    })
+    };
+    Ok(without_current_dir_components(&joined))
+}
+
+/// Drop the `.` components a joined path picks up, so that `-p .` is reported as
+/// the directory it names rather than as `…\project\.`.
+///
+/// `..` is left alone on purpose: cancelling it textually is not the same as
+/// resolving it when a component in between is a symlink, and this build never
+/// follows a symlink it has not been told to.
+fn without_current_dir_components(path: &Path) -> PathBuf {
+    let kept = path
+        .components()
+        .filter(|c| !matches!(c, std::path::Component::CurDir))
+        .collect::<PathBuf>();
+    if kept.as_os_str().is_empty() {
+        // `-p .` in a relative working directory: the directory itself, which an
+        // empty path would not say.
+        return PathBuf::from(".");
+    }
+    kept
 }
 
 #[cfg(test)]
@@ -371,10 +469,7 @@ mod tests {
 
     #[test]
     fn newest_prefers_the_recorded_time_and_breaks_ties_by_id() {
-        let dir = std::env::temp_dir().join(format!(
-            "swp-cli-newest-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("swp-cli-newest-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let store = Store::init(&dir, &RootSecret::from_bytes(&[7u8; 32]).unwrap())
             .unwrap()
@@ -420,9 +515,18 @@ mod tests {
             resolve("src", Path::new("/proj")).unwrap(),
             PathBuf::from("/proj/src")
         );
-        assert_eq!(resolve("/x", Path::new("/proj")).unwrap(), PathBuf::from("/x"));
-        assert_eq!(resolve("./x", Path::new("/proj")).unwrap(), PathBuf::from("/proj/./x"));
-        assert_eq!(resolve("", Path::new("/proj")).unwrap_err().code(), ErrorCode::Usage);
+        assert_eq!(
+            resolve("/x", Path::new("/proj")).unwrap(),
+            PathBuf::from("/x")
+        );
+        assert_eq!(
+            resolve("./x", Path::new("/proj")).unwrap(),
+            PathBuf::from("/proj/./x")
+        );
+        assert_eq!(
+            resolve("", Path::new("/proj")).unwrap_err().code(),
+            ErrorCode::Usage
+        );
     }
 
     fn sample_release(id: &ReleaseId, project: swp_core::ProjectId) -> swp_identity::ReleaseRecord {

@@ -56,9 +56,7 @@ use swp_core::site::TagWidth;
 use swp_detection::{Detection, SiteStatus};
 
 /// The five deterministic steps, ordered.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum EvidenceLevel {
     None,
@@ -490,10 +488,7 @@ pub fn assess(detection: &Detection) -> Assessment {
             .cmp(&a.level)
             .then(b.fragments.cmp(&a.fragments))
             .then(b.bits.cmp(&a.bits))
-            .then(
-                (b.fingerprint == "match")
-                    .cmp(&(a.fingerprint == "match")),
-            )
+            .then((b.fingerprint == "match").cmp(&(a.fingerprint == "match")))
     });
     let best = 0usize;
     let top = releases.first();
@@ -610,7 +605,11 @@ mod tests {
     }
 
     fn confirmed_at(file: &str) -> SiteMatch {
-        site(SiteStatus::TagConfirmed, file, vec![RadiusKind::StatementId])
+        site(
+            SiteStatus::TagConfirmed,
+            file,
+            vec![RadiusKind::StatementId],
+        )
     }
 
     fn detection(releases: Vec<ReleaseDetection>, partial: bool) -> Detection {
@@ -648,8 +647,7 @@ mod tests {
             (chance_of_coincidence(&[16], 4) - (1.0 - (15.0f64 / 16.0).powi(16))).abs() < 1e-12
         );
         assert!(
-            (chance_of_coincidence(&[100], 8) - (1.0 - (255.0f64 / 256.0).powi(100))).abs()
-                < 1e-12
+            (chance_of_coincidence(&[100], 8) - (1.0 - (255.0f64 / 256.0).powi(100))).abs() < 1e-12
         );
         let tight = chance_of_coincidence(&[16, 16, 16], 4);
         assert!((tight - 3.0 * (1.0 - (15.0f64 / 16.0).powi(16))).abs() < 1e-9);
@@ -700,12 +698,18 @@ mod tests {
 
     #[test]
     fn a_clean_full_scan_is_negative_and_a_partial_one_is_inconclusive() {
-        let clean = detection(vec![release(vec![site(SiteStatus::Absent, "", vec![])])], false);
+        let clean = detection(
+            vec![release(vec![site(SiteStatus::Absent, "", vec![])])],
+            false,
+        );
         let a = assess(&clean);
         assert_eq!(a.outcome, Outcome::NoProvenanceDetected);
         assert_eq!(a.level, EvidenceLevel::None);
 
-        let unread = detection(vec![release(vec![site(SiteStatus::Absent, "", vec![])])], true);
+        let unread = detection(
+            vec![release(vec![site(SiteStatus::Absent, "", vec![])])],
+            true,
+        );
         assert_eq!(assess(&unread).outcome, Outcome::Inconclusive);
         assert!(assess(&unread).level == EvidenceLevel::None);
     }
@@ -730,17 +734,22 @@ mod tests {
         assert_eq!(a.releases[0].stripped, 1);
         assert_eq!(a.releases[0].fragments, 0);
         assert_eq!(a.releases[0].probes, 9);
-        assert!(a.reasons.iter().any(|r| r.contains("not counted as evidence")));
+        assert!(a
+            .reasons
+            .iter()
+            .any(|r| r.contains("not counted as evidence")));
     }
 
     #[test]
     fn a_spread_constellation_survives_the_bound_and_is_graded_by_the_counts() {
         let sites: Vec<SiteMatch> = (0..8)
-            .map(|i| confirmed_at(match i {
-                0..=2 => "src/a.js",
-                3..=5 => "src/b.js",
-                _ => "src/c.js",
-            }))
+            .map(|i| {
+                confirmed_at(match i {
+                    0..=2 => "src/a.js",
+                    3..=5 => "src/b.js",
+                    _ => "src/c.js",
+                })
+            })
             .collect();
         let a = assess(&detection(vec![release(sites)], false));
         assert_eq!(a.level, EvidenceLevel::VeryStrong, "{:?}", a.reasons);
@@ -765,7 +774,11 @@ mod tests {
         // addresses owe the scan eight coincidences, so confirming all eight says
         // nothing about where the candidate came from.
         assert_eq!(a.outcome, Outcome::Inconclusive, "{:?}", a.reasons);
-        assert!(a.reasons.iter().any(|r| r.contains("capped")), "{:?}", a.reasons);
+        assert!(
+            a.reasons.iter().any(|r| r.contains("capped")),
+            "{:?}",
+            a.reasons
+        );
         assert!(
             a.reasons.iter().any(|r| r.contains("coincidence bound")),
             "{:?}",
@@ -787,10 +800,8 @@ mod tests {
         // so the bound expects 2.5 and this is an unrelated tree with a coincidence
         // in it. The honest verb is "cannot say".
         let mut sites = vec![probed(confirmed_at("src/a.js"), 112)];
-        sites.extend(
-            (0..3)
-                .map(|_| probed(site(SiteStatus::LocationOnly, "src/b.js", vec![]), 11)),
-        );
+        sites
+            .extend((0..3).map(|_| probed(site(SiteStatus::LocationOnly, "src/b.js", vec![]), 11)));
         let a = assess(&detection(vec![release(sites)], false));
         assert_eq!(a.level, EvidenceLevel::Weak);
         assert_eq!(a.outcome, Outcome::Inconclusive, "{:?}", a.reasons);
@@ -806,7 +817,10 @@ mod tests {
             "the reason must say what the scan refused to claim: {:?}",
             a.reasons
         );
-        assert!(a.reasons.iter().any(|r| r.contains("not counted as evidence")));
+        assert!(a
+            .reasons
+            .iter()
+            .any(|r| r.contains("not counted as evidence")));
     }
 
     #[test]
@@ -817,10 +831,10 @@ mod tests {
         // fragment is WEAK, and WEAK is the level §23 defines as "a lead worth
         // manual review". A thin candidate must not be able to buy a verdict just
         // by being thin.
-        let a = assess(&detection(vec![release(vec![probed(
-            confirmed_at("src/a.js"),
-            2,
-        )])], false));
+        let a = assess(&detection(
+            vec![release(vec![probed(confirmed_at("src/a.js"), 2)])],
+            false,
+        ));
         assert_eq!(a.level, EvidenceLevel::Weak);
         assert!(a.releases[0].guarantee > 0.8, "{:?}", a.releases[0]);
         assert_eq!(a.outcome, Outcome::Inconclusive, "{:?}", a.reasons);

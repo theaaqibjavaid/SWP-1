@@ -73,7 +73,9 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
     );
     let saved = if parsed.has(Flag::Save) {
         let stem = format!("scan-{}", now.filename_stem());
-        let path = project.store.save_report(&stem, report.to_json().as_bytes())?;
+        let path = project
+            .store
+            .save_report(&stem, report.to_json().as_bytes())?;
         sink.note(&format!("report saved to {path}"));
         // The store numbers a collision rather than overwriting, so the name to
         // print — and the name `swp report` will accept — is the one it returned.
@@ -177,8 +179,10 @@ fn next_steps(report: &Report, json: bool, saved: Option<&Saved>) -> Vec<String>
                     .to_string(),
             );
             if saved.is_none() {
-                out.push("re-run with --save to keep this report under .swp/private/reports/"
-                    .to_string());
+                out.push(
+                    "re-run with --save to keep this report under .swp/private/reports/"
+                        .to_string(),
+                );
             } else {
                 out.push(format!(
                     "swp report {} --format json   (re-render the saved copy)",
@@ -228,15 +232,9 @@ mod tests {
         let owner = Scratch::protected("scan", "copy");
         let leak = Scratch::new("scan", "copy-tree");
         owner.copy_sources_to(&leak);
-        let r = owner.run(&[
-            "scan",
-            &leak.root.display().to_string(),
-            "--format",
-            "json",
-        ]);
+        let r = owner.run(&["scan", &leak.root.display().to_string(), "--format", "json"]);
         assert_eq!(
-            r.code,
-            1,
+            r.code, 1,
             "a copy of protected source is a finding:\n{}{}",
             r.out, r.err
         );
@@ -334,11 +332,10 @@ mod tests {
         );
         if doc["result"] == "INCONCLUSIVE" {
             assert!(
-                doc["explanation"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .any(|l| l.as_str().unwrap_or_default().contains("the bound covers them")),
+                doc["explanation"].as_array().unwrap().iter().any(|l| l
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("the bound covers them")),
                 "an inconclusive verdict owed its reader the arithmetic behind it:\n{doc:#}"
             );
         }
@@ -360,9 +357,16 @@ mod tests {
             &at.display().to_string(),
         ]);
         assert_eq!(r.code, 0, "{}", r.err);
-        assert!(r.out.is_empty(), "--output leaves stdout empty: {:?}", r.out);
+        assert!(
+            r.out.is_empty(),
+            "--output leaves stdout empty: {:?}",
+            r.out
+        );
         let written = std::fs::read_to_string(&at).unwrap();
-        assert!(written.contains("\"schema\": \"SWP-1-report-v1\""), "{written}");
+        assert!(
+            written.contains("\"schema\": \"SWP-1-report-v1\""),
+            "{written}"
+        );
         let names = owner.store().report_names().unwrap();
         assert_eq!(names.len(), 1, "{names:?}");
         assert!(names[0].starts_with("scan-"), "{}", names[0]);

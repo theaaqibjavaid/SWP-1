@@ -136,6 +136,15 @@ impl Opened {
     }
 }
 
+/// How an input is named back to the user.
+///
+/// `root` keeps the verbatim path, because on Windows that is what lets a deep
+/// tree open at all; `described` is a report header, and a `\\?\` prefix there
+/// reads as a corrupted path.
+fn described(path: &Path) -> String {
+    swp_core::text::display_path(&path.display().to_string()).to_string()
+}
+
 /// Classify and open `path`.
 pub fn open(path: &Path, limits: &Limits) -> Result<Opened, SwpError> {
     let meta = std::fs::symlink_metadata(path).map_err(|e| {
@@ -149,7 +158,7 @@ pub fn open(path: &Path, limits: &Limits) -> Result<Opened, SwpError> {
         return Ok(Opened {
             root: path.to_path_buf(),
             kind: InputKind::Directory,
-            described: path.display().to_string(),
+            described: crate::input::described(path),
             notes: Vec::new(),
             _temp: None,
         });
@@ -194,13 +203,18 @@ pub fn open(path: &Path, limits: &Limits) -> Result<Opened, SwpError> {
     let mut opened = Opened {
         root: into.clone(),
         kind,
-        described: path.display().to_string(),
+        described: crate::input::described(path),
         notes: Vec::new(),
         _temp: Some(temp),
     };
     let result = match kind {
         InputKind::Zip => extract_zip(path, &into, limits, &mut opened.notes),
-        InputKind::Tar => extract_tar(Box::new(File::open(path)?), &into, limits, &mut opened.notes),
+        InputKind::Tar => extract_tar(
+            Box::new(File::open(path)?),
+            &into,
+            limits,
+            &mut opened.notes,
+        ),
         InputKind::TarGz => {
             let file = File::open(path)?;
             let decoder = std::io::BufReader::new(flate2::read::MultiGzDecoder::new(file));
@@ -226,7 +240,12 @@ pub fn open(path: &Path, limits: &Limits) -> Result<Opened, SwpError> {
 fn sniff(path: &Path) -> Result<InputKind, SwpError> {
     let mut head = Vec::new();
     File::open(path)
-        .map_err(|e| SwpError::new(ErrorCode::Io, format!("cannot open {}: {e}", path.display())))?
+        .map_err(|e| {
+            SwpError::new(
+                ErrorCode::Io,
+                format!("cannot open {}: {e}", path.display()),
+            )
+        })?
         .take(SNIFF_LEN)
         .read_to_end(&mut head)?;
     // `PK\x03\x04` opens every stored file's local header; `PK\x05\x06` opens the
@@ -282,7 +301,7 @@ fn stage_file(path: &Path, limits: &Limits) -> Result<Opened, SwpError> {
     Ok(Opened {
         root: temp.path.clone(),
         kind: InputKind::SingleFile,
-        described: path.display().to_string(),
+        described: crate::input::described(path),
         notes: Vec::new(),
         _temp: Some(temp),
     })
@@ -297,8 +316,7 @@ fn gunzip_single(path: &Path, into: &Path, limits: &Limits) -> Result<(), SwpErr
         .map(String::from)
         .unwrap_or_else(|| "payload".to_string());
     let out = checked_path(into, &out_name)?;
-    let mut decoder =
-        flate2::read::MultiGzDecoder::new(std::io::BufReader::new(File::open(path)?));
+    let mut decoder = flate2::read::MultiGzDecoder::new(std::io::BufReader::new(File::open(path)?));
     write_bounded(&mut decoder, &out, limits, &out_name)?;
     Ok(())
 }
@@ -327,7 +345,10 @@ fn make_temp(prefix: &str) -> Result<TempDir, SwpError> {
     }
     Err(SwpError::new(
         ErrorCode::Io,
-        format!("cannot create a temporary directory under {}", base.display()),
+        format!(
+            "cannot create a temporary directory under {}",
+            base.display()
+        ),
     ))
 }
 
@@ -375,7 +396,12 @@ fn rejected(name: &str, why: &str) -> SwpError {
 
 /// Copy one member out, enforcing the per-member and cumulative bounds as it goes
 /// rather than trusting the size the archive declares.
-fn write_bounded(src: &mut dyn Read, dest: &Path, limits: &Limits, name: &str) -> Result<u64, SwpError> {
+fn write_bounded(
+    src: &mut dyn Read,
+    dest: &Path,
+    limits: &Limits,
+    name: &str,
+) -> Result<u64, SwpError> {
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -425,10 +451,18 @@ fn charge(budget: &mut Budget, name: &str, n: u64, limits: &Limits) -> Result<()
     Ok(())
 }
 
-fn extract_zip(path: &Path, into: &Path, limits: &Limits, notes: &mut Vec<String>) -> Result<(), SwpError> {
+fn extract_zip(
+    path: &Path,
+    into: &Path,
+    limits: &Limits,
+    notes: &mut Vec<String>,
+) -> Result<(), SwpError> {
     let file = File::open(path)?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| {
-        SwpError::new(ErrorCode::MalformedSource, format!("zip container is unreadable: {e}"))
+        SwpError::new(
+            ErrorCode::MalformedSource,
+            format!("zip container is unreadable: {e}"),
+        )
     })?;
     if archive.len() as u64 > limits.max_archive_entries {
         return Err(SwpError::new(
@@ -447,7 +481,10 @@ fn extract_zip(path: &Path, into: &Path, limits: &Limits, notes: &mut Vec<String
     };
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| {
-            SwpError::new(ErrorCode::MalformedSource, format!("zip entry {i} is unreadable: {e}"))
+            SwpError::new(
+                ErrorCode::MalformedSource,
+                format!("zip entry {i} is unreadable: {e}"),
+            )
         })?;
         let raw = entry.name().to_string();
         if entry.is_dir() {
@@ -496,7 +533,12 @@ fn extract_zip(path: &Path, into: &Path, limits: &Limits, notes: &mut Vec<String
     Ok(())
 }
 
-fn check_ratio(name: &str, compressed: u64, expanded: u64, limits: &Limits) -> Result<(), SwpError> {
+fn check_ratio(
+    name: &str,
+    compressed: u64,
+    expanded: u64,
+    limits: &Limits,
+) -> Result<(), SwpError> {
     if compressed == 0 || limits.max_archive_ratio == 0 {
         return Ok(());
     }
@@ -530,16 +572,24 @@ fn extract_tar(
         entries: 0,
     };
     for entry in archive.entries().map_err(|e| {
-        SwpError::new(ErrorCode::MalformedSource, format!("tar container is unreadable: {e}"))
+        SwpError::new(
+            ErrorCode::MalformedSource,
+            format!("tar container is unreadable: {e}"),
+        )
     })? {
-        let mut entry = entry
-            .map_err(|e| {
-                SwpError::new(ErrorCode::MalformedSource, format!("tar entry is unreadable: {e}"))
-            })?;
+        let mut entry = entry.map_err(|e| {
+            SwpError::new(
+                ErrorCode::MalformedSource,
+                format!("tar entry is unreadable: {e}"),
+            )
+        })?;
         let raw = entry
             .path()
             .map_err(|e| {
-                SwpError::new(ErrorCode::MalformedSource, format!("tar entry path is unreadable: {e}"))
+                SwpError::new(
+                    ErrorCode::MalformedSource,
+                    format!("tar entry path is unreadable: {e}"),
+                )
             })?
             .to_string_lossy()
             .into_owned();
@@ -704,7 +754,11 @@ mod tests {
         let root = temp("magic");
         // Named like source, is a zip. Reading it as a `.js` file would produce a
         // clean report about bytes that are a container.
-        let path = write(&root, "notsource.js", &std::fs::read(zip_of(&[("a.js", b"var x = 1;")])).unwrap());
+        let path = write(
+            &root,
+            "notsource.js",
+            &std::fs::read(zip_of(&[("a.js", b"var x = 1;")])).unwrap(),
+        );
         let opened = open(&path, &Limits::default()).unwrap();
         assert_eq!(opened.kind, InputKind::Zip);
         assert!(opened.root.join("a.js").is_file());
@@ -741,9 +795,9 @@ mod tests {
         let symlink_opts: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default()
             .compression_method(zip::CompressionMethod::Stored)
             .unix_permissions(0o120777);
-        w.add_symlink("evil", "../../outside", symlink_opts).unwrap();
-        w.start_file("ok.js", stored())
+        w.add_symlink("evil", "../../outside", symlink_opts)
             .unwrap();
+        w.start_file("ok.js", stored()).unwrap();
         w.write_all(b"var x = 1;").unwrap();
         w.finish().unwrap();
 
@@ -797,8 +851,7 @@ mod tests {
         let path = dir.join("b.zip");
         let file = File::create(&path).unwrap();
         let mut w = zip::ZipWriter::new(file);
-        w.start_file("huge.js", deflated())
-            .unwrap();
+        w.start_file("huge.js", deflated()).unwrap();
         // Highly compressible, so the stored size is tiny against 4 MiB.
         for _ in 0..4096 {
             w.write_all(&[0u8; 1024]).unwrap();
@@ -811,7 +864,10 @@ mod tests {
 
     #[test]
     fn a_nested_archive_is_reported_rather_than_opened() {
-        let path = zip_of(&[("vendor/inner.zip", b"PK\x03\x04rest"), ("src/a.js", b"var x = 1;")]);
+        let path = zip_of(&[
+            ("vendor/inner.zip", b"PK\x03\x04rest"),
+            ("src/a.js", b"var x = 1;"),
+        ]);
         let opened = open(&path, &Limits::default()).unwrap();
         assert_eq!(opened.notes.len(), 1, "{:?}", opened.notes);
         assert!(opened.notes[0].contains("nested archive"));
@@ -820,7 +876,10 @@ mod tests {
         // temporary tree for no benefit. The note names it, which is the finding.
         assert!(!opened.root.join("vendor/inner.zip").exists());
         assert!(opened.root.join("src/a.js").is_file());
-        assert!(opened.is_partial(), "part of the candidate was not examined");
+        assert!(
+            opened.is_partial(),
+            "part of the candidate was not examined"
+        );
     }
 
     #[test]
@@ -856,7 +915,10 @@ mod tests {
     fn a_special_file_is_refused_rather_than_read() {
         let root = temp("special");
         let opened = open(&root.join("nowhere.js"), &Limits::default());
-        assert!(opened.is_err(), "a path that does not exist cannot be scanned");
+        assert!(
+            opened.is_err(),
+            "a path that does not exist cannot be scanned"
+        );
     }
 
     #[test]
@@ -881,7 +943,10 @@ mod tests {
         e.finish().unwrap();
         let opened = open(&out, &Limits::default()).unwrap();
         assert_eq!(opened.kind, InputKind::Gzip);
-        assert_eq!(std::fs::read(opened.root.join("a.js")).unwrap(), b"var x = 1000;\n");
+        assert_eq!(
+            std::fs::read(opened.root.join("a.js")).unwrap(),
+            b"var x = 1000;\n"
+        );
     }
 
     #[test]
@@ -889,7 +954,9 @@ mod tests {
         // `a/../../../etc/passwd` normalises upward, and the check runs per
         // component, so it must be refused at the first `..` rather than resolved.
         assert!(checked_path(Path::new("/tmp/x"), "a/../../../etc/passwd").is_err());
-        assert!(checked_path(Path::new("/tmp/x"), "./safe.js").unwrap().ends_with("safe.js"));
+        assert!(checked_path(Path::new("/tmp/x"), "./safe.js")
+            .unwrap()
+            .ends_with("safe.js"));
         assert!(checked_path(Path::new("/tmp/x"), "").is_err());
     }
 }

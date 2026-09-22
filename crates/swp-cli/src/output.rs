@@ -173,7 +173,7 @@ pub fn print_error(sink: &mut Sink<'_>, error: &SwpError) -> i32 {
     if let Some(path) = error.path() {
         let _ = writeln!(sink.err, "  at: {path}");
     }
-    let _ = writeln!(sink.err, "  next: {}", code.next_step());
+    let _ = writeln!(sink.err, "  next: {}", error.next_step());
     code.exit_code()
 }
 
@@ -207,7 +207,13 @@ mod tests {
         let mut err = Vec::new();
         let lines = vec!["sites 3".to_string(), "human prose".to_string()];
         sink(Format::Json, false, &mut out, &mut err)
-            .result(&Value { schema: "x", sites: 3 }, &lines)
+            .result(
+                &Value {
+                    schema: "x",
+                    sites: 3,
+                },
+                &lines,
+            )
             .unwrap();
         let text = String::from_utf8(out).unwrap();
         assert!(!text.contains("human prose"), "{text}");
@@ -222,7 +228,10 @@ mod tests {
         let mut err = Vec::new();
         sink(Format::Text, false, &mut out, &mut err)
             .result(
-                &Value { schema: "x", sites: 3 },
+                &Value {
+                    schema: "x",
+                    sites: 3,
+                },
                 &["sites 3".to_string()],
             )
             .unwrap();
@@ -300,12 +309,17 @@ mod tests {
             Some(&at),
         )
         .unwrap();
-        assert!(out.is_empty(), "the document went to the file, not to stdout");
+        assert!(
+            out.is_empty(),
+            "the document went to the file, not to stdout"
+        );
         let written = std::fs::read_to_string(&path).unwrap();
         assert!(written.contains("\"sites\": 7"), "{written}");
         assert!(!written.contains("text rendering"), "{written}");
         assert!(
-            String::from_utf8(err).unwrap().contains("wrote the JSON document"),
+            String::from_utf8(err)
+                .unwrap()
+                .contains("wrote the JSON document"),
             "the operator is told where it went"
         );
         // No `--output` is the ordinary case: stdout gets the chosen rendering.

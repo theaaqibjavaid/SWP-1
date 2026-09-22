@@ -38,7 +38,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::transform::{Tree, read_tree};
+use crate::transform::{read_tree, Tree};
 
 /// The spelling a fragment was written in. Named for what a reader sees, not for
 /// the family that produced it: the whole point of §52's first attack is that the
@@ -251,7 +251,9 @@ pub fn normalize(tree: &mut Tree, flags: &[Flag]) -> usize {
     }
     let mut changed = 0;
     for (file, mut spans) in by_file {
-        let Some(body) = tree.get(file).cloned() else { continue };
+        let Some(body) = tree.get(file).cloned() else {
+            continue;
+        };
         // Last to first, so no replacement moves a span that is still to come.
         spans.sort_by_key(|f| std::cmp::Reverse(f.start));
         let mut out = body.clone();
@@ -324,14 +326,9 @@ fn fold(text: &str, shape: Shape) -> Option<String> {
             let left = &b[pieces[0].0..pieces[0].1];
             let right = &b[pieces[1].0..pieces[1].1];
             let quote = *left.first()? as char;
-            let inner = |piece: &[u8]| {
-                String::from_utf8_lossy(&piece[1..piece.len() - 1]).into_owned()
-            };
-            Some(format!(
-                "{quote}{}{}{quote}",
-                inner(left),
-                inner(right)
-            ))
+            let inner =
+                |piece: &[u8]| String::from_utf8_lossy(&piece[1..piece.len() - 1]).into_owned();
+            Some(format!("{quote}{}{}{quote}", inner(left), inner(right)))
         }
     }
 }
@@ -592,10 +589,13 @@ impl Recall {
 /// "it found some".
 pub fn score(flags: &[Flag], renderings: &[String]) -> Recall {
     let mut out = Recall {
-        by_shape: flags.iter().fold(BTreeMap::new(), |mut m: BTreeMap<&'static str, usize>, f| {
-            *m.entry(f.shape.slug()).or_default() += 1;
-            m
-        }),
+        by_shape: flags.iter().fold(
+            BTreeMap::new(),
+            |mut m: BTreeMap<&'static str, usize>, f| {
+                *m.entry(f.shape.slug()).or_default() += 1;
+                m
+            },
+        ),
         total: renderings.len(),
         ..Recall::default()
     };
@@ -652,7 +652,10 @@ mod tests {
             );
         }
         assert_eq!(
-            found.iter().filter(|(s, _)| *s == "foldable-arithmetic").count(),
+            found
+                .iter()
+                .filter(|(s, _)| *s == "foldable-arithmetic")
+                .count(),
             3
         );
     }
@@ -667,7 +670,11 @@ mod tests {
                     const lower = 0xff00;\nconst text = \"plain string\";\n\
                     const joined = first + last;\nconst idx = (1 + 2 + 3);\n\
                     function f(x) { return x + 1; }\nconst v = 1e9;\n";
-        assert_eq!(shapes(body), vec![], "a plain file was flagged as holding fragments");
+        assert_eq!(
+            shapes(body),
+            vec![],
+            "a plain file was flagged as holding fragments"
+        );
     }
 
     #[test]
@@ -750,7 +757,11 @@ mod tests {
         let project = Project::fixture("locate-protected", "forms");
         project.set_config(crate::fixtures::FORMS_CONFIG);
         let release = project.protect();
-        let renderings: Vec<String> = release.site_texts().into_iter().map(|s| s.rendered).collect();
+        let renderings: Vec<String> = release
+            .site_texts()
+            .into_iter()
+            .map(|s| s.rendered)
+            .collect();
         let flags = locate_tree(project.root());
         let score = score(&flags, &renderings);
         println!(
@@ -804,11 +815,10 @@ mod tests {
             let dir = crate::TempDir::new(&format!("locate-{}", corpus.slug()));
             let files = corpus.write(dir.path());
             let flags = locate_tree(dir.path());
-            let by_shape: BTreeMap<&str, usize> =
-                flags.iter().fold(BTreeMap::new(), |mut m, f| {
-                    *m.entry(f.shape.slug()).or_default() += 1;
-                    m
-                });
+            let by_shape: BTreeMap<&str, usize> = flags.iter().fold(BTreeMap::new(), |mut m, f| {
+                *m.entry(f.shape.slug()).or_default() += 1;
+                m
+            });
             println!(
                 "  {:<12} {:>4} file(s), {:>3} shape flag(s)  {by_shape:?}",
                 corpus.slug(),

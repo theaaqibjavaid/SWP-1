@@ -63,8 +63,7 @@ pub mod input;
 pub mod spans;
 
 pub use find::{
-    scan_against, Detection, FingerprintCheck, ReleaseDetection, SiteMatch, SiteStatus,
-    SLOT_COUNT,
+    scan_against, Detection, FingerprintCheck, ReleaseDetection, SiteMatch, SiteStatus, SLOT_COUNT,
 };
 pub use index::{build_indexes, CandidateRelease, LocationHit, ReleaseIndex};
 pub use input::{open, InputKind, Opened};

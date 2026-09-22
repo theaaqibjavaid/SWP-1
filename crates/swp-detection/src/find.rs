@@ -182,7 +182,9 @@ impl SiteMatch {
 
     /// Whether this site was found somewhere other than where we embedded it.
     pub fn moved(&self) -> bool {
-        self.found_in.as_deref().is_some_and(|f| f != self.manifest_file)
+        self.found_in
+            .as_deref()
+            .is_some_and(|f| f != self.manifest_file)
     }
 }
 
@@ -283,13 +285,19 @@ impl ReleaseDetection {
     /// How many confirmed sites were found at a path other than the one we
     /// protected, which is the file-movement channel of §25.
     pub fn moved(&self) -> usize {
-        self.sites.iter().filter(|s| s.confirmed() && s.moved()).count()
+        self.sites
+            .iter()
+            .filter(|s| s.confirmed() && s.moved())
+            .count()
     }
 
     /// How many confirmed sites were reached only through the rename-tolerant
     /// keys, which is the renaming and reformatting channel of §25.
     pub fn refactored(&self) -> usize {
-        self.sites.iter().filter(|s| s.confirmed() && s.refactored()).count()
+        self.sites
+            .iter()
+            .filter(|s| s.confirmed() && s.refactored())
+            .count()
     }
 
     /// How many candidate spans were offered a code comparison, across every site.
@@ -385,10 +393,11 @@ pub fn scan_against(
     // to fix; here the honest answer is "this scan could not look at anything",
     // which §20 files under *cannot say* and §51 forbids dressing up as a clean
     // verdict.
-    let (walked, nothing_to_examine) = match walk::walk_for_scan(&opened.root, &scan_config(), limits) {
-        Ok(walked) => (walked, false),
-        Err(e) => return Err(e),
-    };
+    let (walked, nothing_to_examine) =
+        match walk::walk_for_scan(&opened.root, &scan_config(), limits) {
+            Ok(walked) => (walked, false),
+            Err(e) => return Err(e),
+        };
     let nothing_to_examine = nothing_to_examine || walked.is_empty();
 
     let mut observations: Vec<BTreeMap<usize, Vec<Observation>>> =
@@ -408,7 +417,10 @@ pub fn scan_against(
         let width = TagWidth::new(group.tag_bits).map_err(|_| {
             SwpError::new(
                 ErrorCode::InvalidWatermark,
-                format!("a release declares an unsupported tag width of {}", group.tag_bits),
+                format!(
+                    "a release declares an unsupported tag width of {}",
+                    group.tag_bits
+                ),
             )
         })?;
         let keys: &ManifestKeys = indexes[group.positions[0]].keys();
@@ -628,7 +640,12 @@ fn groups(indexes: &[ReleaseIndex<'_>]) -> Vec<Group> {
 }
 
 fn widths(indexes: &[ReleaseIndex<'_>]) -> Vec<u8> {
-    indexes.iter().map(|i| i.tag_bits()).collect::<BTreeSet<_>>().into_iter().collect()
+    indexes
+        .iter()
+        .map(|i| i.tag_bits())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 /// One lookup table for a whole group: a location id straight to the releases and
@@ -655,15 +672,12 @@ fn merged_index<'a>(indexes: &'a [ReleaseIndex<'_>], positions: &[usize]) -> Mer
         let idx = &indexes[*pos];
         for (site, entry) in idx.sites().iter().enumerate() {
             for (slot, kind) in RadiusKind::all().iter().enumerate() {
-                merged
-                    .entry(entry.locations[slot])
-                    .or_default()
-                    .push(Hit {
-                        release: *pos,
-                        site,
-                        slot: *kind,
-                        rendered: &entry.rendered,
-                    });
+                merged.entry(entry.locations[slot]).or_default().push(Hit {
+                    release: *pos,
+                    site,
+                    slot: *kind,
+                    rendered: &entry.rendered,
+                });
             }
         }
     }
@@ -809,6 +823,24 @@ fn confirm(
         }
     }
     slots.sort();
+    // Two files in one tree can hold the same statement, and then this site has an
+    // observation at each of them that is just as good as the other. Which one the
+    // loop above kept is the order the walk happened to read them in. `moved` is a
+    // claim about where the watermark *is*, so the copy sitting at the address the
+    // manifest published wins that tie rather than the first one found — otherwise
+    // an untouched project reads as having moved a site on some keys and not on
+    // others, for a reason that has nothing to do with its own history.
+    if let Some(chosen) = best {
+        if chosen.file != entry.file {
+            let at_published = obs.unwrap_or(&[]).iter().find(|o| {
+                o.file == entry.file
+                    && observation_tier(o, &entry.rendered, entry.family, width, tag) >= status
+            });
+            if at_published.is_some() {
+                best = at_published;
+            }
+        }
+    }
     Ok(SiteMatch {
         site,
         manifest_file: entry.file.clone(),
@@ -834,6 +866,28 @@ fn confirm(
         // accusing.
         probes: obs.unwrap_or(&[]).len() as u32,
     })
+}
+
+/// What one observation on its own would say about this site.
+///
+/// The three rules the scan loop applies, factored out so a tie between two equal
+/// observations can be settled after the loop instead of inside it.
+fn observation_tier(
+    obs: &Observation,
+    rendered: &str,
+    family: FormFamily,
+    width: TagWidth,
+    tag: SiteTag,
+) -> SiteStatus {
+    if obs.text == rendered {
+        return SiteStatus::ExactRendering;
+    }
+    if let Some(code) = observed_code(obs, family, width) {
+        if tag.matches(code) {
+            return SiteStatus::TagConfirmed;
+        }
+    }
+    SiteStatus::LocationOnly
 }
 
 /// What a literal in the candidate tree carries, under the family the manifest
@@ -863,9 +917,8 @@ fn read_source(
     } else {
         root.join(&entry.abs)
     };
-    let bytes = std::fs::read(&abs).map_err(|e| {
-        SwpError::new(ErrorCode::Io, format!("cannot read {}: {e}", abs.display()))
-    })?;
+    let bytes = std::fs::read(&abs)
+        .map_err(|e| SwpError::new(ErrorCode::Io, format!("cannot read {}: {e}", abs.display())))?;
     if bytes.len() as u64 > limits.max_file_bytes {
         return Ok(None);
     }
@@ -910,7 +963,10 @@ mod tests {
         let mut m = site_match(vec![RadiusKind::StatementId]);
         assert!(m.refactored(), "an L3-only hit is a renamed copy");
         m.slots.push(RadiusKind::StatementRaw);
-        assert!(!m.refactored(), "an L1 hit means the text was not respelled");
+        assert!(
+            !m.refactored(),
+            "an L1 hit means the text was not respelled"
+        );
     }
 
     #[test]
@@ -933,7 +989,11 @@ mod tests {
             windows_tried: 10,
         };
         assert_eq!(release.renderings(), 1);
-        assert_eq!(release.probes(), 2, "one comparison per span the address offered");
+        assert_eq!(
+            release.probes(),
+            2,
+            "one comparison per span the address offered"
+        );
     }
 
     #[test]
@@ -991,7 +1051,11 @@ mod tests {
     fn releases_are_grouped_by_everything_a_location_id_depends_on() {
         // Two widths means two harvests, because the candidate scan filters the
         // families it offers by the width it is running at.
-        let same = |bits: u8| Group { tag_bits: bits, canonicalizer: 1, positions: vec![0, 1] };
+        let same = |bits: u8| Group {
+            tag_bits: bits,
+            canonicalizer: 1,
+            positions: vec![0, 1],
+        };
         let a = same(4);
         let b = same(6);
         assert_ne!(a.tag_bits, b.tag_bits);
@@ -1018,7 +1082,9 @@ mod tests {
 
     #[test]
     fn an_uncomparable_fingerprint_is_never_reported_as_a_mismatch() {
-        let check = FingerprintCheck::NotComparable { declared: "L3".into() };
+        let check = FingerprintCheck::NotComparable {
+            declared: "L3".into(),
+        };
         assert!(!check.matched());
         assert_eq!(check.as_str(), "not-comparable");
     }

@@ -79,7 +79,9 @@ impl ArtifactClass {
                 "never commit: location keys, literal values and source paths, one of which is \
                  the root secret that derives every watermark"
             }
-            ArtifactClass::Config => "safe to commit: behaviour and resource limits, no key material",
+            ArtifactClass::Config => {
+                "safe to commit: behaviour and resource limits, no key material"
+            }
             ArtifactClass::Source => {
                 "the project's own files; `swp protect` modified some of them in place"
             }
@@ -172,9 +174,7 @@ pub const GITIGNORE_NEEDLE: &str = ".swp/private/";
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use swp_identity::{
-        IDENTITY_FILE, MANIFESTS_DIR, PLANS_DIR, RELEASES_DIR, ROOT_KEY_FILE,
-    };
+    use swp_identity::{IDENTITY_FILE, MANIFESTS_DIR, PLANS_DIR, RELEASES_DIR, ROOT_KEY_FILE};
 
     fn class(p: &str) -> ArtifactClass {
         classify(p)
@@ -184,13 +184,19 @@ mod tests {
     fn the_store_layout_classifies_as_documented() {
         assert_eq!(class(".swp/config.toml"), ArtifactClass::Config);
         assert_eq!(class(".swp/public/identity.json"), ArtifactClass::Public);
-        assert_eq!(class(".swp/public/releases/rel-a.json"), ArtifactClass::Public);
+        assert_eq!(
+            class(".swp/public/releases/rel-a.json"),
+            ArtifactClass::Public
+        );
         assert_eq!(class(".swp/private/root.key"), ArtifactClass::Private);
         assert_eq!(
             class(".swp/private/manifests/rel-a.json"),
             ArtifactClass::Private
         );
-        assert_eq!(class(".swp/private/plans/rel-a.json"), ArtifactClass::Private);
+        assert_eq!(
+            class(".swp/private/plans/rel-a.json"),
+            ArtifactClass::Private
+        );
         assert_eq!(class("src/app.js"), ArtifactClass::Source);
         assert_eq!(class("README.md"), ArtifactClass::Source);
         assert_eq!(class(""), ArtifactClass::Foreign);
@@ -205,7 +211,10 @@ mod tests {
         assert_eq!(class("./.swp/public/identity.json"), ArtifactClass::Public);
         assert_eq!(class(".swp/./private/plans/a.json"), ArtifactClass::Private);
         // A path that escapes the project is not this project's store.
-        assert_eq!(class("../other/.swp/private/root.key"), ArtifactClass::Source);
+        assert_eq!(
+            class("../other/.swp/private/root.key"),
+            ArtifactClass::Source
+        );
     }
 
     #[test]
@@ -258,10 +267,22 @@ mod tests {
             format!("{SWP_DIR}/{PRIVATE_DIR}"),
             ".swp/private".to_string()
         );
-        assert_eq!(format!("{SWP_DIR}/{PUBLIC_DIR}/{RELEASES_DIR}"), ".swp/public/releases");
-        assert_eq!(format!("{SWP_DIR}/{PUBLIC_DIR}/{IDENTITY_FILE}"), ".swp/public/identity.json");
-        assert_eq!(format!("{SWP_DIR}/{PRIVATE_DIR}/{MANIFESTS_DIR}"), ".swp/private/manifests");
-        assert_eq!(format!("{SWP_DIR}/{PRIVATE_DIR}/{PLANS_DIR}"), ".swp/private/plans");
+        assert_eq!(
+            format!("{SWP_DIR}/{PUBLIC_DIR}/{RELEASES_DIR}"),
+            ".swp/public/releases"
+        );
+        assert_eq!(
+            format!("{SWP_DIR}/{PUBLIC_DIR}/{IDENTITY_FILE}"),
+            ".swp/public/identity.json"
+        );
+        assert_eq!(
+            format!("{SWP_DIR}/{PRIVATE_DIR}/{MANIFESTS_DIR}"),
+            ".swp/private/manifests"
+        );
+        assert_eq!(
+            format!("{SWP_DIR}/{PRIVATE_DIR}/{PLANS_DIR}"),
+            ".swp/private/plans"
+        );
         assert_eq!(format!("{SWP_DIR}/{CONFIG_FILE}"), ".swp/config.toml");
     }
 }

@@ -99,11 +99,7 @@ fn sample<T>(run: impl FnOnce() -> T) -> Sample<T> {
     let wall = start.elapsed();
     let peak = PEAK.load(Ordering::Relaxed);
     drop(guard);
-    Sample {
-        value,
-        wall,
-        peak,
-    }
+    Sample { value, wall, peak }
 }
 
 /// One command, repeated: the answer from the first run, and every timing.
@@ -223,8 +219,7 @@ fn the_ladder_is_measured_and_scales_with_its_own_size() {
         // site many spans sharing its abstracted address, and a matcher that
         // keeps only the first of them loses sites that are sitting right there.
         assert_eq!(
-            verify.value.code,
-            0,
+            verify.value.code, 0,
             "verify failed on its own project at the {label} tier:\n{}",
             verify.value.out
         );
@@ -287,9 +282,21 @@ fn the_ladder_is_measured_and_scales_with_its_own_size() {
     let base = &rows[0];
     for row in &rows[1..] {
         for (phase, small, big) in [
-            ("protect", base.per_file_ms(base.protect), row.per_file_ms(row.protect)),
-            ("verify", base.per_file_ms(base.verify), row.per_file_ms(row.verify)),
-            ("scan", base.per_file_ms(base.scan), row.per_file_ms(row.scan)),
+            (
+                "protect",
+                base.per_file_ms(base.protect),
+                row.per_file_ms(row.protect),
+            ),
+            (
+                "verify",
+                base.per_file_ms(base.verify),
+                row.per_file_ms(row.verify),
+            ),
+            (
+                "scan",
+                base.per_file_ms(base.scan),
+                row.per_file_ms(row.scan),
+            ),
         ] {
             assert!(
                 big <= small * 4.0 + 1.0,
@@ -319,7 +326,11 @@ fn the_ladder_is_measured_and_scales_with_its_own_size() {
 fn report(rows: &[Row]) {
     println!(
         "\n§44 performance ladder — build: {}",
-        if cfg!(debug_assertions) { "debug" } else { "release" }
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        }
     );
     println!(
         "  {:<11} {:>6} {:>7} {:>6} {:>9} {:>9} {:>9} {:>9} {:>12} {:>8}",

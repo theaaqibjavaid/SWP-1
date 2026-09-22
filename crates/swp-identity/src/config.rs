@@ -71,9 +71,14 @@ pub struct ProtectConfig {
     /// Bits carried per site. Raising this raises per-site evidence strength
     /// and lowers how many sites can be embedded safely.
     pub tag_bits: u8,
-    /// Rewrite which literals as well as numbers. String literals are the more
-    /// visible change and the more likely to upset a formatter diff, so they are
-    /// off unless asked for.
+    /// Rewrite string literals as well as numbers.
+    ///
+    /// On by default, because a string-only tree has nothing else to carry a
+    /// site and a constellation chosen from numbers alone is a thinner one. A
+    /// string rewrite is the more visible diff and the more likely to upset a
+    /// formatter, so a project that cares about either sets this to `false`; the
+    /// cost is stated where it is paid, as a count of literals that were not
+    /// offered as sites in the run's notes.
     pub embed_strings: bool,
 }
 
@@ -119,8 +124,17 @@ impl ProtectConfig {
 
 impl SwpConfig {
     pub fn parse(text: &str) -> Result<Self, SwpError> {
-        let cfg: SwpConfig = toml::from_str(text)
-            .map_err(|e| SwpError::invalid_manifest(format!("config.toml: {e}")))?;
+        let cfg: SwpConfig = toml::from_str(text).map_err(|e| {
+            // `INVALID_MANIFEST`'s standing advice is about release manifests, which
+            // is the wrong remedy for a settings file: this one is in version
+            // control and regenerable, and that one is not.
+            SwpError::invalid_manifest(format!("config.toml: {e}")).with_next(
+                "The line the parser named above is the whole fix: a duplicated key, a \
+                 misspelled one, or a value in the wrong type. This file holds settings \
+                 only, so restoring the committed copy — or deleting it and letting \
+                 `swp init` write the defaults — loses no watermark data.",
+            )
+        })?;
         cfg.validate()?;
         Ok(cfg)
     }

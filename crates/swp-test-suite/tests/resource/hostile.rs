@@ -77,12 +77,7 @@ enum Answer {
 /// the failure this suite exists to catch, so it is reported with the whole
 /// command output rather than an assert on a field.
 fn scan_hostile(project: &Project, candidate: &Path) -> Answer {
-    let run = project.run(&[
-        "scan",
-        &candidate.display().to_string(),
-        "--format",
-        "json",
-    ]);
+    let run = project.run(&["scan", &candidate.display().to_string(), "--format", "json"]);
     match run.code {
         0 | 1 | 10 => {
             let v = Verdict::of(run);
@@ -270,7 +265,11 @@ fn a_file_over_the_size_ceiling_is_refused_and_says_so() {
         b"function rate(base) {\n  const fee = base * 0.125;\n  return fee + 4211;\n}\nmodule.exports = { rate };\n",
     );
     let before = inventory(dir.path());
-    assert_eq!(before.len(), 2, "the hostile tree lost a file before the scan");
+    assert_eq!(
+        before.len(),
+        2,
+        "the hostile tree lost a file before the scan"
+    );
 
     let v = scan_hostile(&project, dir.path()).report("the 8 MiB + 1 file");
     let answer = Answer::Partial(v.clone());
@@ -300,7 +299,10 @@ fn a_file_over_the_size_ceiling_is_refused_and_says_so() {
         v.level,
         v.run.code
     );
-    println!("  the refusal as the report words it: {}", omissions.lines().next().unwrap_or_default());
+    println!(
+        "  the refusal as the report words it: {}",
+        omissions.lines().next().unwrap_or_default()
+    );
 }
 
 #[test]
@@ -337,10 +339,7 @@ fn deep_nesting_is_stopped_before_the_stack_is() {
     println!(
         "\n§45 — 4 000 nested blocks: survived in one file, {} byte(s) read, verdict {} / {} \
          (exit {})",
-        v.bytes_scanned,
-        v.result,
-        v.level,
-        v.run.code
+        v.bytes_scanned, v.result, v.level, v.run.code
     );
     println!("  {}", omissions.lines().next().unwrap_or_default());
 }
@@ -411,11 +410,19 @@ fn a_tree_of_many_files_stops_at_the_walk_ceiling_and_reports_the_rest() {
     for i in 0..400 {
         dir.write(
             &format!("src/m{i:03}.js"),
-            format!("const V_{i} = {};\nmodule.exports = {{ V_{i} }};\n", 1000 + i).as_bytes(),
+            format!(
+                "const V_{i} = {};\nmodule.exports = {{ V_{i} }};\n",
+                1000 + i
+            )
+            .as_bytes(),
         );
     }
     let before = inventory(dir.path());
-    assert_eq!(before.len(), 400, "the hostile tree lost a file before the scan");
+    assert_eq!(
+        before.len(),
+        400,
+        "the hostile tree lost a file before the scan"
+    );
 
     let answer = scan_hostile(&project, dir.path());
     // This one is allowed to answer either way, and both answers are the same
@@ -452,10 +459,7 @@ fn a_tree_of_many_files_stops_at_the_walk_ceiling_and_reports_the_rest() {
             r.code
         ),
     }
-    println!(
-        "  {}",
-        first_line(&answer.whole(), "max_files")
-    );
+    println!("  {}", first_line(&answer.whole(), "max_files"));
 }
 
 #[test]
@@ -463,8 +467,14 @@ fn malformed_and_binary_candidates_are_answered_not_crashed() {
     let project = scanner();
     let dir = hostile("broken");
     dir.write("src/unclosed.js", b"function oops( {\n  return 1234\n");
-    dir.write("src/truncated.js", b"const half = { \"nested\": [1, 2, 3, /* unterminated");
-    dir.write("src/binary.js", &[0u8, 159, 146, 150, 0, 255, 128, 0, 7, 8, 9]);
+    dir.write(
+        "src/truncated.js",
+        b"const half = { \"nested\": [1, 2, 3, /* unterminated",
+    );
+    dir.write(
+        "src/binary.js",
+        &[0u8, 159, 146, 150, 0, 255, 128, 0, 7, 8, 9],
+    );
     dir.write("src/empty.js", b"");
     dir.write("src/nulls.py", b"def f():\n    return 42\x00\n");
     dir.write("src/crlf.ts", "export const X = 4021;\r\n\r\n".as_bytes());
@@ -472,7 +482,11 @@ fn malformed_and_binary_candidates_are_answered_not_crashed() {
     dir.write("src/notsource.md", b"# Notes\n\nNothing here is source.\n");
     let before = inventory(dir.path());
     let names: BTreeSet<String> = before.iter().map(|(p, _, _)| p.clone()).collect();
-    assert_eq!(names.len(), 8, "the hostile tree lost a file before the scan");
+    assert_eq!(
+        names.len(),
+        8,
+        "the hostile tree lost a file before the scan"
+    );
 
     let answer = scan_hostile(&project, dir.path());
     // Nothing here is a limit breach to refuse: broken source is a normal thing a
@@ -492,7 +506,11 @@ fn malformed_and_binary_candidates_are_answered_not_crashed() {
         v.result.as_str(),
         "NO_PROVENANCE_DETECTED" | "INCONCLUSIVE" | "PROVENANCE_DETECTED"
     );
-    assert!(legal, "a malformed tree produced no verdict at all: {:?}", v.result);
+    assert!(
+        legal,
+        "a malformed tree produced no verdict at all: {:?}",
+        v.result
+    );
     let expected = match v.result.as_str() {
         "PROVENANCE_DETECTED" => 1,
         "INCONCLUSIVE" => 10,
@@ -535,11 +553,7 @@ fn malformed_and_binary_candidates_are_answered_not_crashed() {
         "\n§45 — 8 hostile files (unclosed, truncated, binary, empty, embedded NUL, CRLF, 200 KB \
          of semicolons, one non-source): verdict {} / {} (exit {}), {} file(s) scanned, {} \
          byte(s) read",
-        v.result,
-        v.level,
-        v.run.code,
-        v.files_scanned,
-        v.bytes_scanned
+        v.result, v.level, v.run.code, v.files_scanned, v.bytes_scanned
     );
     for line in omissions.lines().filter(|l| !l.is_empty()).take(4) {
         println!("  {line}");
@@ -591,7 +605,11 @@ fn an_archive_bomb_is_measured_before_it_expands_past_the_ceiling() {
         match &answer {
             Answer::Partial(v) => v.run.json()["omissions"]
                 .as_array()
-                .map(|a| a.iter().filter_map(|l| l.as_str()).collect::<Vec<_>>().join(" | "))
+                .map(|a| a
+                    .iter()
+                    .filter_map(|l| l.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" | "))
                 .unwrap_or_default(),
             Answer::Refused(r) => r.err.lines().nth(1).unwrap_or_default().to_string(),
         }
@@ -632,8 +650,8 @@ fn bomb_container() -> (Vec<u8>, usize) {
     use std::io::Write;
 
     let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::<u8>::new()));
-    let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
+    let options: zip::write::FileOptions<'_, ()> =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     zip.start_file("src/bombed.js", options).unwrap();
     let chunk = vec![b' '; 1024 * 1024];
     for _ in 0..64 {
@@ -674,7 +692,10 @@ fn a_candidate_cannot_hide_behind_a_symlink_without_saying_so() {
         "the link was not followed, and the report did not say which file that left \
          unread:\n{omissions}"
     );
-    println!("  a link is refused and named: {}", first_line(&omissions, "escape.js"));
+    println!(
+        "  a link is refused and named: {}",
+        first_line(&omissions, "escape.js")
+    );
 }
 
 /// Create a symlink, and report whether the platform allowed it. Windows needs

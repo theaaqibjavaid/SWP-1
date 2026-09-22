@@ -211,14 +211,9 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
 fn store_view(project: &Ctx) -> Result<Rendering, SwpError> {
     let s = &project.store;
     let inventory = s.inventory()?;
-    let count = |needle: &str| {
-        inventory
-            .iter()
-            .filter(|(p, _)| p.contains(needle))
-            .count()
-    };
+    let count = |needle: &str| inventory.iter().filter(|(p, _)| p.contains(needle)).count();
     let data = json!({
-        "root": s.project_root().display().to_string(),
+        "root": swp_core::text::display_path(&s.project_root().display().to_string()),
         "store": s.relabel(&s.swp_dir()),
         "protocol": project.identity.protocol,
         "canonicalizer_version": project.identity.canonicalizer_version,
@@ -247,7 +242,10 @@ fn store_view(project: &Ctx) -> Result<Rendering, SwpError> {
             s.relabel(&s.swp_dir()),
             project.identity.project_id
         ),
-        format!("  root        {}", s.project_root().display()),
+        format!(
+            "  root        {}",
+            swp_core::text::display_path(&s.project_root().display().to_string())
+        ),
         format!(
             "  secret      {}",
             if s.root_key_exists() {
@@ -284,7 +282,10 @@ fn store_view(project: &Ctx) -> Result<Rendering, SwpError> {
     }
     out.push(String::new());
     out.push(format!("  {} artifact(s) in the store.", inventory.len()));
-    out.push(format!("  back up: {}", swp_manifest::BACKUP_ARTIFACTS.join(", ")));
+    out.push(format!(
+        "  back up: {}",
+        swp_manifest::BACKUP_ARTIFACTS.join(", ")
+    ));
     out.push(String::new());
     out.push("Views".to_string());
     for v in View::ALL {
@@ -316,7 +317,10 @@ fn identity_view(project: &Ctx) -> Result<Rendering, SwpError> {
             "  protocol    {} · schema {} · canonicalizer {}",
             i.protocol, i.schema, i.canonicalizer_version
         ),
-        format!("  generator   {} {}", i.generator.generator, i.generator.swp_version),
+        format!(
+            "  generator   {} {}",
+            i.generator.generator, i.generator.swp_version
+        ),
         format!(
             "  verify key  {} ({}, {} bytes)",
             i.verification.verify_key_b64,
@@ -326,8 +330,10 @@ fn identity_view(project: &Ctx) -> Result<Rendering, SwpError> {
         String::new(),
         "  This file is public by design: the verify key authenticates this project's".to_string(),
         "  manifests and release records, and anyone holding it can check them. Nobody".to_string(),
-        "  holding it can produce one — the signing key is derived from the root secret and".to_string(),
-        "  is never stored. The project id is that same derivation, so changing the display".to_string(),
+        "  holding it can produce one — the signing key is derived from the root secret and"
+            .to_string(),
+        "  is never stored. The project id is that same derivation, so changing the display"
+            .to_string(),
         "  name here never changes which copies are yours.".to_string(),
     ];
     Ok((None, data, out, json!({})))
@@ -353,8 +359,12 @@ fn config_view(project: &Ctx) -> Result<Rendering, SwpError> {
     out.push(String::new());
     out.extend(toml.lines().map(|l| l.to_string()));
     out.push(String::new());
-    out.push("  This is the file as it stands on disk. `--target`, `--sites` and `--bits`".to_string());
-    out.push("  change what one protection run uses and never write here, which is why".to_string());
+    out.push(
+        "  This is the file as it stands on disk. `--target`, `--sites` and `--bits`".to_string(),
+    );
+    out.push(
+        "  change what one protection run uses and never write here, which is why".to_string(),
+    );
     out.push("  `swp protect` prints the settings a run actually used.".to_string());
     if !project.warnings.is_empty() {
         out.push(String::new());
@@ -398,8 +408,12 @@ fn releases_view(project: &Ctx, limit: usize) -> Result<Rendering, SwpError> {
             "  {:<22} {:<22} {:>5} {:>7} {:>4}  {}",
             row["release_id"].as_str().unwrap_or_default(),
             row["created_at"].as_str().unwrap_or_default(),
-            row["watermark"]["sites_embedded"].as_u64().unwrap_or_default(),
-            row["watermark"]["sites_skipped"].as_u64().unwrap_or_default(),
+            row["watermark"]["sites_embedded"]
+                .as_u64()
+                .unwrap_or_default(),
+            row["watermark"]["sites_skipped"]
+                .as_u64()
+                .unwrap_or_default(),
             row["watermark"]["tag_bits"].as_u64().unwrap_or_default(),
             private_half(row),
         ));
@@ -412,7 +426,9 @@ fn releases_view(project: &Ctx, limit: usize) -> Result<Rendering, SwpError> {
         "  {} site(s) across {} release(s). A `swp scan` matches a candidate against all of \
          them unless --release or --latest names one.",
         rows.iter()
-            .map(|r| r["watermark"]["sites_embedded"].as_u64().unwrap_or_default())
+            .map(|r| r["watermark"]["sites_embedded"]
+                .as_u64()
+                .unwrap_or_default())
             .sum::<u64>(),
         history.len()
     ));
@@ -428,7 +444,9 @@ fn releases_view(project: &Ctx, limit: usize) -> Result<Rendering, SwpError> {
 fn private_half(row: &Value) -> String {
     let m = &row["private_manifest"];
     match (m["present"].as_bool(), m["digest_agrees"].as_bool()) {
-        (Some(true), Some(true)) => format!("manifest ({} site(s))", m["sites"].as_u64().unwrap_or(0)),
+        (Some(true), Some(true)) => {
+            format!("manifest ({} site(s))", m["sites"].as_u64().unwrap_or(0))
+        }
         (Some(true), _) => "manifest here, digest DISAGREES with the record".to_string(),
         (Some(false), _) => format!(
             "MISSING — restore {}",
@@ -475,7 +493,7 @@ fn release_row(project: &Ctx, r: &ReleaseRecord) -> Result<Value, SwpError> {
 
 fn release_view(project: &Ctx, parsed: &Parsed) -> Result<Rendering, SwpError> {
     let id = project.one_release(parsed)?;
-    let record = project.store.read_release(&id)?;
+    let record = project.release(&id)?;
     let data = release_row(project, &record)?;
     let w = &record.watermark;
     let manifest = &data["private_manifest"];
@@ -487,8 +505,9 @@ fn release_view(project: &Ctx, parsed: &Parsed) -> Result<Rendering, SwpError> {
             "present ({} byte(s)), and it hashes to the digest this record published",
             manifest["bytes"].as_u64().unwrap_or_default()
         ),
-        (Some(true), _) => "present, but it does NOT hash to the digest this record published"
-            .to_string(),
+        (Some(true), _) => {
+            "present, but it does NOT hash to the digest this record published".to_string()
+        }
         _ => format!(
             "missing — restore {}",
             manifest["path"].as_str().unwrap_or_default()
@@ -524,11 +543,17 @@ fn release_view(project: &Ctx, parsed: &Parsed) -> Result<Rendering, SwpError> {
             record.fingerprint, record.fingerprint_level
         ),
         format!("  manifest    {manifest_line}"),
-        format!("  plan        {}", data["plan"]["path"].as_str().unwrap_or_default()),
+        format!(
+            "  plan        {}",
+            data["plan"]["path"].as_str().unwrap_or_default()
+        ),
         String::new(),
-        "  The record is signed and public: `.swp/public/releases/` may be committed, and a".to_string(),
-        "  copy of it proves nothing without the private manifest it is the digest of. That".to_string(),
-        "  split is deliberate — the record says what was protected, the manifest says where.".to_string(),
+        "  The record is signed and public: `.swp/public/releases/` may be committed, and a"
+            .to_string(),
+        "  copy of it proves nothing without the private manifest it is the digest of. That"
+            .to_string(),
+        "  split is deliberate — the record says what was protected, the manifest says where."
+            .to_string(),
         String::new(),
         format!("  `swp inspect fragments --release {id}` reads the site list."),
     ];
@@ -586,9 +611,17 @@ fn manifest_view(project: &Ctx, parsed: &Parsed, limit: usize) -> Result<Renderi
         out.push(format!("  … and {omitted} more; --full lists every one"));
     }
     out.push(String::new());
-    out.push("  Every site carries four keyed identities: the statement radius and the scope".to_string());
-    out.push("  radius, each with local names abstracted and each with them kept. The tag hangs".to_string());
-    out.push("  off the `primary` one. `--format json` prints all four, and both literals.".to_string());
+    out.push(
+        "  Every site carries four keyed identities: the statement radius and the scope"
+            .to_string(),
+    );
+    out.push(
+        "  radius, each with local names abstracted and each with them kept. The tag hangs"
+            .to_string(),
+    );
+    out.push(
+        "  off the `primary` one. `--format json` prints all four, and both literals.".to_string(),
+    );
     Ok((Some(id), data, out, json!({ "sites": omitted })))
 }
 
@@ -648,7 +681,11 @@ fn plan_view(project: &Ctx, parsed: &Parsed, limit: usize) -> Result<Rendering, 
         ),
         format!(
             "  strings     {}",
-            if plan.embed_strings { "enabled" } else { "disabled" }
+            if plan.embed_strings {
+                "enabled"
+            } else {
+                "disabled"
+            }
         ),
         String::new(),
         "What was refused, and why (§11: skipped, never forced)".to_string(),
@@ -676,7 +713,10 @@ fn plan_view(project: &Ctx, parsed: &Parsed, limit: usize) -> Result<Rendering, 
         }
     }
     out.push(String::new());
-    out.push(format!("  The {} planned site(s), counted:", plan.sites.len()));
+    out.push(format!(
+        "  The {} planned site(s), counted:",
+        plan.sites.len()
+    ));
     for (label, groups) in [
         ("class", tally(&plan.sites, |s| s.class.clone())),
         ("family", tally(&plan.sites, |s| s.family.clone())),
@@ -685,8 +725,14 @@ fn plan_view(project: &Ctx, parsed: &Parsed, limit: usize) -> Result<Rendering, 
         out.push(format!("    by {:<7} {}", label, groups.join(", ")));
     }
     out.push(String::new());
-    out.push("  A plan is unsigned: it records an intent, not a claim about the release. The".to_string());
-    out.push("  manifest is the signed half — and a plan holds no literal text and no tag, so".to_string());
+    out.push(
+        "  A plan is unsigned: it records an intent, not a claim about the release. The"
+            .to_string(),
+    );
+    out.push(
+        "  manifest is the signed half — and a plan holds no literal text and no tag, so"
+            .to_string(),
+    );
     out.push("  this is the only place the refusals are written down.".to_string());
     Ok((Some(id), data, out, json!({ "skipped": omitted })))
 }
@@ -754,8 +800,12 @@ fn fragments_view(project: &Ctx, parsed: &Parsed, limit: usize) -> Result<Render
         out.push(format!("  … and {omitted} more; --full lists every one"));
     }
     out.push(String::new());
-    out.push("  The last column is what `swp verify` looks for and what a scan decodes its".to_string());
-    out.push("  fragment out of. Its value to anybody else is that it means nothing without".to_string());
+    out.push(
+        "  The last column is what `swp verify` looks for and what a scan decodes its".to_string(),
+    );
+    out.push(
+        "  fragment out of. Its value to anybody else is that it means nothing without".to_string(),
+    );
     out.push("  this project's root secret — which is why reading it here is safe and".to_string());
     out.push("  publishing it is not.".to_string());
     let data = json!({
@@ -809,9 +859,7 @@ mod tests {
     /// A protected project and the release it published.
     fn protected(command: &str, label: &str) -> (Scratch, String) {
         let dir = Scratch::protected(command, label);
-        let doc = dir
-            .run(&["inspect", "releases", "--format", "json"])
-            .json();
+        let doc = dir.run(&["inspect", "releases", "--format", "json"]).json();
         let release = doc["data"]["releases"][0]["release_id"]
             .as_str()
             .unwrap()
@@ -838,13 +886,25 @@ mod tests {
         let (dir, release) = protected("inspect", "all-views");
         for view in View::ALL {
             let r = dir.run(&["inspect", view.as_str(), "--format", "json"]);
-            assert_eq!(r.code, 0, "{} view failed:
-{}{}", view.as_str(), r.out, r.err);
+            assert_eq!(
+                r.code,
+                0,
+                "{} view failed:
+{}{}",
+                view.as_str(),
+                r.out,
+                r.err
+            );
             let doc = r.json();
             assert_eq!(doc["schema"], SCHEMA);
             assert_eq!(doc["view"], view.as_str());
             assert_eq!(doc["project_id"], dir.project_id().as_str());
-            assert_ne!(doc["data"], Value::Null, "{} printed no data", view.as_str());
+            assert_ne!(
+                doc["data"],
+                Value::Null,
+                "{} printed no data",
+                view.as_str()
+            );
             // The four release-scoped views all name the release they read, and
             // with one release on disk there is exactly one candidate for that.
             if view.is_private() || view == View::Release {
@@ -895,11 +955,15 @@ mod tests {
         }
         // `fragments` is the one that trades an address for a literal: its whole
         // value is showing what the watermark looks like in the source.
-        let frags = dir.run(&["inspect", "fragments", "--format", "json"]).json();
+        let frags = dir
+            .run(&["inspect", "fragments", "--format", "json"])
+            .json();
         let sites = frags["data"]["sites"].as_array().unwrap();
         assert!(!sites.is_empty(), "the fragments view printed no site");
         assert!(
-            sites.iter().all(|s| s["rendered"].as_str().is_some_and(|r| !r.is_empty())),
+            sites
+                .iter()
+                .all(|s| s["rendered"].as_str().is_some_and(|r| !r.is_empty())),
             "a site arrived without the text at it: {frags:#}"
         );
         assert!(
@@ -909,7 +973,13 @@ mod tests {
         );
         // The other five are the views an operator would share. None of them may
         // carry a keyed address, because a leak of those is a leak of the watermark.
-        for view in [View::Store, View::Identity, View::Config, View::Releases, View::Release] {
+        for view in [
+            View::Store,
+            View::Identity,
+            View::Config,
+            View::Releases,
+            View::Release,
+        ] {
             let r = dir.run(&["inspect", view.as_str(), "--format", "json"]);
             assert_eq!(r.code, 0, "{}", r.err);
             assert!(
@@ -918,8 +988,16 @@ mod tests {
                 view.as_str()
             );
             for id in &ids {
-                assert!(!r.out.contains(id), "{} leaked keyed address {id}", view.as_str());
-                assert!(!r.err.contains(id), "{} leaked keyed address {id} on stderr", view.as_str());
+                assert!(
+                    !r.out.contains(id),
+                    "{} leaked keyed address {id}",
+                    view.as_str()
+                );
+                assert!(
+                    !r.err.contains(id),
+                    "{} leaked keyed address {id} on stderr",
+                    view.as_str()
+                );
             }
         }
     }
@@ -937,7 +1015,8 @@ mod tests {
         for view in View::ALL {
             let r = dir.run(&["inspect", view.as_str(), "--format", "json"]);
             assert_eq!(
-                r.code, 0,
+                r.code,
+                0,
                 "{} needed the root key:
 {}{}",
                 view.as_str(),
@@ -960,7 +1039,11 @@ mod tests {
         let r = dir.run(&["inspect", "constellation"]);
         assert_eq!(r.code, ErrorCode::Usage.exit_code(), "{}", r.err);
         for name in View::names() {
-            assert!(r.err.contains(name), "the refusal omitted {name:?}: {}", r.err);
+            assert!(
+                r.err.contains(name),
+                "the refusal omitted {name:?}: {}",
+                r.err
+            );
         }
         // Two arguments are a mistake too, not a second view to merge.
         let two = dir.run(&["inspect", "store", "identity"]);

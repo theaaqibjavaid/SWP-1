@@ -27,6 +27,10 @@ pub struct Dialect {
     /// Python yes; JavaScript and TypeScript no.
     pub adjacent_strings: bool,
     /// Whether `\xHH` escapes are accepted inside an ordinary string literal.
+    /// This is the whole of what the `str-escape` family needs from a language,
+    /// so a dialect that sets it false simply never sees that family offered —
+    /// on either side of the pipeline, which is the point: a family the scanner
+    /// would not recognise is one the writer must not produce.
     pub hex_escapes: bool,
     /// Quote characters that begin a plain string literal.
     pub quote_chars: &'static [char],
@@ -72,10 +76,12 @@ impl Dialect {
     ///
     /// Every field takes the least-committal value available, because a fallback
     /// that guesses grants rewrites a real parser would refuse: the exactness
-    /// bound is JavaScript's rather than an unbounded one, adjacent-literal
-    /// concatenation and digit separators are off, and `hex_escapes` describes
-    /// only what the form engine will produce, not what some unknown language
-    /// accepts.
+    /// bound is JavaScript's rather than an unbounded one, and adjacent-literal
+    /// concatenation and digit separators are off. `hex_escapes` is the one field
+    /// set to `true` rather than `false`, and deliberately so: the fallback
+    /// offers no string sites of its own, so that flag can only ever widen what a
+    /// scan *reads back* — and a scanner that refused to decode an escape it was
+    /// shown would lose real evidence to a technicality.
     pub const GENERIC: Dialect = Dialect {
         name: "generic",
         max_exact_integer: (1i128 << 53) - 1,

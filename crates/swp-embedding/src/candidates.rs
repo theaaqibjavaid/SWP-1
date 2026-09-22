@@ -221,7 +221,10 @@ impl Scan {
     }
 
     pub fn files_with_candidates(&self) -> usize {
-        self.files.iter().filter(|f| !f.candidates.is_empty()).count()
+        self.files
+            .iter()
+            .filter(|f| !f.candidates.is_empty())
+            .count()
     }
 
     /// How many of this scan's candidate sites share each radius key.
@@ -247,8 +250,7 @@ impl KeyCounts {
             for cand in &file.candidates {
                 for kind in RadiusKind::all() {
                     let slot = kind.code();
-                    *out
-                        .0
+                    *out.0
                         .entry((slot, cand.locations[slot as usize]))
                         .or_insert(0) += 1;
                 }
@@ -386,7 +388,10 @@ pub fn scan(
             ));
         }
         *by_language
-            .entry((analysis.language.clone(), adapter_label(analysis.capabilities.kind)))
+            .entry((
+                analysis.language.clone(),
+                adapter_label(analysis.capabilities.kind),
+            ))
             .or_insert(0) += 1;
         scan.files.push(FileScan {
             rel: entry.rel.clone(),
@@ -402,7 +407,11 @@ pub fn scan(
 
     scan.adapters = by_language
         .into_iter()
-        .map(|((language, mode), files)| AdapterStat { language, mode, files })
+        .map(|((language, mode), files)| AdapterStat {
+            language,
+            mode,
+            files,
+        })
         .collect();
     Ok(scan)
 }
@@ -445,11 +454,13 @@ fn admit(
     // Everything `admit` refuses here is a file the walk had already decided was
     // source, so every skip below is a hole in the examination rather than a
     // non-source file being ignored (§45).
-    let skip = |reason: String| Admission::Skip(Omission {
-        path: entry.rel.clone(),
-        reason,
-        kind: OmissionKind::NotExamined,
-    });
+    let skip = |reason: String| {
+        Admission::Skip(Omission {
+            path: entry.rel.clone(),
+            reason,
+            kind: OmissionKind::NotExamined,
+        })
+    };
     let bytes = match std::fs::read(&abs) {
         Ok(b) => b,
         Err(e) => return Ok(skip(format!("cannot read: {e}"))),
@@ -569,15 +580,7 @@ mod tests {
 
     fn scanned(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Scan {
         let walked = crate::walk::walk(root, cfg, limits).unwrap();
-        scan(
-            root,
-            &walked,
-            &keys(),
-            cfg,
-            TagWidth::DEFAULT,
-            limits,
-        )
-        .unwrap()
+        scan(root, &walked, &keys(), cfg, TagWidth::DEFAULT, limits).unwrap()
     }
 
     fn cfg(t: &[&str]) -> ProtectConfig {
@@ -603,7 +606,11 @@ mod tests {
         for c in &s.files[0].candidates {
             assert!(c.locations.iter().all(|l| *l != LocationId::default()));
             assert!(c.families.iter().any(|f| f.applies_to_numbers()));
-            assert!(c.line_hint >= 1 && c.line_hint <= 5, "line hint {}", c.line_hint);
+            assert!(
+                c.line_hint >= 1 && c.line_hint <= 5,
+                "line hint {}",
+                c.line_hint
+            );
         }
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -615,8 +622,16 @@ mod tests {
         // canonicalize identically, which is exactly the case the wider scope key
         // and the raw keys exist to separate — and the case that selection must
         // notice rather than embed twice under one identity.
-        write(&root, "src/a.js", "function f() {\n  return 100;\n}\nconsole.log(f(), 7);");
-        write(&root, "src/b.js", "function f() {\n  return 100;\n}\nconsole.log(f(), 9);");
+        write(
+            &root,
+            "src/a.js",
+            "function f() {\n  return 100;\n}\nconsole.log(f(), 7);",
+        );
+        write(
+            &root,
+            "src/b.js",
+            "function f() {\n  return 100;\n}\nconsole.log(f(), 9);",
+        );
         let s = scanned(&root, &cfg(&["src"]), &Limits::default());
         let mut all: Vec<LocationId> = s
             .files
@@ -687,7 +702,11 @@ mod tests {
         let a = temp("nl-a");
         let b = temp("nl-b");
         write(&a, "src/m.js", "function f(x) {\n  return x + 1000;\n}\n");
-        write(&b, "src/m.js", "function f(x) {\r\n  return x + 1000;\r\n}\r\n");
+        write(
+            &b,
+            "src/m.js",
+            "function f(x) {\r\n  return x + 1000;\r\n}\r\n",
+        );
         let sa = scanned(&a, &cfg(&["src"]), &Limits::default());
         let sb = scanned(&b, &cfg(&["src"]), &Limits::default());
         let find = |s: &Scan| -> Vec<LocationId> {
@@ -715,12 +734,11 @@ mod tests {
             &format!("const small = 5;\nconst big = \"{big}\";\nconst other = 7;\n"),
         );
         let s = scanned(&root, &cfg(&["src"]), &Limits::default());
-        assert!(
-            s.files
-                .iter()
-                .flat_map(|f| f.candidates.iter())
-                .all(|c| c.original.len() <= MAX_HINT_LEN)
-        );
+        assert!(s
+            .files
+            .iter()
+            .flat_map(|f| f.candidates.iter())
+            .all(|c| c.original.len() <= MAX_HINT_LEN));
         assert!(s
             .files
             .iter()
@@ -770,7 +788,10 @@ mod tests {
             body.push_str(&format!("export const v{i} = {};\n", 1000 + i));
         }
         write(&root, "src/gen.js", &body);
-        let limits = Limits { max_sites_per_file: 10, ..Limits::default() };
+        let limits = Limits {
+            max_sites_per_file: 10,
+            ..Limits::default()
+        };
         let s = scanned(&root, &cfg(&["src"]), &limits);
         assert!(s.files[0].usable() <= 10);
         assert!(
@@ -786,9 +807,20 @@ mod tests {
         let root = temp("budget");
         write(&root, "src/a.js", "const a = 100;\nconst b = 200;\n");
         write(&root, "src/b.js", "const c = 300;\nconst d = 400;\n");
-        let limits = Limits { max_total_bytes: 32, ..Limits::default() };
+        let limits = Limits {
+            max_total_bytes: 32,
+            ..Limits::default()
+        };
         let walked = crate::walk::walk(&root, &cfg(&["src"]), &limits).unwrap();
-        let e = scan(&root, &walked, &keys(), &cfg(&["src"]), TagWidth::DEFAULT, &limits).unwrap_err();
+        let e = scan(
+            &root,
+            &walked,
+            &keys(),
+            &cfg(&["src"]),
+            TagWidth::DEFAULT,
+            &limits,
+        )
+        .unwrap_err();
         assert_eq!(e.code(), ErrorCode::LimitExceeded);
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -815,7 +847,10 @@ mod tests {
             ByteSpan::new(25, 40),
         );
         assert!(a.radii_overlap(&b), "b's site is inside a's statement");
-        assert!(b.radii_overlap(&a), "the test must not depend on argument order");
+        assert!(
+            b.radii_overlap(&a),
+            "the test must not depend on argument order"
+        );
         // C is in a statement of its own but the same scope, which is still a
         // conflict: A's scope key would be digested from text that B changed.
         let c = candidate(
@@ -835,11 +870,7 @@ mod tests {
         assert!(!d.radii_overlap(&a));
     }
 
-    fn candidate(
-        span: ByteSpan,
-        statement: ByteSpan,
-        scope: ByteSpan,
-    ) -> Candidate {
+    fn candidate(span: ByteSpan, statement: ByteSpan, scope: ByteSpan) -> Candidate {
         Candidate {
             file: 0,
             site: 0,

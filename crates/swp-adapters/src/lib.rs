@@ -51,9 +51,3 @@ pub use forms::{
 };
 pub use generic::GenericAdapter;
 pub use literal::{DecodedSite, OwnedString, RefusalKind, SiteValue};
-
-/// The workspace's canonicalizer version, recorded in every release.
-///
-/// Bumping this is a protocol change: old releases decode under the rules they
-/// were written with, so the value is stored per release rather than assumed.
-pub const CANONICALIZER_VERSION: u16 = 1;

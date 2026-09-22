@@ -96,7 +96,13 @@ fn assert_legal(name: &str, v: &Verdict) {
         v.result, v.run.code, v.run.out
     );
     let doc = v.run.json();
-    for field in ["schema", "protocol", "result", "evidence_level", "candidate"] {
+    for field in [
+        "schema",
+        "protocol",
+        "result",
+        "evidence_level",
+        "candidate",
+    ] {
         assert!(
             !doc[field].is_null(),
             "{name}: the §33 document is missing {field}\n{}",
@@ -116,7 +122,10 @@ fn assert_legal(name: &str, v: &Verdict) {
             v.run.out
         );
         assert!(
-            !doc["evidence"].as_array().map(|e| e.is_empty()).unwrap_or(true),
+            !doc["evidence"]
+                .as_array()
+                .map(|e| e.is_empty())
+                .unwrap_or(true),
             "{name}: PROVENANCE_DETECTED with an empty evidence list — §22 does not allow a \
              conclusion the document cannot show its work for:\n{}",
             v.run.out
@@ -226,7 +235,10 @@ fn random_refactoring_chains_never_break_the_verdict_contract() {
         longest_finding >= 1,
         "no chain of any length survived, which contradicts §25's per-form results at seed \
          {SEED:#x}: {rows:?}",
-        rows = rows.iter().map(|(n, v)| (n.clone(), v.fragments)).collect::<Vec<_>>()
+        rows = rows
+            .iter()
+            .map(|(n, v)| (n.clone(), v.fragments))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -283,10 +295,7 @@ fn removal_attacks_compose_downwards() {
         drawn += 1;
         println!(
             "  step {step:>2} {} -> {} fragment(s), {} / {}",
-            name,
-            v.fragments,
-            v.result,
-            v.level,
+            name, v.fragments, v.result, v.level,
         );
     }
     println!(

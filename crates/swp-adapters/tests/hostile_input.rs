@@ -45,7 +45,10 @@ fn a_five_thousand_term_expression_is_truncated_rather_than_fatal() {
 
 #[test]
 fn a_deeply_nested_python_pattern_survives_its_own_binding_scan() {
-    let source = format!("def f():\n    x = {}\n", "[ ".repeat(5_000) + "1" + &" ]".repeat(5_000));
+    let source = format!(
+        "def f():\n    x = {}\n",
+        "[ ".repeat(5_000) + "1" + &" ]".repeat(5_000)
+    );
     let analysis = analyze("hostile.py", &source, &Limits::default());
     assert!(analysis.truncated || !analysis.tokens.is_empty());
 }

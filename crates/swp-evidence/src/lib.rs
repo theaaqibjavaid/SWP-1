@@ -59,8 +59,7 @@ pub mod report;
 pub use item::{collect, EvidenceItem, EvidenceKind, Region};
 pub use level::{
     assess, chance_of_coincidence, partial_level, union_bound_of_coincidence, Assessment,
-    EvidenceLevel, Outcome, ReleaseTally,
-    MODERATE_MIN_FRAGMENTS, STRONG_MIN_FRAGMENTS, STRONG_SOLO_MIN_FRAGMENTS, VERY_STRONG_MIN_FILES,
-    VERY_STRONG_MIN_FRAGMENTS,
+    EvidenceLevel, Outcome, ReleaseTally, MODERATE_MIN_FRAGMENTS, STRONG_MIN_FRAGMENTS,
+    STRONG_SOLO_MIN_FRAGMENTS, VERY_STRONG_MIN_FILES, VERY_STRONG_MIN_FRAGMENTS,
 };
 pub use report::{kind_counts, Candidate, Report, Run, REPORT_SCHEMA, TEXT_EVIDENCE_ITEMS};

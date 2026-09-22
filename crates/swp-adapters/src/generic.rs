@@ -1,12 +1,22 @@
 //! The lexical fallback: what SWP-1 does with a language it has no parser for.
 //!
-//! # Why this exists at all
+//! # Why this exists, and where it does not reach
 //!
-//! A project that mixes languages must still be protectable, and a scan that
-//! silently ignores `main.cob` is worse than one that says it analyzed the file
-//! with weaker tools. The fallback therefore exists so that "unsupported" is a
-//! *graded* statement — "analyzed lexically, evidence capped at MODERATE" —
-//! rather than a gap.
+//! A caller that names a language [`crate::Registry::for_language`] has no
+//! grammar for gets this one, so the token contract below is what an adapter
+//! author extending the protocol starts from. What no caller does in this build
+//! is hand it a file from a tree: both walks admit a path only when a real
+//! grammar covers its extension, and name the omission otherwise, because on a
+//! language SWP-1 cannot re-parse, `validate` cannot prove the surrounding code
+//! unchanged. That is the reason an unsupported project is refused outright
+//! rather than covered with weaker tools, and the source walk in `swp-embedding`
+//! is where that decision is written down.
+//!
+//! So "unsupported" in this build is a clean no rather than a weaker yes. The
+//! graded machinery is there to be used — an [`Analysis`] records which adapter
+//! produced it and [`crate::AdapterKind::max_evidence`] caps a lexical one at
+//! token strength — but no walk exercises it, and the protocol's claim stays
+//! legible without a footnote about which half of a tree was guessed at.
 //!
 //! # What it refuses, and why each refusal is load-bearing
 //!
@@ -25,7 +35,8 @@
 //! So the fallback offers **numeric literals in expression positions only**, and
 //! refuses every text literal, with the reason recorded. That is a smaller
 //! constellation than a parser would find, which is the honest price of not
-//! having one; the size of that price is what `swp scan --languages` reports.
+//! having one; the tests in `tests/token_stream.rs` are where that price is
+//! measured, since nothing in the product reaches this adapter to show it.
 //!
 //! # What it guarantees
 //!

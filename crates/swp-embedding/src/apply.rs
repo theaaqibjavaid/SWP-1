@@ -44,9 +44,9 @@ use swp_core::canon::{canonicalize, ByteSpan, CanonLevel};
 use swp_core::error::SwpError;
 use swp_core::id::{Digest, LocationId};
 use swp_core::limits::Limits;
+use swp_core::radius_digests;
 use swp_core::site::{FormFamily, RadiusKind, TagWidth};
 use swp_core::text::decode_utf8_strict;
-use swp_core::radius_digests;
 use swp_manifest::{ManifestKeys, SiteEntry, MAX_HINT_LEN};
 
 use crate::candidates::{line_of, line_starts, Candidate, FileScan, Scan};
@@ -272,10 +272,7 @@ pub fn apply(
                     cand.span.start, file.rel
                 )));
             };
-            let rendered = ByteSpan::new(
-                range.start as u32,
-                (range.start + spelling.len()) as u32,
-            );
+            let rendered = ByteSpan::new(range.start as u32, (range.start + spelling.len()) as u32);
             text.replace_range(range, &spelling);
             delta += spelling.len() as i64 - cand.span.len() as i64;
             edits.push(
@@ -429,13 +426,9 @@ fn find_site<'a>(
     analysis: &'a Analysis,
     cand: &Candidate,
 ) -> Option<(usize, &'a swp_adapters::CandidateSite)> {
-    analysis
-        .sites
-        .iter()
-        .enumerate()
-        .find(|(_, s)| {
-            s.span == cand.span && s.statement == cand.statement && s.scope == cand.scope
-        })
+    analysis.sites.iter().enumerate().find(|(_, s)| {
+        s.span == cand.span && s.statement == cand.statement && s.scope == cand.scope
+    })
 }
 
 /// A stable index into `n` choices, from a keyed 32-byte value.
@@ -580,8 +573,7 @@ mod tests {
                 entry.original,
                 entry.rendered
             );
-            let expected = k
-                .fragment_tag(&entry.primary_id().unwrap(), width());
+            let expected = k.fragment_tag(&entry.primary_id().unwrap(), width());
             assert_eq!(decoded.code(), expected, "the site carries the wrong tag");
         }
         std::fs::remove_dir_all(&root).unwrap();
@@ -655,7 +647,11 @@ mod tests {
     #[test]
     fn a_file_changed_between_the_scan_and_the_write_loses_its_own_sites_only() {
         let root = temp("raced");
-        write(&root, "src/a.js", "function one(v) {\n  return v + 1000;\n}\n");
+        write(
+            &root,
+            "src/a.js",
+            "function one(v) {\n  return v + 1000;\n}\n",
+        );
         write(
             &root,
             "src/b.js",
@@ -666,7 +662,11 @@ mod tests {
         assert_eq!(sel.chosen.len(), 3, "{:?}", sel.skipped);
         // The scan still describes `src/a.js` as it was; the file on disk has been
         // rewritten under it, so its address no longer means anything.
-        write(&root, "src/a.js", "function one(v) {\n  return v + 4242;\n}\n");
+        write(
+            &root,
+            "src/a.js",
+            "function one(v) {\n  return v + 4242;\n}\n",
+        );
         let applied = apply(&root, &scan, &sel, &k, width(), &Limits::default()).unwrap();
         let dropped_a: Vec<&Dropped> = applied
             .dropped
@@ -681,7 +681,11 @@ mod tests {
         );
         // The other file was never in question.
         assert_eq!(
-            applied.entries.iter().filter(|e| e.file == "src/b.js").count(),
+            applied
+                .entries
+                .iter()
+                .filter(|e| e.file == "src/b.js")
+                .count(),
             2,
             "{:?}",
             applied.entries
@@ -762,13 +766,21 @@ mod tests {
     #[test]
     fn fingerprint_inputs_cover_every_file_exactly_once() {
         let root = temp("fingerprint");
-        write(&root, "src/a.js", "function one(v) {\n  return v + 1000;\n}\n");
+        write(
+            &root,
+            "src/a.js",
+            "function one(v) {\n  return v + 1000;\n}\n",
+        );
         write(
             &root,
             "src/b.js",
             "function two(v) {\n  return v * 2 + 2000;\n}\n",
         );
-        write(&root, "src/c.ts", "const x: number = 3000;\nexport { x };\n");
+        write(
+            &root,
+            "src/c.ts",
+            "const x: number = 3000;\nexport { x };\n",
+        );
         let k = keys("rel-aaaaaaaaaaaa");
         let (scan, sel) = plan(&root, &k, 10);
         let applied = apply(&root, &scan, &sel, &k, width(), &Limits::default()).unwrap();
@@ -822,10 +834,7 @@ mod tests {
         let registry = Registry::standard();
         for entry in &applied.entries {
             assert!(matches!(entry.adapter.as_str(), "ast" | "lexical"));
-            let kind = registry
-                .for_language(&entry.language)
-                .capabilities()
-                .kind;
+            let kind = registry.for_language(&entry.language).capabilities().kind;
             assert_eq!(
                 entry.adapter,
                 crate::candidates::adapter_label(kind),

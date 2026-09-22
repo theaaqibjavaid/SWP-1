@@ -185,7 +185,8 @@ impl Report {
         ));
         out.push_str(&format!(
             "candidate {} ({})\n",
-            self.candidate.described, self.candidate.kind
+            swp_core::text::display_path(&self.candidate.described),
+            self.candidate.kind
         ));
         out.push_str(&format!(
             "scope     {} file(s), {} byte(s){}\n",
@@ -227,8 +228,15 @@ impl Report {
         }
 
         if !self.omissions.is_empty() {
-            out.push_str(&format!("\nSkipped ({}): not examined, so not cleared\n", self.omissions.len()));
-            for line in self.omissions.iter().take(if full { usize::MAX } else { 20 }) {
+            out.push_str(&format!(
+                "\nSkipped ({}): not examined, so not cleared\n",
+                self.omissions.len()
+            ));
+            for line in self
+                .omissions
+                .iter()
+                .take(if full { usize::MAX } else { 20 })
+            {
                 out.push_str(&format!("  - {line}\n"));
             }
             if !full && self.omissions.len() > 20 {
@@ -298,7 +306,11 @@ fn release_text(tally: &ReleaseTally) -> String {
         "  Watermark fragments: {}/{}\n",
         tally.fragments, tally.sites
     ));
-    out.push_str(&format!("  Structural regions: {}\n", tally.stripped));
+    // The name this line carried before said "structural regions", which is a
+    // feature this build does not have; the number it printed was always
+    // `stripped`, the count of addresses found without their code. `verify` calls
+    // the same thing `address-without-code`, so this page now uses that word too.
+    out.push_str(&format!("  Address without its code: {}\n", tally.stripped));
     out.push_str(&format!("  Exact renderings: {}\n", tally.exact_renderings));
     out.push_str(&format!(
         "  Present as canonicalized content only: {}\n",
@@ -321,7 +333,10 @@ fn release_text(tally: &ReleaseTally) -> String {
         tally.chance,
         crate::level::union_bound_of_coincidence(tally.probes, tally.tag_bits)
     ));
-    out.push_str(&format!("  Fingerprint ({}): {}\n", tally.sites, tally.fingerprint));
+    out.push_str(&format!(
+        "  Fingerprint ({}): {}\n",
+        tally.sites, tally.fingerprint
+    ));
     out.push_str(&format!("  Evidence: {}\n\n", tally.level.as_str()));
     out
 }
@@ -449,7 +464,9 @@ mod tests {
                     (0..8)
                         // Three candidate files, so the spread rule as well as the
                         // count rule is satisfied.
-                        .map(|i| site_at(SiteStatus::ExactRendering, &format!("copy/{}.js", i / 3), 5))
+                        .map(|i| {
+                            site_at(SiteStatus::ExactRendering, &format!("copy/{}.js", i / 3), 5)
+                        })
                         .collect(),
                     FingerprintCheck::NotMatched,
                 )],
@@ -537,10 +554,16 @@ mod tests {
         // 80-item document. The window sizes the text only; the document below it is
         // whatever the scan found.
         let total = big.evidence.len();
-        assert_eq!(total, 80, "the fixture's own shape, restated so the counts mean something");
+        assert_eq!(
+            total, 80,
+            "the fixture's own shape, restated so the counts mean something"
+        );
         let five = big.to_text_items(5);
         assert_eq!(five.matches("\n  [").count(), 5, "{five}");
-        assert!(five.contains(&format!("… and {} more", total - 5)), "{five}");
+        assert!(
+            five.contains(&format!("… and {} more", total - 5)),
+            "{five}"
+        );
         assert_eq!(big.to_text_items(5000).matches("\n  [").count(), total);
         // The default window and `--full` are both expressible through the one
         // renderer, so they cannot disagree with it.
@@ -553,18 +576,20 @@ mod tests {
     #[test]
     fn an_inconclusive_scan_says_which_of_the_two_negatives_it_is() {
         let d = detection(
-            vec![release(vec![site(SiteStatus::Absent, 0)], FingerprintCheck::NotMatched)],
+            vec![release(
+                vec![site(SiteStatus::Absent, 0)],
+                FingerprintCheck::NotMatched,
+            )],
             true,
         );
         let r = Report::build(&d, "scan", "2026-01-01T00:00:00Z", "swp 1.0.0");
         assert_eq!(r.result, Outcome::Inconclusive);
         assert_eq!(r.exit_code(), ErrorCode::InsufficientEvidence.exit_code());
-        assert!(r
-            .limitations
-            .iter()
-            .any(|l| l.contains("not examined")),
+        assert!(
+            r.limitations.iter().any(|l| l.contains("not examined")),
             "{:?}",
-            r.limitations);
+            r.limitations
+        );
     }
 
     #[test]

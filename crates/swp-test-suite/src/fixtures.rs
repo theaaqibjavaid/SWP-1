@@ -103,9 +103,18 @@ pub fn python_project(root: &Path) -> Vec<String> {
 /// is `walk.rs`'s own rule and this corpus obeys it.
 pub fn form_project(root: &Path) -> Vec<String> {
     let files = [
-        ("src/pricing.js", include_str!("../fixtures/forms/src/pricing.js")),
-        ("src/report.py", include_str!("../fixtures/forms/src/report.py")),
-        ("src/labels.ts", include_str!("../fixtures/forms/src/labels.ts")),
+        (
+            "src/pricing.js",
+            include_str!("../fixtures/forms/src/pricing.js"),
+        ),
+        (
+            "src/report.py",
+            include_str!("../fixtures/forms/src/report.py"),
+        ),
+        (
+            "src/labels.ts",
+            include_str!("../fixtures/forms/src/labels.ts"),
+        ),
     ];
     write_files(root, &files)
 }
@@ -269,28 +278,11 @@ const SDK_MODULES: usize = 80;
 /// table of 80 strings and no RNG: `FIRST[i / 10]` joined to `FIRST[i % 10]`
 /// names every module, and the same `i` picks the path.
 const SDK_HEAD: [&str; 10] = [
-    "project",
-    "deploy",
-    "member",
-    "quota",
-    "region",
-    "secret",
-    "build",
-    "audit",
-    "token",
+    "project", "deploy", "member", "quota", "region", "secret", "build", "audit", "token",
     "cluster",
 ];
 const SDK_TAIL: [&str; 10] = [
-    "access",
-    "policy",
-    "limit",
-    "event",
-    "cursor",
-    "metric",
-    "bundle",
-    "link",
-    "group",
-    "index",
+    "access", "policy", "limit", "event", "cursor", "metric", "bundle", "link", "group", "index",
 ];
 
 /// One module of the generator's output, verbatim except for the three names.
@@ -669,7 +661,14 @@ const TRIVIA_BODY: &str = r#"function clamp_@ID@(value, unit) {
 const CLASS_SHAPES: &[&str] = &[CLASS_BODY, LEDGER_BODY, RANGE_BODY];
 /// The function shapes. `TABLE_BODY` contributes a class-level `const` as well.
 const FN_SHAPES: &[&str] = &[
-    DUTY_BODY, TRY_BODY, WHILE_BODY, PIPE_BODY, TABLE_BODY, RECURSE_BODY, LABEL_BODY, CHECK_BODY,
+    DUTY_BODY,
+    TRY_BODY,
+    WHILE_BODY,
+    PIPE_BODY,
+    TABLE_BODY,
+    RECURSE_BODY,
+    LABEL_BODY,
+    CHECK_BODY,
 ];
 
 /// A deterministic multi-module JavaScript tree, for the measurement suites.
@@ -727,7 +726,10 @@ pub fn synthetic_variant(root: &Path, modules: usize, variant: usize) -> Vec<Str
 /// every module's pool at the same counter, so the same statement carries the
 /// same constant in module 0 and module 70 — see [`synthetic_dense`].
 fn synthetic_draw(root: &Path, modules: usize, variant: usize, spread: u64) -> Vec<String> {
-    assert!(modules >= 8, "a synthetic tree smaller than 8 modules cannot express a 10% copy");
+    assert!(
+        modules >= 8,
+        "a synthetic tree smaller than 8 modules cannot express a 10% copy"
+    );
     let mut paths = Vec::new();
     for k in 0..modules {
         let mut rng = Lcg::new(0x5dee_cee6 + (k + variant * 97) as u64 * 0x10e3_92d2);
@@ -840,12 +842,13 @@ impl Pool {
     }
 
     fn word(&mut self) -> String {
-        const WORDS: [&str; 8] = ["net", "gross", "listed", "final", "base", "capped", "quoted", "set"];
+        const WORDS: [&str; 8] = [
+            "net", "gross", "listed", "final", "base", "capped", "quoted", "set",
+        ];
         self.next += 3;
         WORDS[(self.next % WORDS.len() as u64) as usize].to_string()
     }
 }
-
 
 /// The suites' own generator: 64-bit multiplicative LCG, no state shared
 /// between modules, so one module's constants never depend on how many came
@@ -1134,7 +1137,10 @@ mod tests {
         }
         // Big enough that 10% of the project is two files, and every file has
         // literals in it: an empty module would quietly shrink every denominator.
-        assert!(totals > 8_000, "the synthetic tree is too small to measure: {totals} bytes");
+        assert!(
+            totals > 8_000,
+            "the synthetic tree is too small to measure: {totals} bytes"
+        );
         for name in &names {
             let body = std::fs::read_to_string(a.child(name)).unwrap();
             assert!(
@@ -1148,7 +1154,10 @@ mod tests {
         for name in &names {
             let body = std::fs::read_to_string(a.child(name)).unwrap();
             let fingerprint: String = body.chars().filter(|c| c.is_ascii_digit()).collect();
-            assert!(first_lines.insert(fingerprint), "{name} repeats another module's constants");
+            assert!(
+                first_lines.insert(fingerprint),
+                "{name} repeats another module's constants"
+            );
         }
     }
 
@@ -1198,7 +1207,8 @@ mod tests {
     fn the_synthetic_tree_is_mostly_distinct_statements() {
         let tmp = TempDir::new("synthetic-diverse");
         let names = synthetic_project(tmp.path(), 12);
-        let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        let mut counts: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
         for name in &names {
             let body = std::fs::read_to_string(tmp.child(name)).unwrap();
             for line in body.lines() {

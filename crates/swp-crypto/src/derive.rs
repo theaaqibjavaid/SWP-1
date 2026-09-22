@@ -35,13 +35,20 @@ pub enum Domain {
     /// exist between "the project id is derived from the signing key" and "the
     /// signing key is derived from the project id".
     Identity,
-    /// Location identity: which site is this.
+    /// The site key: its message is a canonical digest, and its answer is a
+    /// location id — "which site is this?". Named for what it is keyed to (the
+    /// project), not for what it produces.
     Project,
-    /// Fragment tags: what value does this site encode.
+    /// The tag key: keyed to a location, and answers "what value must this site
+    /// carry?".
     Location,
-    /// Release record binding.
+    /// Release record binding. Reserved: no v1 artifact derives under this label
+    /// (a release record is bound by an Ed25519 signature under [`Domain::Signing`],
+    /// not by a keyed MAC), and the label is spent now so that a later version
+    /// cannot reuse it with a different meaning.
     Release,
-    /// Report/evidence binding nonces.
+    /// Report and evidence binding nonces. Reserved, for the same reason and by
+    /// the same argument as [`Domain::Release`].
     Evidence,
     /// Ed25519 manifest signing seed.
     Signing,
@@ -111,9 +118,10 @@ pub fn hmac_keyed(
     Ok(hmac(key.as_slice(), &derivation_message(expect, fields)))
 }
 
-/// Take the low `bits` bits of a 32-byte MAC as an integer. Because every tag
-/// width is a power of two, this is uniform — there is no modulo bias to
-/// correct.
+/// Turn a 32-byte MAC into a `bits`-wide integer: the first four bytes read big-
+/// endian, masked to `bits`. A 32-bit value is already uniform, and every width
+/// in use divides 2^32, so the mask is exact — there is no modulo bias to
+/// correct, which is why no rejection sampling is needed here.
 pub fn truncate_bits(mac: &[u8; 32], bits: u8) -> u32 {
     debug_assert!((1..=32).contains(&bits));
     let raw = u32::from_be_bytes([mac[0], mac[1], mac[2], mac[3]]);

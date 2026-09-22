@@ -509,12 +509,7 @@ pub fn parse(argv: &[String]) -> Result<Parsed, SwpError> {
         let value = if flag.takes_value() {
             match inline.or_else(|| rest.next().cloned()) {
                 Some(v) => v,
-                None => {
-                    return Err(SwpError::usage(format!(
-                        "{} needs a value",
-                        flag.long()
-                    )))
-                }
+                None => return Err(SwpError::usage(format!("{} needs a value", flag.long()))),
             }
         } else {
             if let Some(v) = inline {
@@ -625,7 +620,10 @@ mod tests {
         assert_eq!(longs.len(), all.len(), "two flags share a long name");
         shorts.sort();
         shorts.dedup();
-        assert_eq!(shorts.len(), all.iter().filter(|f| f.short().is_some()).count());
+        assert_eq!(
+            shorts.len(),
+            all.iter().filter(|f| f.short().is_some()).count()
+        );
         for f in all {
             assert!(!f.summary().is_empty());
             assert!(

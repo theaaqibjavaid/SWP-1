@@ -423,7 +423,9 @@ pub fn string_family_supports(
         FormFamily::StringConcat => site.char_count() > m,
         FormFamily::StringAdjacent => dialect.adjacent_strings && site.char_count() > m,
         FormFamily::StringEscape => {
-            site.char_count() >= m && site.inner.chars().take(m).all(|c| (c as u32) <= 0xff)
+            dialect.hex_escapes
+                && site.char_count() >= m
+                && site.inner.chars().take(m).all(|c| (c as u32) <= 0xff)
         }
         _ => false,
     }
@@ -522,7 +524,8 @@ pub fn decode_string(
             decode_pieces(text, width, Joiner::Space)
         }
         FormFamily::StringAdjacent => None,
-        FormFamily::StringEscape => decode_escaped(text, width),
+        FormFamily::StringEscape if dialect.hex_escapes => decode_escaped(text, width),
+        FormFamily::StringEscape => None,
         _ => None,
     }
 }
@@ -829,6 +832,54 @@ mod tests {
             TagWidth::DEFAULT,
             &Dialect::PY
         ));
+    }
+
+    /// A dialect that has no `\xHH` escapes must not be offered the family, and
+    /// must not decode it either — the writer and the reader are gated by the
+    /// same one piece of data, so a language cannot end up with fragments its
+    /// scanner was never willing to look for.
+    #[test]
+    fn a_dialect_without_hex_escapes_never_sees_the_escape_family() {
+        let d = Dialect {
+            name: "no-escapes",
+            hex_escapes: false,
+            ..Dialect::JS
+        };
+        let site = StringForm {
+            inner: "a very long piece of text",
+            quote: '"',
+        };
+        assert!(string_family_supports(
+            &site,
+            FormFamily::StringEscape,
+            TagWidth::DEFAULT,
+            &Dialect::JS
+        ));
+        assert!(!string_family_supports(
+            &site,
+            FormFamily::StringEscape,
+            TagWidth::DEFAULT,
+            &d
+        ));
+        let rendered = render_string(
+            &site,
+            FormFamily::StringEscape,
+            3,
+            TagWidth::DEFAULT,
+            &Dialect::JS,
+        )
+        .expect("JavaScript does have \\xHH");
+        assert_eq!(
+            decode_string(&rendered, FormFamily::StringEscape, TagWidth::DEFAULT, &d),
+            None
+        );
+        assert!(decode_string(
+            &rendered,
+            FormFamily::StringEscape,
+            TagWidth::DEFAULT,
+            &Dialect::JS
+        )
+        .is_some());
     }
 
     #[test]

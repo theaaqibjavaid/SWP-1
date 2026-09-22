@@ -797,11 +797,13 @@ mod tests {
             .save_report("scan-2026-09-21T10-00-00Z", b"b")
             .unwrap();
         assert_eq!(
-            older,
-            ".swp/private/reports/scan-2026-09-20T10-00-00Z.json",
+            older, ".swp/private/reports/scan-2026-09-20T10-00-00Z.json",
             "the name `swp scan --save` prints must be the name that was written"
         );
-        assert_eq!(store.read_report("scan-2026-09-20T10-00-00Z").unwrap(), b"a");
+        assert_eq!(
+            store.read_report("scan-2026-09-20T10-00-00Z").unwrap(),
+            b"a"
+        );
         assert_eq!(
             store.report_names().unwrap(),
             vec![
@@ -826,8 +828,7 @@ mod tests {
         let second = store.save_report(stem, b"second").unwrap();
         assert_ne!(first, second, "an existing name is not overwritten");
         assert_eq!(
-            second,
-            ".swp/private/reports/scan-2026-09-21T10-00-00Z-2.json",
+            second, ".swp/private/reports/scan-2026-09-21T10-00-00Z-2.json",
             "the collision is numbered, and the numbered name is what the caller prints"
         );
         assert_eq!(store.read_report(stem).unwrap(), b"first");

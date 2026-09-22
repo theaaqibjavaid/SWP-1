@@ -384,8 +384,13 @@ mod dpapi {
         }
     }
 
-    /// SAFETY: standard DPAPI calls with well-formed blobs. CRPG_DISABLE_PROMPT
-    /// (0x1) guarantees no UI on a headless run.
+    /// SAFETY: standard DPAPI calls with well-formed blobs. The `0x1` both calls
+    /// pass is `CRYPTPROTECT_PROMPT_ON_STRONGPASSWORD`, and the prompt struct is
+    /// `NULL` in each, so there is nothing for it to prompt with: no UI is
+    /// possible on a headless run. (`CryptProtectData` has no
+    /// `CRYPTPROTECT_UI_FORBIDDEN` — that flag belongs to the message-encryption
+    /// API — so passing NULL with the prompt flag is the way to say the same
+    /// thing.)
     pub fn protect(input: &[u8]) -> Result<Vec<u8>, std::io::Error> {
         let mut src = input.to_vec();
         let mut in_blob = blob(&mut src);

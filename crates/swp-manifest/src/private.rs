@@ -124,10 +124,9 @@ impl SiteEntry {
             }
         }
         // Equal slots are legal, not a collision: a module-level statement in a
-        // short file has the same span at both radii, and the lexical fallback
-        // uses the whole document for both. The four *keys* remain distinct
-        // because the radius is mixed into the id, but the underlying canonical
-        // text can be identical, and that must not reject a real site.
+        // short file has the same span at both radii, so the underlying canonical
+        // text can be identical and that must not reject a real site. The four
+        // *keys* remain distinct because the radius kind is mixed into the id.
         // Two sites that share all four, however, are indistinguishable, and
         // `PrivateManifest::validate` refuses those.
         let primary = self.primary_kind()?;
@@ -351,8 +350,7 @@ impl PrivateManifest {
     /// Pretty JSON for disk. The *signed* bytes are canonical JSON with the
     /// signature field removed, so reformatting this file never breaks it.
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        let mut s =
-            serde_json::to_string_pretty(self).expect("manifest is serializable by shape");
+        let mut s = serde_json::to_string_pretty(self).expect("manifest is serializable by shape");
         s.push('\n');
         s.into_bytes()
     }
@@ -411,9 +409,9 @@ impl PrivateManifest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keys::ManifestKeys;
     use swp_core::id::Digest;
     use swp_crypto::RootSecret;
-    use crate::keys::ManifestKeys;
 
     fn keys() -> ManifestKeys {
         ManifestKeys::derive(
@@ -507,16 +505,19 @@ mod tests {
     fn an_unsigned_or_forged_manifest_is_refused() {
         let k = keys();
         let m = manifest(&k, vec![site(&k, 1, 10)]);
-        assert!(PrivateManifest::load(&m.to_json_bytes(), &signing_key().verifying_key())
-            .unwrap_err()
-            .message()
-            .contains("unsigned"));
+        assert!(
+            PrivateManifest::load(&m.to_json_bytes(), &signing_key().verifying_key())
+                .unwrap_err()
+                .message()
+                .contains("unsigned")
+        );
 
         let mut signed = m.clone();
         signed.sign(&signing_key()).unwrap();
         let mut bytes = String::from_utf8(signed.to_json_bytes()).unwrap();
         bytes = bytes.replace("\"line_hint\": 10", "\"line_hint\": 11");
-        let e = PrivateManifest::load(bytes.as_bytes(), &signing_key().verifying_key()).unwrap_err();
+        let e =
+            PrivateManifest::load(bytes.as_bytes(), &signing_key().verifying_key()).unwrap_err();
         assert!(e.message().contains("signature"), "{e:?}");
 
         let other = ManifestSigningKey::from_root(
@@ -537,7 +538,9 @@ mod tests {
         let value: serde_json::Value = serde_json::from_slice(&m.to_json_bytes()).unwrap();
         let compact = value.to_string();
         let back: PrivateManifest = serde_json::from_str(&compact).unwrap();
-        assert!(back.verify_signature(&signing_key().verifying_key()).is_ok());
+        assert!(back
+            .verify_signature(&signing_key().verifying_key())
+            .is_ok());
     }
 
     #[test]
@@ -548,8 +551,8 @@ mod tests {
         // A well-formed but protocol-lying document must fail as a version
         // problem, not merely as a signature problem.
         m.protocol = "SWP-2".to_string();
-        let e = PrivateManifest::load(&m.to_json_bytes(), &signing_key().verifying_key())
-            .unwrap_err();
+        let e =
+            PrivateManifest::load(&m.to_json_bytes(), &signing_key().verifying_key()).unwrap_err();
         assert!(e.code() == ErrorCode::ProtocolVersionUnsupported, "{e:?}");
     }
 
@@ -597,7 +600,11 @@ mod tests {
         let k = keys();
         let mut unchanged = site(&k, 1, 10);
         unchanged.rendered = unchanged.original.clone();
-        assert!(unchanged.validate().unwrap_err().message().contains("no watermark"));
+        assert!(unchanged
+            .validate()
+            .unwrap_err()
+            .message()
+            .contains("no watermark"));
 
         let mut mismatched = site(&k, 2, 10);
         mismatched.family = FormFamily::StringConcat;
@@ -618,7 +625,11 @@ mod tests {
 
         let mut bad_path = site(&k, 4, 10);
         bad_path.file = "src\\sub\\app.js".to_string();
-        assert!(bad_path.validate().unwrap_err().message().contains("canonical"));
+        assert!(bad_path
+            .validate()
+            .unwrap_err()
+            .message()
+            .contains("canonical"));
 
         let mut leaked = site(&k, 5, 10);
         leaked.grammar_path = "a\0b".to_string();
@@ -626,7 +637,11 @@ mod tests {
 
         let mut zero_line = site(&k, 6, 10);
         zero_line.line_hint = 0;
-        assert!(zero_line.validate().unwrap_err().message().contains("1-based"));
+        assert!(zero_line
+            .validate()
+            .unwrap_err()
+            .message()
+            .contains("1-based"));
     }
 
     #[test]

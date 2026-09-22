@@ -106,6 +106,18 @@ pub fn canonical_relpath(path: &str) -> String {
     nfc(&parts.join("/"))
 }
 
+/// A path with its Windows verbatim prefix removed, for display only.
+///
+/// The store canonicalizes with `\\?\` so that a deep tree stays readable, which
+/// is the right thing to hand the filesystem and the wrong thing to print at a
+/// person: the prefix is an implementation detail of one platform, and `{:?}` on
+/// such a path doubles every separator in it.
+pub fn display_path(path: &str) -> &str {
+    path.strip_prefix(r"\\?\UNC\")
+        .or_else(|| path.strip_prefix(r"\\?\"))
+        .unwrap_or(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

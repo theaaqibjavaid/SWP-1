@@ -64,11 +64,13 @@ fn unparseable(root: &Path) -> Vec<String> {
     let limits = swp_core::limits::Limits::default();
     read_tree(root)
         .iter()
-        .filter_map(|(rel, body)| match registry.analyze(Path::new(rel), body, &limits) {
-            Ok(analysis) if analysis.parse_errors > 0 => Some(rel.clone()),
-            Err(_) => Some(rel.clone()),
-            _ => None,
-        })
+        .filter_map(
+            |(rel, body)| match registry.analyze(Path::new(rel), body, &limits) {
+                Ok(analysis) if analysis.parse_errors > 0 => Some(rel.clone()),
+                Err(_) => Some(rel.clone()),
+                _ => None,
+            },
+        )
         .collect()
 }
 
@@ -193,8 +195,8 @@ fn the_acceptance_scenario_establishes_its_own_results() {
         read_tree(c_dir.path()).len(),
     );
     println!(
-        "  {:<16} {:>9} {:>7} {:>10} {:>13}  {}",
-        "row", "confirmed", "probes", "fingerprint", "verdict", "whose keys ran"
+        "  {:<16} {:>9} {:>7} {:>10} {:>13}  whose keys ran",
+        "row", "confirmed", "probes", "fingerprint", "verdict"
     );
     for (label, v) in &rows {
         println!(
@@ -239,7 +241,10 @@ fn the_acceptance_scenario_establishes_its_own_results() {
             "{label}: the scan ran on {id}'s keys and the report names {}",
             v.project_id
         );
-        assert_eq!(v.fingerprint, "match", "{label} lost the exact-copy fingerprint");
+        assert_eq!(
+            v.fingerprint, "match",
+            "{label} lost the exact-copy fingerprint"
+        );
     }
 
     // ---- C is not falsely identified ----------------------------------------
@@ -256,7 +261,10 @@ fn the_acceptance_scenario_establishes_its_own_results() {
             !v.detected(),
             "{label}: a finding against a candidate holding none of this project's code"
         );
-        assert_ne!(v.fingerprint, "match", "{label} matched the release fingerprint");
+        assert_ne!(
+            v.fingerprint, "match",
+            "{label} matched the release fingerprint"
+        );
     }
     // And the cross-checks, which is where a keyed detector would fail if the key
     // were not doing its job: B's code holds A's *nothing*, and vice versa.
@@ -277,7 +285,11 @@ fn the_acceptance_scenario_establishes_its_own_results() {
 
     // ---- the four A variants -------------------------------------------------
     let copy = of(copy_row);
-    assert!(copy.detected(), "a whole copy was not a finding:\n{}", copy.run.out);
+    assert!(
+        copy.detected(),
+        "a whole copy was not a finding:\n{}",
+        copy.run.out
+    );
     assert_eq!(
         copy.fragments, a_total,
         "the whole copy confirmed {} of {a_total} site(s)",
@@ -300,9 +312,7 @@ fn the_acceptance_scenario_establishes_its_own_results() {
         "the refactored tree produced no comparison at all, so it was never evaluated:\n{}",
         refactored.run.out
     );
-    let reasons = refactored
-        .run
-        .json()["releases"][0]["reasons"]
+    let reasons = refactored.run.json()["releases"][0]["reasons"]
         .as_array()
         .cloned()
         .unwrap_or_default();

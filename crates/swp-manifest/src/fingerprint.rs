@@ -140,11 +140,23 @@ mod tests {
 
     #[test]
     fn any_edit_to_the_tree_changes_it() {
-        let base = project_fingerprint("L1", V, &[file("src/a.js", 1), file("src/b.js", 2)]).unwrap();
-        let edited = project_fingerprint("L1", V, &[file("src/a.js", 9), file("src/b.js", 2)]).unwrap();
-        let added = project_fingerprint("L1", V, &[file("src/a.js", 1), file("src/b.js", 2), file("src/c.js", 3)]).unwrap();
+        let base =
+            project_fingerprint("L1", V, &[file("src/a.js", 1), file("src/b.js", 2)]).unwrap();
+        let edited =
+            project_fingerprint("L1", V, &[file("src/a.js", 9), file("src/b.js", 2)]).unwrap();
+        let added = project_fingerprint(
+            "L1",
+            V,
+            &[
+                file("src/a.js", 1),
+                file("src/b.js", 2),
+                file("src/c.js", 3),
+            ],
+        )
+        .unwrap();
         let removed = project_fingerprint("L1", V, &[file("src/a.js", 1)]).unwrap();
-        let renamed = project_fingerprint("L1", V, &[file("src/other.js", 1), file("src/b.js", 2)]).unwrap();
+        let renamed =
+            project_fingerprint("L1", V, &[file("src/other.js", 1), file("src/b.js", 2)]).unwrap();
         for other in [edited, added, removed, renamed] {
             assert_ne!(base, other);
         }
@@ -188,12 +200,8 @@ mod tests {
 
     #[test]
     fn duplicate_paths_are_refused_not_merged() {
-        let e = project_fingerprint(
-            "L1",
-            V,
-            &[file("src/a.js", 1), file("src/a.js", 2)],
-        )
-        .unwrap_err();
+        let e =
+            project_fingerprint("L1", V, &[file("src/a.js", 1), file("src/a.js", 2)]).unwrap_err();
         assert!(e.message().contains("twice"));
     }
 
@@ -203,14 +211,20 @@ mod tests {
         // not collide with any non-empty tree's.
         let empty = project_fingerprint("L1", V, &[]).unwrap();
         assert_eq!(empty, project_fingerprint("L1", V, &[]).unwrap());
-        assert_ne!(empty, project_fingerprint("L1", V, &[file("a", 1)]).unwrap());
+        assert_ne!(
+            empty,
+            project_fingerprint("L1", V, &[file("a", 1)]).unwrap()
+        );
     }
 
     #[test]
     fn fingerprint_is_sha256_of_the_stated_bytes() {
         let files = [file("src/a.js", 1)];
         let bytes = fingerprint_bytes("L1", V, &files).unwrap();
-        assert_eq!(project_fingerprint("L1", V, &files).unwrap(), sha256(&bytes));
+        assert_eq!(
+            project_fingerprint("L1", V, &files).unwrap(),
+            sha256(&bytes)
+        );
         assert_eq!(sha256(b"").hex().len(), 64);
         // The published label opens the encoding, so an auditor can reproduce it.
         assert!(bytes.starts_with(b"SWP-1\0fingerprint\0"));

@@ -134,11 +134,7 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
         [one] => {
             let (report, at, stem) = read_one(&project.store, one)?;
             if let Some(id) = &filter {
-                if !report
-                    .releases
-                    .iter()
-                    .any(|t| t.release_id == id.as_str())
-                {
+                if !report.releases.iter().any(|t| t.release_id == id.as_str()) {
                     sink.warn(&format!(
                         "{stem} does not mention release {id}; it is printed anyway. \
                          `swp report --release {id}` lists the ones that do."
@@ -191,11 +187,7 @@ fn index(project: &Ctx, filter: Option<&ReleaseId>) -> Result<Index, SwpError> {
             }
         };
         if let Some(id) = filter {
-            if !report
-                .releases
-                .iter()
-                .any(|t| t.release_id == id.as_str())
-            {
+            if !report.releases.iter().any(|t| t.release_id == id.as_str()) {
                 continue;
             }
         }
@@ -246,8 +238,7 @@ fn index_next(filter: Option<&ReleaseId>) -> Vec<String> {
     }
     out.push("swp report <name>   (re-render one report as it was graded)".to_string());
     out.push(
-        "swp report <name> --output out.json   (export it; the bytes are unchanged)"
-            .to_string(),
+        "swp report <name> --output out.json   (export it; the bytes are unchanged)".to_string(),
     );
     out
 }
@@ -297,7 +288,7 @@ fn index_text(index: &Index, limit: usize) -> Vec<String> {
         if index.saved == 0 {
             out.push("  nothing has been saved yet.".to_string());
             out.push(
-              "  `swp scan <candidate> --save` and `swp verify --save` write reports here; \
+                "  `swp scan <candidate> --save` and `swp verify --save` write reports here; \
                this command only reads them."
                     .to_string(),
             );
@@ -450,7 +441,9 @@ fn stored_text(report: &Report, at: &str, stem: &str, limit: usize) -> Vec<Strin
     ));
     out.push(String::new());
     out.push("Next".to_string());
-    out.push(format!("swp report {stem} --format json   (this document as JSON)"));
+    out.push(format!(
+        "swp report {stem} --format json   (this document as JSON)"
+    ));
     out.push(format!(
         "swp report {stem} --output out.json   (export the stored bytes unchanged)"
     ));
@@ -492,7 +485,7 @@ mod tests {
             result,
             evidence_level: level,
             explanation: vec![
-                "two sites carry their code, which is more than chance explains".to_string()
+                "two sites carry their code, which is more than chance explains".to_string(),
             ],
             releases: releases
                 .iter()
@@ -553,25 +546,29 @@ mod tests {
         assert_eq!(r.code, 0, "{}", r.err);
         assert!(r.out.contains("nothing has been saved yet"), "{}", r.out);
         assert!(r.out.contains("--save"), "{}", r.out);
-        let j: Value = serde_json::from_str(
-            &dir.run(&["report", "--format", "json"]).out,
-        )
-        .unwrap();
+        let j: Value = serde_json::from_str(&dir.run(&["report", "--format", "json"]).out).unwrap();
         assert_eq!(j["schema"], INDEX_SCHEMA);
         assert_eq!(j["saved"], 0);
         assert!(j["reports"].as_array().unwrap().is_empty());
-        assert!(j["release_filter"].is_null(), "no filter is a value, not a key");
+        assert!(
+            j["release_filter"].is_null(),
+            "no filter is a value, not a key"
+        );
     }
 
     #[test]
     fn the_index_lists_what_was_saved_and_who_wrote_it() {
         let dir = Scratch::protected("report", "index");
-        save(&dir, "scan-2026-09-20T10-00-00Z", &stored(
-            "scan",
-            Outcome::ProvenanceDetected,
-            EvidenceLevel::Strong,
-            &["rel-aaaaaaaaaaaaaaaa"],
-        ));
+        save(
+            &dir,
+            "scan-2026-09-20T10-00-00Z",
+            &stored(
+                "scan",
+                Outcome::ProvenanceDetected,
+                EvidenceLevel::Strong,
+                &["rel-aaaaaaaaaaaaaaaa"],
+            ),
+        );
         save(
             &dir,
             "verify-2026-09-21T10-00-00Z",
@@ -599,10 +596,7 @@ mod tests {
         );
         assert!(r.out.contains("STRONG"), "{}", r.out);
         assert!(r.out.contains("2 of 2 file(s)"), "{}", r.out);
-        let j: Value = serde_json::from_str(
-            &dir.run(&["report", "--format", "json"]).out,
-        )
-        .unwrap();
+        let j: Value = serde_json::from_str(&dir.run(&["report", "--format", "json"]).out).unwrap();
         assert_eq!(j["listed"], 2);
         assert_eq!(j["reports"][0]["name"], "verify-2026-09-21T10-00-00Z");
         assert_eq!(j["reports"][0]["command"], "verify");
@@ -640,20 +634,22 @@ mod tests {
         assert!(r.out.contains("scan-2026-09-20"), "{}", r.out);
         assert!(!r.out.contains("scan-2026-09-21"), "{}", r.out);
         let j: Value = serde_json::from_str(
-            &dir
-                .run(&[
-                    "report",
-                    "--release",
-                    "rel-bbbbbbbbbbbbbbbb",
-                    "--format",
-                    "json",
-                ])
-                .out,
+            &dir.run(&[
+                "report",
+                "--release",
+                "rel-bbbbbbbbbbbbbbbb",
+                "--format",
+                "json",
+            ])
+            .out,
         )
         .unwrap();
         assert_eq!(j["release_filter"], "rel-bbbbbbbbbbbbbbbb");
         assert_eq!(j["listed"], 1);
-        assert_eq!(j["saved"], 2, "the filter hides rows, not the size of the store");
+        assert_eq!(
+            j["saved"], 2,
+            "the filter hides rows, not the size of the store"
+        );
         // A release with no reports is an empty listing, not an error: the filter
         // does not require the release to still be in the store.
         let none = dir.run(&["report", "--release", "rel-cccccccccccccccc"]);
@@ -679,12 +675,13 @@ mod tests {
             .unwrap();
         let r = dir.run(&["report"]);
         assert_eq!(r.code, 0, "{}", r.err);
-        assert!(r.out.contains("Not a report this build can read"), "{}", r.out);
+        assert!(
+            r.out.contains("Not a report this build can read"),
+            "{}",
+            r.out
+        );
         assert!(r.out.contains("scan-2026-09-20"), "{}", r.out);
-        let j: Value = serde_json::from_str(
-            &dir.run(&["report", "--format", "json"]).out,
-        )
-        .unwrap();
+        let j: Value = serde_json::from_str(&dir.run(&["report", "--format", "json"]).out).unwrap();
         assert_eq!(j["listed"], 1);
         assert_eq!(j["saved"], 2);
         assert_eq!(j["unreadable"][0]["name"], "scan-2026-09-19T10-00-00Z");
@@ -732,12 +729,7 @@ mod tests {
                 &["rel-aaaaaaaaaaaaaaaa"],
             ),
         );
-        let at = dir
-            .store()
-            .report_path(stem)
-            .unwrap()
-            .display()
-            .to_string();
+        let at = dir.store().report_path(stem).unwrap().display().to_string();
         let by_stem = dir.run(&["report", stem]);
         let by_file = dir.run(&["report", &format!("{stem}.json")]);
         let by_path = dir.run(&["report", &at]);
@@ -757,9 +749,16 @@ mod tests {
         // directory. So this asks for a report that does not exist rather than
         // opening a file somewhere else in the project.
         let outside = dir.run(&["report", "../manifests/rel-aaaaaaaaaaaaaaaa"]);
-        assert_eq!(outside.code, ErrorCode::Usage.exit_code(), "{}", outside.err);
+        assert_eq!(
+            outside.code,
+            ErrorCode::Usage.exit_code(),
+            "{}",
+            outside.err
+        );
         assert!(
-            outside.err.contains("no saved report \"rel-aaaaaaaaaaaaaaaa\""),
+            outside
+                .err
+                .contains("no saved report \"rel-aaaaaaaaaaaaaaaa\""),
             "the name it actually looked for is the one it should report: {}",
             outside.err
         );
@@ -770,9 +769,19 @@ mod tests {
         );
         // A name that could never be a stored entry is refused before the lookup.
         let hidden = dir.run(&["report", ".swp-private"]);
-        assert_eq!(hidden.code, ErrorCode::PathRejected.exit_code(), "{}", hidden.err);
+        assert_eq!(
+            hidden.code,
+            ErrorCode::PathRejected.exit_code(),
+            "{}",
+            hidden.err
+        );
         let spaced = dir.run(&["report", "with space"]);
-        assert_eq!(spaced.code, ErrorCode::PathRejected.exit_code(), "{}", spaced.err);
+        assert_eq!(
+            spaced.code,
+            ErrorCode::PathRejected.exit_code(),
+            "{}",
+            spaced.err
+        );
     }
 
     #[test]
@@ -807,14 +816,13 @@ mod tests {
         );
         save(&dir, stem, &original);
         let at = dir.root.join("exported.json");
-        let r = dir.run(&[
-            "report",
-            stem,
-            "--output",
-            &at.display().to_string(),
-        ]);
+        let r = dir.run(&["report", stem, "--output", &at.display().to_string()]);
         assert_eq!(r.code, 0, "{}", r.err);
-        assert!(r.out.is_empty(), "--output leaves stdout empty: {:?}", r.out);
+        assert!(
+            r.out.is_empty(),
+            "--output leaves stdout empty: {:?}",
+            r.out
+        );
         assert_eq!(
             std::fs::read_to_string(&at).unwrap(),
             original.to_json(),
@@ -849,7 +857,8 @@ mod tests {
         assert!(every.out.contains("EV-029"), "{}", every.out);
         // None of the three touched the document.
         let j: Value = serde_json::from_str(
-            &dir.run(&["report", stem, "--limit", "3", "--format", "json"]).out,
+            &dir.run(&["report", stem, "--limit", "3", "--format", "json"])
+                .out,
         )
         .unwrap();
         assert_eq!(j["evidence"].as_array().unwrap().len(), 30);
@@ -871,6 +880,10 @@ mod tests {
         assert_eq!(doc["run"]["command"], "scan");
         let listed = owner.run(&["report"]);
         assert!(listed.out.contains(&names[0]), "{}", listed.out);
-        assert!(listed.out.contains("NO_PROVENANCE_DETECTED"), "{}", listed.out);
+        assert!(
+            listed.out.contains("NO_PROVENANCE_DETECTED"),
+            "{}",
+            listed.out
+        );
     }
 }

@@ -224,8 +224,9 @@ impl Plan {
                     "planned site has a zero line hint or an unsupported tag width".to_string(),
                 ));
             }
-            RadiusKind::from_code(site.primary)
-                .map_err(|e| SwpError::invalid_manifest(format!("planned site: {}", e.message())))?;
+            RadiusKind::from_code(site.primary).map_err(|e| {
+                SwpError::invalid_manifest(format!("planned site: {}", e.message()))
+            })?;
             if !matches!(site.adapter.as_str(), "ast" | "lexical") {
                 return Err(SwpError::invalid_manifest(format!(
                     "planned site names unknown adapter {:?}",
@@ -318,13 +319,25 @@ mod tests {
         let limits = Limits::default();
         let k = keys("rel-aaaaaaaaaaaa");
         let walked = crate::walk::walk(&root, &cfg, &limits).unwrap();
-        let scan =
-            crate::candidates::scan(&root, &walked, &k, &cfg, swp_core::TagWidth::DEFAULT, &limits)
-                .unwrap();
+        let scan = crate::candidates::scan(
+            &root,
+            &walked,
+            &k,
+            &cfg,
+            swp_core::TagWidth::DEFAULT,
+            &limits,
+        )
+        .unwrap();
         let selection = crate::select::select(&scan, target, &limits).unwrap();
-        let applied =
-            crate::apply::apply(&root, &scan, &selection, &k, swp_core::TagWidth::DEFAULT, &limits)
-                .unwrap();
+        let applied = crate::apply::apply(
+            &root,
+            &scan,
+            &selection,
+            &k,
+            swp_core::TagWidth::DEFAULT,
+            &limits,
+        )
+        .unwrap();
         let plan = Plan::build(
             ProjectId::new("swp1-abcdefghijklmnop").unwrap(),
             ReleaseId::new("rel-aaaaaaaaaaaa").unwrap(),
@@ -376,7 +389,11 @@ mod tests {
     fn every_site_and_every_refusal_the_run_made_appears_in_the_plan() {
         let (plan, scan, selection, applied) = built("account", 3);
         assert_eq!(plan.sites.len(), applied.sites());
-        let refused = selection.skipped.iter().filter(|s| !s.file.is_empty()).count()
+        let refused = selection
+            .skipped
+            .iter()
+            .filter(|s| !s.file.is_empty())
+            .count()
             + applied.dropped.len();
         assert_eq!(plan.skipped.len(), refused);
         assert_eq!(plan.target_sites, 3);
@@ -436,13 +453,25 @@ mod tests {
         let limits = Limits::default();
         let k = keys("rel-aaaaaaaaaaaa");
         let walked = crate::walk::walk(&root, &cfg, &limits).unwrap();
-        let scan =
-            crate::candidates::scan(&root, &walked, &k, &cfg, swp_core::TagWidth::DEFAULT, &limits)
-                .unwrap();
+        let scan = crate::candidates::scan(
+            &root,
+            &walked,
+            &k,
+            &cfg,
+            swp_core::TagWidth::DEFAULT,
+            &limits,
+        )
+        .unwrap();
         let selection = crate::select::select(&scan, 6, &limits).unwrap();
-        let applied =
-            crate::apply::apply(&root, &scan, &selection, &k, swp_core::TagWidth::DEFAULT, &limits)
-                .unwrap();
+        let applied = crate::apply::apply(
+            &root,
+            &scan,
+            &selection,
+            &k,
+            swp_core::TagWidth::DEFAULT,
+            &limits,
+        )
+        .unwrap();
         let plan = Plan::build(
             ProjectId::new("swp1-abcdefghijklmnop").unwrap(),
             ReleaseId::new("rel-aaaaaaaaaaaa").unwrap(),

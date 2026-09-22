@@ -48,13 +48,7 @@ fn protected(label: &str) -> (Project, Release) {
 fn numbers(v: &Verdict, total: usize) -> String {
     format!(
         "{:>3} of {:>3} confirmed {:>6} probes bound {:>6.3} guarantee {:>6.3} {} / {}",
-        v.fragments,
-        total,
-        v.probes,
-        v.chance,
-        v.guarantee,
-        v.result,
-        v.level,
+        v.fragments, total, v.probes, v.chance, v.guarantee, v.result, v.level,
     )
 }
 
@@ -97,13 +91,15 @@ fn broken_files(root: &Path) -> Vec<String> {
     let limits = swp_core::limits::Limits::default();
     read_tree(root)
         .iter()
-        .filter_map(|(rel, body)| match registry.analyze(Path::new(rel), body, &limits) {
-            Ok(analysis) if analysis.parse_errors > 0 => {
-                Some(format!("{rel} ({} error(s))", analysis.parse_errors))
-            }
-            Ok(_) => None,
-            Err(e) => Some(format!("{rel} (refused: {})", e.message())),
-        })
+        .filter_map(
+            |(rel, body)| match registry.analyze(Path::new(rel), body, &limits) {
+                Ok(analysis) if analysis.parse_errors > 0 => {
+                    Some(format!("{rel} ({} error(s))", analysis.parse_errors))
+                }
+                Ok(_) => None,
+                Err(e) => Some(format!("{rel} (refused: {})", e.message())),
+            },
+        )
         .collect()
 }
 
@@ -150,7 +146,10 @@ fn a_shape_search_finds_the_sites_and_folding_them_takes_the_finding_away() {
         *m.entry(f.shape.slug()).or_default() += 1;
         m
     });
-    assert!(!flags.is_empty(), "the search found nothing in a tree holding {total} sites");
+    assert!(
+        !flags.is_empty(),
+        "the search found nothing in a tree holding {total} sites"
+    );
 
     let changed = locate::normalize(&mut tree, &flags);
     assert!(
@@ -260,7 +259,10 @@ fn the_previous_version_of_the_source_unwrites_the_watermark() {
 
     let site_files = release.files();
     let mut rows = Vec::new();
-    for (num, den, label) in [(1, 4, "one site file in four"), (1, 2, "half the site files")] {
+    for (num, den, label) in [
+        (1, 4, "one site file in four"),
+        (1, 2, "half the site files"),
+    ] {
         let mut tree = whole.clone();
         for (rel, body) in tree.iter_mut() {
             let index = site_files.iter().position(|f| f == rel);
@@ -320,9 +322,7 @@ fn the_previous_version_of_the_source_unwrites_the_watermark() {
          half, {} after every changed file. §51's boundary applies to this table as much as to \
          any other: a revert proves the watermark was there, for whoever can prove they hold \
          the earlier copy.",
-        rows[0].1.fragments,
-        rows[1].1.fragments,
-        full.fragments,
+        rows[0].1.fragments, rows[1].1.fragments, full.fragments,
     );
 }
 
@@ -353,7 +353,11 @@ fn a_bundled_and_compound_rebuild_of_the_tree_is_measured() {
     let untouched = project.copy_whole("adv-restructure-control");
     let base = project.scan(untouched.path());
     assert_never_accuses_on_no_evidence("unmodified copy", &base);
-    assert!(base.detected(), "the control was not found:\n{}", base.run.out);
+    assert!(
+        base.detected(),
+        "the control was not found:\n{}",
+        base.run.out
+    );
 
     let mut rows = Vec::new();
 
@@ -523,7 +527,9 @@ fn bundle_modules(tree: &mut std::collections::BTreeMap<String, String>, dir: &s
         .cloned()
         .collect();
     for (i, rel) in sources.iter().enumerate() {
-        let Some(body) = tree.remove(rel) else { continue };
+        let Some(body) = tree.remove(rel) else {
+            continue;
+        };
         tree.insert(
             format!("{dir}/bundle_{i}.js"),
             format!("const module_{i} = (function () {{\n{body}\n}})();\n"),
@@ -561,7 +567,10 @@ fn lifted_functions_are_measured_at_three_sizes() {
     let mut carriers: Vec<(String, String)> = Vec::new();
     for (rel, body) in &tree {
         for (name, text) in functions(body) {
-            if sites.iter().any(|s| &s.file == rel && text.contains(&s.rendered)) {
+            if sites
+                .iter()
+                .any(|s| &s.file == rel && text.contains(&s.rendered))
+            {
                 carriers.push((format!("{rel}::{name}"), text));
             }
         }
@@ -584,7 +593,10 @@ fn lifted_functions_are_measured_at_three_sizes() {
         fixtures::Corpus::Boilerplate.write(host.path());
         let mut lifted = read_tree(host.path());
         for (i, (from, text)) in carriers.iter().take(take).enumerate() {
-            lifted.insert(format!("lifted/lift_{i}.js"), format!("// {from}\n{text}\n"));
+            lifted.insert(
+                format!("lifted/lift_{i}.js"),
+                format!("// {from}\n{text}\n"),
+            );
         }
         let candidate = TempDir::new(&format!("adv-lift-candidate-{take}"));
         write_tree(candidate.path(), &lifted);
@@ -594,7 +606,10 @@ fn lifted_functions_are_measured_at_three_sizes() {
         rows.push((label.to_string(), take, v));
     }
 
-    header("§52.6 — lift the functions that work, into somebody else's project", total);
+    header(
+        "§52.6 — lift the functions that work, into somebody else's project",
+        total,
+    );
     println!(
         "  {} of the {} file(s) hold at least one of the {total} fragments, and {} function(s) \
          contain one; a candidate below is an unrelated corpus plus their text, copied whole. \

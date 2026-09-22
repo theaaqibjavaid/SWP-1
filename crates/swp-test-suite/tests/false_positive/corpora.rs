@@ -147,8 +147,7 @@ fn assert_examined(name: &str, v: &Verdict, want_files: usize) {
 /// tree that was never touched by this project is an accusation on no evidence.
 fn assert_not_accused(name: &str, v: &Verdict) {
     assert_ne!(
-        v.result,
-        "PROVENANCE_DETECTED",
+        v.result, "PROVENANCE_DETECTED",
         "{name}: §27 false positive — unrelated source got a finding.\n{}",
         v.run.out
     );
@@ -233,8 +232,15 @@ fn unrelated_corpora_are_not_mistaken_for_watermark_evidence() {
         ),
         &rows,
     );
-    let worst = rows.iter().map(|(_, v)| v.fragments).max().unwrap_or_default();
-    let read = rows.iter().map(|(_, v)| v.files_scanned as u64).sum::<u64>();
+    let worst = rows
+        .iter()
+        .map(|(_, v)| v.fragments)
+        .max()
+        .unwrap_or_default();
+    let read = rows
+        .iter()
+        .map(|(_, v)| v.files_scanned as u64)
+        .sum::<u64>();
     let bytes = rows.iter().map(|(_, v)| v.bytes_scanned).sum::<u64>();
     let loose = rows.iter().map(|(_, v)| v.union_bound()).sum::<f64>();
     println!(

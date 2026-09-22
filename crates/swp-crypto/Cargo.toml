@@ -17,8 +17,3 @@ zeroize.workspace = true
 subtle.workspace = true
 base64.workspace = true
 serde.workspace = true
-
-[features]
-# Compiled into test builds only. Exposes plaintext key material so the
-# secret-leak suite can grep artifacts for it. Never enabled in a release build.
-test-hooks = []
