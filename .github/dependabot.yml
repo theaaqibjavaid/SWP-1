@@ -17,9 +17,12 @@ updates:
       day: tuesday
       time: "06:00"
       timezone: Etc/UTC
-    # Patch and minor together; a major bump of a cryptographic or grammar
-    # dependency is a decision, and a pull request that bundles nine of them is not
-    # a way to make one.
+    # Every direct dependency belongs to a group below, and a group opens one pull
+    # request rather than one per crate. `update-types` stops at minor and patch on
+    # purpose: without it a group happily bundles a major — this configuration once
+    # proposed moving `zip` from 2 to 8 inside a group named "containers", which is
+    # a review decision arriving dressed as housekeeping. A major still shows up, in
+    # the release notes of the grouped pull request and whenever a human asks for it.
     groups:
       rustcrypto:
         patterns:
@@ -29,18 +32,37 @@ updates:
           - zeroize
           - ed25519-dalek
           - getrandom
+        update-types:
+          - minor
+          - patch
       grammars:
         patterns:
           - tree-sitter
           - tree-sitter-javascript
           - tree-sitter-typescript
           - tree-sitter-python
+        update-types:
+          - minor
+          - patch
       containers:
         patterns:
           - zip
           - tar
           - flate2
-    open-pull-requests-limit: 5
+        update-types:
+          - minor
+          - patch
+      # The catch-all. A dependency nobody listed is exactly the kind of thing that
+      # should not be allowed to arrive as its own pull request every Tuesday.
+      everything-else:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    # Four groups, four pull requests at most, and one of them is the maintenance
+    # line rather than a stack of single-crate bumps.
+    open-pull-requests-limit: 4
     commit-message:
       prefix: deps
     labels:
@@ -50,6 +72,15 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # Majors included here, unlike the Rust groups: an action's major *is* the
+    # maintenance — `actions/checkout` 4 still runs on a Node runtime GitHub has
+    # deprecated, and refusing majors would pin the whole workflow set to a runtime
+    # on its way out. Grouped, that arrives as one reviewable pull request a month
+    # instead of three.
+    groups:
+      actions:
+        patterns:
+          - "*"
     open-pull-requests-limit: 3
     commit-message:
       prefix: ci

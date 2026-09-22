@@ -97,7 +97,7 @@ suite.
 
 ```console
 $ swp scan ./nowhere
-error [IO_ERROR]: cannot read … The system cannot find the file specified. (os error 2)
+error [IO_ERROR]: cannot read … (os error 2)
   next: Check that the path exists, is not locked by another process, and that you have write permission.
 exit 14
 ```

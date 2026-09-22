@@ -52,7 +52,7 @@ reports `NOT_PROTECTED` no matter what the candidate holds.
 ```console
 $ swp inspect store -p .
 error [NOT_PROTECTED]: there is a .swp/ directory at …, but it has no config.toml for this command to read, so it is not treated as a store. Restore that one file (settings only — `swp init` writes the defaults again); do not re-initialize a project whose releases you still need to verify.
-  at: …\.swp\config.toml
+  at: ….swp…config.toml
   next: Copy .swp/config.toml back from version control and the store opens again. `swp init` will also rewrite it, in a project that still has its private/ directory — which is the case this message is warning against confusing with the other one, where the whole store is gone.
 exit 4
 ```
@@ -82,8 +82,8 @@ on the machine you are on, because the secret is what the keys are derived from:
 
 ```console
 $ swp generate -p .
-error [SECRET_UNAVAILABLE]: no root secret at …\.swp\private\root.key. A protected project can only be re-protected or verified against its own releases using the secret that created it
-  next: Watermark verification needs the root secret. Check .swp/private/root.key exists and is readable, and that you are running as the same Windows account that created it (the secret is sealed per-user). Recovery from backup is documented in docs/GETTING-STARTED.md.
+error [SECRET_UNAVAILABLE]: no root secret at ….swp…private…root.key. A protected project can only be re-protected or verified against its own releases using the secret that created it
+  next: Watermark verification needs the root secret. … Recovery from backup is documented in docs/GETTING-STARTED.md.
 exit 3
 ```
 
@@ -94,20 +94,22 @@ Work through these in order:
    drive opened from a different login, reads as missing. Run as the account that
    created it.
 2. **Wrong directory.** `-p <path>` names a project. If the path is right, the
-   message prints the absolute path it looked at — compare it with `dir` output
-   rather than with what you meant.
+   message prints the absolute path it looked at — compare it with what the
+   shell lists (`dir` on Windows, `ls -l` elsewhere) rather than with what you
+   meant.
 3. **The key and the identity came from different backups.** The store compares
    the project id derived from `root.key` with the one in
    `.swp/public/identity.json`, and stops with this code when they disagree —
    every fragment under the wrong key would derive wrongly, and a later scan
    would say "no evidence" about code that is plainly yours. Restore the two
    together.
-4. **A private file could not be hardened.** On a write, the store tightens the
-   key file's ACL to your account and reads it back; if that confirmation fails
-   you get this code and the message says so — "refused to keep a private
-   artifact whose access could not be confirmed". `icacls
-   .swp\private\root.key` shows what it grants; [SECURITY.md](SECURITY.md) says
-   what the check does and does not protect.
+4. **A private file could not be hardened.** On a write, the store restricts the
+   key file to your own account and reads the restriction back; if that
+   confirmation fails you get this code and the message says so — "refused to keep
+   a private artifact whose access could not be confirmed". `icacls
+   .swp\private\root.key` on Windows, or `ls -l` the same path elsewhere, shows
+   what it grants; [SECURITY.md](SECURITY.md) says what the check does and does
+   not protect.
 5. **The file is gone.** Restore `.swp/private/root.key` and
    `.swp/private/manifests/` together, from the backup those two lines in every
    `swp init` and `swp protect` transcript told you to keep. A restored key

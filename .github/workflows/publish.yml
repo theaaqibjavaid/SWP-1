@@ -36,7 +36,12 @@ jobs:
 
       - name: the gate the tag already passed
         shell: bash
-        run: sh scripts/check-release.sh
+        run: |
+          set -euo pipefail
+          # The gate packages offline, which needs the dependencies on disk. A
+          # runner that has never seen this tree has them nowhere.
+          cargo fetch --locked
+          sh scripts/check-release.sh
 
       - name: publish
         shell: bash

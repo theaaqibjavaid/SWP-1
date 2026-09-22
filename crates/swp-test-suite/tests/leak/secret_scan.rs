@@ -110,11 +110,15 @@ fn nothing_in_the_store_but_the_root_key_file_leaks_the_secret() {
     let needles = needles();
 
     // The honest full sweep, with no excuses at all: every violation must be in
-    // the one file that is allowed to hold key material.
+    // the one file that is allowed to hold key material. Under DPAPI that file
+    // holds sealed bytes and this loop has nothing to check; on a plain store it
+    // holds the secret in the clear by design, and this is what proves the
+    // exemption covers that file and no other.
     let bare = sweep_tree(store.project_root(), &needles);
+    let root_key = store.root_key_path().display().to_string();
     for violation in &bare.violations {
         assert!(
-            violation.artifact.ends_with("root.key"),
+            violation.artifact.starts_with(&root_key),
             "key material found outside root.key: {violation}"
         );
     }

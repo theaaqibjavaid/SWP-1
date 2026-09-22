@@ -393,12 +393,8 @@ pub fn scan_against(
     // to fix; here the honest answer is "this scan could not look at anything",
     // which §20 files under *cannot say* and §51 forbids dressing up as a clean
     // verdict.
-    let (walked, nothing_to_examine) =
-        match walk::walk_for_scan(&opened.root, &scan_config(), limits) {
-            Ok(walked) => (walked, false),
-            Err(e) => return Err(e),
-        };
-    let nothing_to_examine = nothing_to_examine || walked.is_empty();
+    let walked = walk::walk_for_scan(&opened.root, &scan_config(), limits)?;
+    let nothing_to_examine = walked.is_empty();
 
     let mut observations: Vec<BTreeMap<usize, Vec<Observation>>> =
         indexes.iter().map(|_| BTreeMap::new()).collect();

@@ -103,6 +103,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+      # check-release.sh packages every manifest with `--offline`, which is the only
+      # honest way to ask whether a crate resolves against what the index really has.
+      # On a runner with a cold registry cache the answer is "nothing resolves",
+      # which is a property of the runner rather than of the manifests — so the
+      # dependencies are fetched first, and the offline flag then means what it says.
+      - name: fill the registry cache
+        run: cargo fetch --locked
+        shell: bash
       - name: check
         run: sh scripts/check-release.sh
         shell: bash

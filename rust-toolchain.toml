@@ -1,3 +1,17 @@
+# An exact compiler, not "whichever stable is current".
+#
+# `channel = "stable"` would mean this tree builds with a different compiler every
+# week, on a machine nobody is looking at: CI runs `clippy -- -D warnings`, so the
+# day a new stable adds a lint, every open pull request turns red for a reason no
+# author caused — and a release binary would be built by whatever toolchain the
+# runner happened to have that day, for a product whose claim is that a build can
+# be checked.
+#
+# So the version is named. Moving it is a deliberate change: update the number, run
+# `sh scripts/check-release.sh` and the whole suite, and expect to fix lints in the
+# same commit rather than after the fact. `rust-version` in Cargo.toml is the other
+# number, and it is the *minimum* a user may build with; this one is the version the
+# project actually builds with.
 [toolchain]
-channel = "stable"
+channel = "1.91.1"
 components = ["rustfmt", "clippy"]

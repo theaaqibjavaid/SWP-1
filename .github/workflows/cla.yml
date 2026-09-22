@@ -42,6 +42,19 @@ jobs:
             exit 0
           fi
 
+          # A bot's pull request is not authorship in the sense CLA.md means. A
+          # dependency bump is a machine proposing a version another project
+          # published; the person who reviews and merges it is the one taking
+          # responsibility for the change, and they are covered by their own record or
+          # by the review. Asking `dependabot[bot]` to sign is asking it to be a
+          # person, so every routine update would arrive red.
+          author=$(gh pr view "$PR" --json author -q '.author.login')
+          if printf '%s' "$author" | grep -q '\[bot\]$'; then
+            echo "result=bot" >>"$GITHUB_OUTPUT"
+            echo "$author is a bot account, so no signature is expected from it."
+            exit 0
+          fi
+
           emails=$(gh api "repos/${{ github.repository }}/pulls/$PR/commits" \
             --jq '.[].commit.author.email' | sort -u)
           handles=$(gh pr view "$PR" --json author -q '.author.login')

@@ -31,13 +31,14 @@ it are the one category of pull request that will be closed rather than revised.
 
 ## Getting set up
 
-Rust 1.85 or newer, pinned by `rust-toolchain.toml`, and nothing else: the
-grammars are prebuilt crates, the CLI's argument parser is hand-written, and
-there is no code generation step to run.
+The crate builds on Rust 1.85 or newer, and `rust-toolchain.toml` names the one
+version this project actually builds and lints with, so CI and your machine agree.
+Nothing else is needed: the grammars are prebuilt crates, the CLI's argument parser
+is hand-written, and there is no code generation step to run.
 
 ```sh
 git clone https://github.com/theaaqibjavaid/SWP-1
-cd swp
+cd SWP-1
 cargo build                 # or cargo build --release
 cargo test --workspace
 cargo run -p swp-cli -- --version
@@ -48,9 +49,9 @@ round trip.
 
 ```sh
 cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace --no-fail-fast
-cargo test -p swp-test-suite --test docs_examples
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked --no-fail-fast
+cargo test --locked -p swp-test-suite --test docs_examples
 ```
 
 The last one is the project's odd rule, and it is load-bearing. Every `console`

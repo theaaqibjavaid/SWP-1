@@ -599,20 +599,28 @@ mod tests {
     }
 
     #[test]
-    fn stripping_a_protected_file_downgrades_the_verdict_and_the_exit_code() {
+    fn stripping_the_protected_sources_downgrades_the_verdict_and_the_exit_code() {
         let dir = Scratch::protected("verify", "stripped");
-        // Replace the protected source with an unprotected version of the same
-        // functions: the sites are gone, the tree is still readable.
-        dir.write(
-            "src/a.js",
-            "function gone(base, scale) {\n  return base * scale;\n}\n",
-        );
+        // Which file the key put a site in is not knowable from here — selection is
+        // keyed over the tree — so stripping one named file is a test that passes or
+        // fails on the draw. Every source file is replaced with an unprotected
+        // version of the same shape instead: the sites are gone wherever they
+        // landed, and the tree is still readable.
+        for rel in dir.sources() {
+            dir.write(
+                &rel,
+                "function gone(base, scale) {\n  return base * scale;\n}\n",
+            );
+        }
         let r = dir.run(&["verify", "--format", "json"]);
         let doc = r.json();
         assert_eq!(r.code, ErrorCode::ReleaseMismatch.exit_code(), "{}", r.out);
         assert_eq!(doc["verdict"], "INCOMPLETE");
         assert_eq!(doc["partial"], false);
-        assert!(doc["sites_confirmed"].as_u64().unwrap() < doc["sites_expected"].as_u64().unwrap());
+        assert!(
+            doc["sites_confirmed"].as_u64().unwrap() < doc["sites_expected"].as_u64().unwrap(),
+            "no site survived the strip: {doc}"
+        );
         // The four counts are a partition of the release's sites, and this is
         // where that is pinned: a site that stopped carrying its code is either
         // gone or an address without a code, and the two are never conflated.

@@ -40,6 +40,17 @@ pub enum ErrorCode {
     Internal,
 }
 
+// The recovery hint for a missing secret names the protection that is actually on
+// the file, which differs by platform: DPAPI seals to a Windows account, while a
+// non-Windows store holds the same bytes unencrypted behind a 0600 mode. One
+// string would be wrong on half the releases this project ships.
+#[cfg(windows)]
+const SECRET_UNAVAILABLE_HINT: &str =
+    "Watermark verification needs the root secret. Check .swp/private/root.key exists and is readable, and that you are running as the same Windows account that created it (the secret is sealed per-user). Recovery from backup is documented in docs/GETTING-STARTED.md.";
+#[cfg(not(windows))]
+const SECRET_UNAVAILABLE_HINT: &str =
+    "Watermark verification needs the root secret. Check .swp/private/root.key exists and is readable, and that it is owned by the user running this command (outside Windows the file is not encrypted at rest, only mode 0600). Recovery from backup is documented in docs/GETTING-STARTED.md.";
+
 impl ErrorCode {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -102,9 +113,7 @@ impl ErrorCode {
             ErrorCode::InvalidWatermark => {
                 "The candidate contains an SWP-1 shaped artifact that fails validation. Treat it as unverified: report it, and re-check the project's release records with `swp inspect manifest`."
             }
-            ErrorCode::SecretUnavailable => {
-                "Watermark verification needs the root secret. Check .swp/private/root.key exists and is readable, and that you are running as the same Windows account that created it (the secret is sealed per-user). Recovery from backup is documented in docs/GETTING-STARTED.md."
-            }
+            ErrorCode::SecretUnavailable => SECRET_UNAVAILABLE_HINT,
             ErrorCode::MalformedSource => {
                 "The file is not decodable text or is truncated. SWP-1 will not guess at it: it is \
                  listed under the report's omissions, and a scan that could not examine it says \
