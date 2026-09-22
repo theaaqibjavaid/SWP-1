@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 100" width="480" height="100" role="img" aria-label="Sponsor SWP-1 on GitHub Sponsors">
+  <title>Sponsor SWP-1</title>
+  <style>
+    .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+  </style>
+
+  <rect width="480" height="100" rx="16" fill="#0B1220" stroke="#223049"/>
+
+  <!-- the four keyed sites, at 44px -->
+  <g transform="translate(26,28) scale(0.1833)">
+    <path d="M84 44 L164 84 L164 164 L84 124 Z" stroke="#7FD4C1" stroke-width="10" fill="none"/>
+    <g fill="#7FD4C1">
+      <circle cx="84" cy="44" r="18"/><circle cx="164" cy="84" r="18"/>
+      <circle cx="164" cy="164" r="18"/><circle cx="84" cy="124" r="18"/>
+    </g>
+  </g>
+
+  <text class="mono" x="86" y="44" font-size="23" font-weight="700" fill="#E6EDF7">Sponsor SWP-1</text>
+  <text class="mono" x="86" y="72" font-size="16" fill="#7FD4C1">github.com/sponsors/theaaqibjavaid</text>
+</svg>

@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 840" width="1600" height="840" role="img" aria-label="The three SWP-1 sponsorship tiers: Builder at ten dollars a month, Production at one hundred, Enterprise backer at five hundred.">
+  <title>SWP-1 sponsorship tiers</title>
+
+  <defs>
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+      .h1   { font-size: 42px; font-weight: 700; fill: #E6EDF7; }
+      .lead { font-size: 22px; fill: #93A4C0; }
+      .name { font-size: 24px; font-weight: 700; fill: #E6EDF7; }
+      .price{ font-size: 38px; font-weight: 700; fill: #7FD4C1; }
+      .per  { font-size: 19px; fill: #93A4C0; }
+      .for  { font-size: 19px; fill: #C7D4E8; font-style: italic; }
+      .li   { font-size: 19px; fill: #DCE6F5; }
+      .plus { font-size: 18px; fill: #7A8BA8; }
+      .note { font-size: 21px; fill: #F2B85C; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="840" fill="#0B1220"/>
+  <rect x="1" y="1" width="1598" height="838" fill="none" stroke="#223049" stroke-width="2"/>
+
+  <text class="mono h1"   x="60" y="76">Sponsorship tiers</text>
+  <text class="mono lead" x="60" y="112">Attention and engineering time. Not a feature, not a licence, not an unlock.</text>
+
+  <!-- Each card: 470 wide, 560 tall, content from y=216 to y=476, the inherited-tier
+       note at y=530. Nothing is allowed below 560 — it would print outside the box. -->
+
+  <!-- ============ Tier 1 ============ -->
+  <g transform="translate(60,150)">
+    <rect width="470" height="560" rx="18" fill="#101B2E" stroke="#223049"/>
+    <text class="mono name"  x="34" y="54">Tier 1 · Builder</text>
+    <text class="mono for"   x="34" y="86">using SWP-1 in anger</text>
+    <text class="mono price" x="34" y="146">$10</text>
+    <text class="mono per"   x="106" y="146">/ month</text>
+    <line x1="34" y1="176" x2="436" y2="176" stroke="#223049"/>
+    <g class="mono li">
+      <text x="34" y="216">•  Pre-release builds,</text>
+      <text x="58" y="242">before the tag</text>
+      <text x="34" y="280">•  A sponsor changelog:</text>
+      <text x="58" y="306">what shipped, what was</text>
+      <text x="58" y="332">dropped, and why</text>
+      <text x="34" y="370">•  The roadmap channel</text>
+      <text x="34" y="408">•  Named in each</text>
+      <text x="58" y="434">release’s notes</text>
+    </g>
+    <text class="mono plus" x="34" y="530">No support promise.</text>
+  </g>
+
+  <!-- ============ Tier 2 ============ -->
+  <g transform="translate(565,150)">
+    <rect width="470" height="560" rx="18" fill="#12203A" stroke="#7FD4C1" stroke-opacity="0.45"/>
+    <text class="mono name"  x="34" y="54">Tier 2 · Production</text>
+    <text class="mono for"   x="34" y="86">your CI runs swp verify</text>
+    <text class="mono price" x="34" y="146">$100</text>
+    <text class="mono per"   x="132" y="146">/ month</text>
+    <line x1="34" y1="176" x2="436" y2="176" stroke="#223049"/>
+    <g class="mono li">
+      <text x="34" y="216">•  48-hour acknowledgement</text>
+      <text x="58" y="242">SLA, engineered against</text>
+      <text x="58" y="268">your input</text>
+      <text x="34" y="306">•  Backport engineering for</text>
+      <text x="58" y="332">a fork or vendored copy</text>
+      <text x="34" y="370">•  Early advisory: the</text>
+      <text x="58" y="396">mitigation, while the fix</text>
+      <text x="58" y="422">is still being written</text>
+      <text x="34" y="460">•  Your protect config and a</text>
+      <text x="58" y="486">report, reviewed by hand</text>
+    </g>
+    <text class="mono plus" x="34" y="530">Everything in Tier 1.</text>
+  </g>
+
+  <!-- ============ Tier 3 ============ -->
+  <g transform="translate(1070,150)">
+    <rect width="470" height="560" rx="18" fill="#101B2E" stroke="#223049"/>
+    <text class="mono name"  x="34" y="54">Tier 3 · Enterprise backer</text>
+    <text class="mono for"   x="34" y="86">an organisation, on a term</text>
+    <text class="mono price" x="34" y="146">$500</text>
+    <text class="mono per"   x="132" y="146">/ month · 3-month minimum</text>
+    <line x1="34" y1="176" x2="436" y2="176" stroke="#223049"/>
+    <g class="mono li">
+      <text x="34" y="216">•  A scheduled engineering</text>
+      <text x="58" y="242">channel, not a queue</text>
+      <text x="34" y="280">•  Roadmap influence:</text>
+      <text x="58" y="306">stated, weighted, and</text>
+      <text x="58" y="332">answered with a reason.</text>
+      <text x="58" y="358">Not control.</text>
+      <text x="34" y="396">•  Priority on adapter and</text>
+      <text x="58" y="422">integration work</text>
+      <text x="34" y="460">•  Your brand in README.md</text>
+      <text x="58" y="486">and the release notes</text>
+    </g>
+    <text class="mono plus" x="34" y="530">Everything in Tier 2.</text>
+  </g>
+
+  <!-- the line the whole arrangement rests on -->
+  <text class="mono note" x="60" y="772">Never for sale: a security fix ahead of everybody else.</text>
+  <text class="mono lead" x="60" y="804">Every supported public version is patched in the same release.</text>
+  <text class="mono lead" x="60" y="830">Sponsors buy response time, not priority over your exposure.</text>
+</svg>

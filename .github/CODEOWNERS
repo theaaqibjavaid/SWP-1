@@ -32,3 +32,9 @@
 # a contributor editing the directory.
 /CLA.md                                 @theaaqibjavaid
 /CLA/signatures/                        @theaaqibjavaid
+
+# What the project promises a sponsor, and the copy that promises it. A tier is a
+# commercial commitment made in the name of the entity that takes the money, so it
+# is not a review a second maintainer can approve on the owner's behalf.
+/SPONSORS.md                            @theaaqibjavaid
+/.github/sponsors/                      @theaaqibjavaid

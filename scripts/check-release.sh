@@ -105,6 +105,29 @@ else
     ok "no unfilled legal or policy field in the tree"
 fi
 
+printf '\n== the sponsorship page and the paste sheet say the same thing ==\n'
+# SPONSORS.md is the promise and .github/sponsors/TIERS.md is what gets pasted into
+# GitHub's form. Two documents describing one arrangement will drift, and the way
+# they drift is the expensive kind: a tier whose price on GitHub does not match the
+# price in the repository. Both files carry `Tier N · Name · $X` on one line, in
+# their own punctuation, and this compares what is left after the punctuation.
+PAGE=$(sed -n 's/^### Tier \([0-9]\) — \(.*\) · \(\$[0-9]*\).*/\1 \2 \3/p' SPONSORS.md | sort)
+SHEET=$(sed -n 's/^## Tier \([0-9]\) · \(.*\) — US\(\$[0-9]*\).*/\1 \2 \3/p' .github/sponsors/TIERS.md | sort)
+if [ -z "$PAGE" ] || [ -z "$SHEET" ]; then
+    bad "neither file yielded any tiers; the headings changed shape"
+    note "SPONSORS.md wants '### Tier 1 — Builder · \$10 a month'"
+    note "TIERS.md wants    '## Tier 1 · Builder — US\$10 / month'"
+elif [ "$PAGE" = "$SHEET" ]; then
+    ok "the tiers match, name and price, in both files"
+    echo "$PAGE" | sed 's/^/        tier /'
+else
+    bad "the sponsorship page and the paste sheet disagree"
+    echo "SPONSORS.md says:"; echo "$PAGE"   | sed 's/^/        tier /'
+    echo ".github/sponsors/TIERS.md says:"; echo "$SHEET" | sed 's/^/        tier /'
+    note "one file was edited and the other was not; the price a sponsor"
+    note "sees on GitHub has to be the price the repository promises"
+fi
+
 printf '\n== the sources contain no built artefacts ==\n'
 TRACKED=$(git ls-files | grep -Ei '\.(pyc|pyo|o|a|so|dll|dylib|exe|class|wasm)$' || true)
 if [ -z "$TRACKED" ]; then

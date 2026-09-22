@@ -5,6 +5,7 @@
 [![CI](https://github.com/theaaqibjavaid/SWP-1/actions/workflows/ci.yml/badge.svg)](https://github.com/theaaqibjavaid/SWP-1/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/theaaqibjavaid/SWP-1)](https://github.com/theaaqibjavaid/SWP-1/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-maintenance-ea4aaa)](https://github.com/sponsors/theaaqibjavaid)
 [![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](rust-toolchain.toml)
 [![Platforms: Windows · Linux · macOS](https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux%20%C2%B7%20macos-lightgrey)](docs/GETTING-STARTED.md)
 
@@ -285,11 +286,11 @@ source.
   [CONTRIBUTING.md](CONTRIBUTING.md#the-cla-and-the-dco) says what happens if you
   hold it.
 * **Sponsorship funds maintenance; it does not unlock the tool.**
-  [SPONSORS.md](SPONSORS.md) has the tiers — pre-release builds, a 48-hour
-  acknowledgement on a support request, backport engineering for a fork of yours,
-  a direct engineering channel — and says plainly that a security patch is never
-  gated, because a provenance tool whose unpaid users run a known-broken detector
-  is not a tool worth buying.
+  [SPONSORS.md](SPONSORS.md) has the tiers — $10, $100 and $500 a month, for
+  pre-release builds, a 48-hour acknowledgement on a support request plus backport
+  engineering for a fork of yours, and a direct engineering channel — and says
+  plainly that a security patch is never gated, because a provenance tool whose
+  unpaid users run a known-broken detector is not a tool worth buying.
 * **Report a security problem through [SECURITY.md](SECURITY.md)**, not an issue.
   What counts as a vulnerability here is narrower than it looks — removal by
   somebody who holds the source is documented behaviour — and the list of what

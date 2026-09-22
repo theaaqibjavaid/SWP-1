@@ -8,7 +8,9 @@ What sponsorship buys is **attention and engineering time** — the scarce thing
 an open-source project, and the one thing that can be sold without making anybody
 else's copy of the software worse.
 
-Sponsor here: https://github.com/sponsors/theaaqibjavaid
+Sponsor here: <https://github.com/sponsors/theaaqibjavaid>
+
+![Sponsor SWP-1](.github/sponsors/assets/swp-sponsor-banner.svg)
 
 ## Why this exists
 
@@ -27,10 +29,13 @@ that gets done on a schedule rather than when there is time.
 
 ## The tiers
 
-Current amounts and benefits are on the sponsorship page; the tiers below are the
-shape of the arrangement, and they are the same for everyone at that level.
+This page is the promise; the amounts on it are the amounts, and
+[`.github/sponsors/TIERS.md`](.github/sponsors/TIERS.md) is the sheet of field
+values to paste into GitHub's form — `scripts/check-release.sh` fails if the tier
+names or prices in the two files disagree. Amounts are monthly, in US dollars, and
+are the same for everyone at that level.
 
-### Tier 1 — Builder
+### Tier 1 — Builder · $10 a month
 
 For somebody using SWP-1 in anger and wanting to see where it is going.
 
@@ -41,7 +46,7 @@ For somebody using SWP-1 in anger and wanting to see where it is going.
 * The sponsor announcements channel for the project's roadmap discussions.
 * A name (or your organisation's) in the acknowledgements of each release.
 
-### Tier 2 — Production
+### Tier 2 — Production · $100 a month
 
 For a team whose CI runs `swp verify` and whose scans matter commercially.
 
@@ -60,7 +65,7 @@ Everything in Tier 1, plus:
   lists, and site/bit budgets for a real repository, and a review of what a
   report you are relying on actually says.
 
-### Tier 3 — Enterprise backer
+### Tier 3 — Enterprise backer · $500 a month, three-month minimum
 
 Everything in Tier 2, plus:
 
