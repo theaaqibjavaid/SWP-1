@@ -39,10 +39,10 @@ swp-test-suite = { path = "crates/swp-test-suite" }
 # client, and `swp` opens no socket in any code path. `swp-cli`'s argument parser
 # is hand-written in `args.rs` for the same reason — a smaller supply chain to
 # audit is the point of a tool whose promise is offline.
-sha2 = "0.10"
-hmac = "0.12"
-ed25519-dalek = { version = "2", features = ["rand_core"] }
-getrandom = "0.3"
+sha2 = "0.11"
+hmac = "0.13"
+ed25519-dalek = { version = "3", features = ["rand_core"] }
+getrandom = "0.4"
 subtle = "2"
 zeroize = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
