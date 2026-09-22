@@ -1,0 +1,5 @@
+[project]
+name = "swp-example-cart"
+version = "1.0.0"
+description = "A Python project small enough to read, used by docs/INTEGRATION.md."
+requires-python = ">=3.10"

@@ -1,0 +1,7 @@
+{
+  "name": "swp-example-invoice",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A JavaScript project small enough to read, used by docs/INTEGRATION.md.",
+  "main": "src/invoice.js"
+}
