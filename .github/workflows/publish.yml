@@ -1,0 +1,72 @@
+name: Publish to the registry
+
+# Manual, and it stays manual. A tag can publish a binary and be deleted; a crate
+# version that reaches crates.io can be yanked and never removed, and a mistyped
+# version number there is permanent. That asymmetry is the whole reason this is not
+# part of release.yml.
+#
+# Needs `CARGO_REGISTRY_TOKEN` as a repository secret, and runs from a checkout of
+# the tag rather than a branch, so what is published is what was reviewed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag to publish, e.g. v1.0.0
+        required: true
+        type: string
+      dry_run:
+        description: Package and verify without uploading
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: crates.io, in dependency order
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: the gate the tag already passed
+        shell: bash
+        run: sh scripts/check-release.sh
+
+      - name: publish
+        shell: bash
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # Order matters twice over: a crate cannot be published before the crates it
+          # depends on, and the registry will refuse a dependency that is not there
+          # yet. This is the same list check-release.sh calls PUBLISHABLE.
+          CRATES="swp-core swp-crypto swp-identity swp-manifest swp-adapters
+                  swp-embedding swp-detection swp-evidence swp-cli"
+
+          for c in $CRATES; do
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::notice::dry run — packaging $c, uploading nothing"
+              cargo publish -p "$c" --dry-run --no-verify --locked
+            else
+              echo "::notice::publishing $c"
+              cargo publish -p "$c" --locked
+              # The index is not instantaneous; the next crate in the list resolves
+              # against it.
+              sleep 20
+            fi
+          done
+
+      - name: what just happened
+        if: inputs.dry_run == false
+        shell: bash
+        run: |
+          echo "Nine crates published. Nothing in this workflow can undo that, so the"
+          echo "next step is a manual one: check each page on the registry, then"
+          echo "confirm the binaries in release.yml point at the same source."

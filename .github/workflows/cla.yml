@@ -1,0 +1,123 @@
+name: Contributor licence
+
+# Every contribution to SWP-1 needs the agreement in CLA.md on file before it can
+# be merged, because the project intends to build a closed, sponsor-funded product
+# on the same code and a Developer Certificate of Origin does not grant the right
+# that needs granting. The asymmetry is explained in
+# CONTRIBUTING.md#the-cla-and-the-dco rather than buried here.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    name: signed statement on file
+    runs-on: ubuntu-latest
+    steps:
+      # `pull_request_target` checks out the base branch, not the pull request, so
+      # the signature records read below come from the repository and the code being
+      # proposed is never executed. That is the only reason this workflow exists in
+      # this form; a `pull_request` trigger would let a pull request approve itself
+      # by editing its own copy of `CLA/signatures/`.
+      - uses: actions/checkout@v4
+
+      - name: look for a signature for every author
+        id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # A maintainer can override on a named exception; the label is auditable,
+          # an invisible judgement is not.
+          if gh pr view "$PR" --json labels -q '.labels[].name' | grep -qx 'cla-approved'; then
+            echo 'result=override' >>"$GITHUB_OUTPUT"
+            echo 'A `cla-approved` label is on this pull request.'
+            exit 0
+          fi
+
+          emails=$(gh api "repos/${{ github.repository }}/pulls/$PR/commits" \
+            --jq '.[].commit.author.email' | sort -u)
+          handles=$(gh pr view "$PR" --json author -q '.author.login')
+
+          # A record matches either identity, because a contributor may sign with the
+          # address on their commits or with the handle on their pull request, and the
+          # only thing that has to be true is that somebody with authority over the
+          # work signed for it. `awk` compares whole fields rather than substrings:
+          # an address is full of characters a pattern would read as syntax, and a
+          # match that should not have happened here is a false approval.
+          has_identity() {
+            awk -v want="$1" '
+              tolower($1) == "email:"  || tolower($1) == "github:" {
+                v = tolower($2); gsub(/^@/, "", v)
+                if (v == want) found = 1
+              }
+              END { exit !found }
+            ' CLA/signatures/*.md 2>/dev/null
+          }
+
+          missing=""
+          if [ -z "$handles" ]; then
+            # Fail closed. An unreadable author list is not evidence of a signature.
+            echo "Could not read the authors of this pull request."
+            echo "result=missing" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for handle in $handles; do
+            if has_identity "$(printf '%s' "$handle" | tr 'A-Z' 'a-z')"; then
+              continue
+            fi
+            matched=no
+            for email in $emails; do
+              if has_identity "$(printf '%s' "$email" | tr 'A-Z' 'a-z')"; then
+                matched=yes
+                break
+              fi
+            done
+            [ "$matched" = yes ] || missing="$missing $handle"
+          done
+
+          if [ -n "$missing" ]; then
+            echo "result=missing" >>"$GITHUB_OUTPUT"
+            echo "No signed statement covers:${missing}"
+          else
+            echo "result=ok" >>"$GITHUB_OUTPUT"
+            echo "Every author on this pull request has a record in CLA/signatures/."
+          fi
+
+      - name: comment when it is missing
+        if: steps.check.outputs.result == 'missing'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          existing=$(gh pr view "$PR" --json comments \
+            --jq '[.comments[] | select(.author.login=="github-actions[bot]") | .body] | map(select(startswith("<!--cla-check-->"))) | length')
+          [ "$existing" -gt 0 ] && exit 0
+          gh pr comment "$PR" --body "$(cat <<'EOF'
+          <!--cla-check-->
+          Thanks for the contribution. This project needs a signed
+          [Contributor Licence Agreement](blob/main/CLA.md) statement from you before
+          the change can be merged — one signature covers everything you send from now
+          on, and it does not take your copyright away.
+
+          If you agree, add the statement described in CLA.md §9 to your first
+          pull request's description, or open a pull request against
+          `CLA/signatures/` with your record. A maintainer will label it.
+
+          If you do not want to grant the relicensing right in CLA.md §2, say so
+          here and nothing is lost: SWP-1 stays Apache-2.0 either way, and there are
+          ways to help that the agreement does not touch — see CONTRIBUTING.md.
+          EOF
+          )"
+
+      - name: fail the check
+        if: steps.check.outputs.result == 'missing'
+        run: exit 1

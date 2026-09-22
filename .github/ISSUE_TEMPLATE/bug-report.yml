@@ -1,0 +1,77 @@
+name: Bug report
+description: The tool did something it should not have, or a check disagrees with you
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Three things make the difference between a triaged bug and a thread of
+        guesses: the version, the command exactly as typed with its full output, and
+        the smallest tree that still does it. `SUPPORT.md` at the top of the
+        repository has the details, and the same three items are what a maintainer
+        will ask you for.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `swp --version`, verbatim
+      placeholder: swp SWP-1 · swp 1.0.0 · report schema SWP-1-report-v1
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Other / CI runner
+    validations:
+      required: true
+  - type: dropdown
+    id: command
+    attributes:
+      label: Which command
+      options:
+        - init
+        - generate
+        - protect
+        - verify
+        - scan
+        - inspect
+        - report
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What you expected, and what happened
+      description: |
+        Include the command as you typed it, the full output, and the `exit N` line
+        when the command prints one. `1` from `scan` is a finding, not a failure;
+        `10` means part of the candidate was never examined.
+      render: console
+    validations:
+      required: true
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: A tree that reproduces it
+      description: |
+        Two files in a `scratch/` directory is usually enough. Say whether the
+        candidate reached `scan` as a directory or as an archive, and whether any
+        `.swp/` store came from another machine — a store sealed on Windows cannot be
+        opened elsewhere, and that is a documented limit rather than a bug.
+        Redact anything you do not have permission to share. The root secret is never
+        printed by anything in this tool; do not paste `root.key` into a report.
+    validations:
+      required: true
+  - type: textarea
+    id: report-json
+    attributes:
+      label: The report, if you have one
+      description: "`swp report --format json`, or the JSON a scan saved with `--save`"
+      render: json
+    validations:
+      required: false

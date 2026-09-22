@@ -1,0 +1,269 @@
+name: Release
+
+# Push a tag `v*` and this builds the three binaries, checks they are the version
+# the tag says, and publishes a GitHub Release whose notes come out of
+# `CHANGELOG.md` rather than out of a model's head.
+#
+# Deliberately not included here: publishing to crates.io. A registry publish is
+# permanent in a way a binary upload is not — it can be yanked, never removed — so
+# it is a separate, manually started workflow (`publish.yml`) rather than something
+# a tag does by itself.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build, e.g. v1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: is this release the version it claims
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.agree.outputs.version }}
+      tag: ${{ steps.agree.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A tag push checks out the tag; a manual run checks out the tag it names,
+          # so the manifest and changelog it reads are the tagged ones.
+          ref: ${{ inputs.tag || github.ref }}
+      - name: tag, manifest and changelog must agree
+        id: agree
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          MANIFEST=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n1)
+
+          {
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+          } >>"$GITHUB_OUTPUT"
+
+          if [ "$VERSION" != "$MANIFEST" ]; then
+            echo "tag says v$VERSION, Cargo.toml says $MANIFEST."
+            echo "A release binary and a crate published under the same number have"
+            echo "to be the same build. Fix one of them, in the tagged commit."
+            exit 1
+          fi
+
+          if ! grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
+            echo "CHANGELOG.md has no [${VERSION}] section."
+            echo "The release notes on a GitHub Release are that section; a release"
+            echo "with no entry is a release nobody can reason about later."
+            exit 1
+          fi
+
+          if grep -rl "github.com/OWNER" --exclude-dir=.git --exclude-dir=target . \
+              | grep -v 'scripts/check-release.sh'; then
+            echo "the repository address is still the OWNER placeholder in the files"
+            echo "above; a release would point its own links at nothing, and a crate"
+            echo "published from this tree would carry the placeholder into the index."
+            exit 1
+          fi
+          echo "v$VERSION is consistent."
+
+  build:
+    name: build (${{ matrix.artifact }})
+    needs: checks
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.checks.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-x64
+            binary: swp.exe
+            archive: zip
+          - os: ubuntu-latest
+            artifact: linux-x64
+            binary: swp
+            archive: tar
+          - os: macos-latest
+            # `macos-latest` is Apple Silicon, so the artifact says so. A build is
+            # named for the machine it ran on: relabeling an arm64 binary as x86_64
+            # is the one mistake a release artifact cannot survive, because the
+            # failure happens on the user's machine and not in this log.
+            artifact: macos-aarch64
+            binary: swp
+            archive: tar
+          - os: macos-13
+            # The last Intel runner. If GitHub retires it, delete this entry rather
+            # than re-pointing it at an ARM machine — an x86_64 macOS build has to be
+            # cross-compiled or built on Intel, and neither is assumed here.
+            artifact: macos-x64
+            binary: swp
+            archive: tar
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: Swatinem/rust-cache@v2
+      - name: build
+        shell: bash
+        run: cargo build --release --locked -p swp-cli
+
+      - name: what did we just build
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$(./target/release/${{ matrix.binary }} --version)"
+          echo "$out"
+          # The binary prints its own version, so a build that linked the wrong
+          # crate says so here rather than in somebody's issue three weeks later.
+          case "$out" in
+            *"swp $VERSION"*) ;;
+            *)
+              echo "the binary does not report version $VERSION."
+              echo "Either the tag and the manifest disagree, or this ran on a"
+              echo "checkout that is not the one the checks job verified."
+              exit 1 ;;
+          esac
+
+      - name: assemble (windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $VERSION = $env:VERSION
+          New-Item -ItemType Directory -Force -Path dist, staging | Out-Null
+          Copy-Item target/release/${{ matrix.binary }} staging/
+          Copy-Item LICENSE, NOTICE, README.md, CHANGELOG.md staging/
+          $stamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          "swp $VERSION · $env:ARTIFACT · built $stamp" | Set-Content staging/BUILD
+          Compress-Archive -Path staging/* -DestinationPath "dist/swp-$VERSION-windows-x64.zip"
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+
+      - name: assemble (unix)
+        if: matrix.archive == 'tar'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist staging
+          cp "target/release/${{ matrix.binary }}" staging/
+          cp LICENSE NOTICE README.md CHANGELOG.md staging/
+          printf 'swp %s · %s · built %s\n' "$VERSION" "${{ matrix.artifact }}" "$(date -u +%FT%TZ)" \
+            > staging/BUILD
+          tar -czf "dist/swp-${VERSION}-${{ matrix.artifact }}.tar.gz" -C staging .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.artifact }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: publish the release
+    needs: [checks, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.checks.outputs.tag }}
+      VERSION: ${{ needs.checks.outputs.version }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: checksums and notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts
+          sha256sum swp-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: write the release body
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## What shipped in ${VERSION}"
+            echo
+            awk -v want="## [${VERSION}]" '
+              index($0, want) == 1 { inside = 1; next }
+              inside && /^## \[/ { exit }
+              inside { print }
+            ' CHANGELOG.md | sed '/./,$!d'
+            echo
+            echo "## Binaries"
+            echo
+            echo "Each archive holds the executable plus \`LICENSE\`, \`NOTICE\`,"
+            echo "\`README.md\`, \`CHANGELOG.md\` and a \`BUILD\` line naming the version,"
+            echo "the target and the time it was compiled."
+            echo
+            echo "| file | platform |"
+            echo "| --- | --- |"
+            echo "| \`swp-${VERSION}-windows-x64.zip\` | Windows 10/11, x86_64 |"
+            echo "| \`swp-${VERSION}-linux-x64.tar.gz\` | Linux, glibc x86_64 |"
+            echo "| \`swp-${VERSION}-macos-aarch64.tar.gz\` | macOS, Apple Silicon |"
+            echo "| \`swp-${VERSION}-macos-x64.tar.gz\` | macOS, Intel |"
+            echo
+            echo "Verify before you run anything:"
+            echo
+            echo '```sh'
+            echo "sha256sum -c SHA256SUMS --ignore-missing"
+            echo '```'
+            echo
+            echo "The binaries are built from the source you can build yourself with"
+            echo "\`cargo install --path crates/swp-cli --locked\`. Nothing in this"
+            echo "project asks you to take a build on trust, and"
+            echo "[docs/VALIDATION.md](https://github.com/${REPO}/blob/v${VERSION}/docs/VALIDATION.md)"
+            echo "records a clean-environment installation of exactly that command."
+            echo
+            echo "A note on the guarantee, because it differs by platform:"
+            echo "[SECURITY.md](https://github.com/${REPO}/blob/v${VERSION}/SECURITY.md)"
+            echo "and"
+            echo "[docs/SECURITY.md](https://github.com/${REPO}/blob/v${VERSION}/docs/SECURITY.md)"
+            echo "— on Windows the root secret is sealed with DPAPI under your own"
+            echo "credential; on Linux and macOS it is a file with 0600 permissions and"
+            echo "is not encrypted at rest. A store sealed on Windows cannot be opened"
+            echo "on either of the others."
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: create or update the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TITLE="swp ${VERSION}"
+          PRERELEASE=()
+          case "$VERSION" in
+            *-*) PRERELEASE=(--prerelease) ;;
+          esac
+          # No --latest: GitHub already points "latest" at the newest stable,
+          # non-draft release, and a pre-release that asked for it would be both
+          # pre-release and latest — a contradiction in one flag.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" \
+              --notes-file release-notes.md "${PRERELEASE[@]+"${PRERELEASE[@]}"}"
+          else
+            gh release create "$TAG" --title "$TITLE" \
+              --notes-file release-notes.md "${PRERELEASE[@]+"${PRERELEASE[@]}"}"
+          fi
+          cd artifacts
+          for f in swp-* SHA256SUMS; do
+            gh release upload "$TAG" "$f" --clobber
+          done

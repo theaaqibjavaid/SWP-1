@@ -1,0 +1,28 @@
+# Code owners: who is asked to review what.
+#
+# Fill this in with real GitHub handles before the first external pull request. An
+# empty CODEOWNERS file is the normal starting state, and a review request to a
+# handle that does not exist is silently dropped rather than failing loudly, which
+# is the worse direction — so say so here instead of inventing owners.
+#
+# The roles correspond to MAINTAINERS.md, and the reason they are split by path is
+# that the two kinds of judgement this project needs are not the same kind: a
+# change to the protocol, the evidence ladder or a documented claim has to be read
+# by somebody who will answer for the claim, and a change to a grammar table does
+# not need that, but does need the adapter's tests to pass.
+#
+# Example, once the handles exist:
+#
+#   *                                       @lead-maintainer
+#   /crates/swp-core/                       @protocol-owners
+#   /crates/swp-crypto/                     @protocol-owners
+#   /crates/swp-adapters/                   @adapter-owners
+#   /docs/                                  @docs-owners
+#   /crates/swp-test-suite/tests/docs/      @docs-owners
+#   /CLA.md                                 @legal-review
+#   /CLA/signatures/                        @owner
+#   /.github/workflows/                     @release-owners
+#
+# `CLA/signatures/` holds signed statements, which are records rather than code:
+# they change by an owner's hand only, because the person asserting a grant cannot
+# be the person accepting it.

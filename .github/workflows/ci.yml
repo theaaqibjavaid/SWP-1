@@ -1,0 +1,113 @@
+name: CI
+
+# Everything a change has to survive before it is merged. The rules are the ones in
+# CONTRIBUTING.md, and the point of running them here rather than in a reviewer's
+# head is that two of them — the documentation transcripts and the secret-leak
+# sweep — are the project's actual guarantees rather than conventions.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fmt:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: check formatting
+        run: cargo fmt --all --check
+        shell: bash
+
+  clippy:
+    name: lints (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      # `-D warnings` rather than RUSTFLAGS, so a build script of a grammar crate
+      # cannot fail the run for a lint nobody wrote.
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        shell: bash
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: build
+        run: cargo build --workspace --locked
+        shell: bash
+      # The point of three operating systems: secret sealing and permission
+      # hardening differ by platform (`seal.rs`, `harden_permissions`), and the
+      # suites classify what they found rather than assume a platform. Note what
+      # this job cannot catch — a document describing the Windows guarantee as a
+      # general one. That is review's job.
+      - name: test
+        run: cargo test --workspace --locked --no-fail-fast
+        shell: bash
+
+  secret-leak:
+    name: the secret stays out of everything
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      # Separate from the `test` matrix on purpose. It is the one suite whose
+      # failure means the project's central promise broke, so it gets its own line
+      # in the checks list rather than a row inside five hundred passing tests.
+      - name: sweep
+        run: cargo test --locked -p swp-test-suite --test secret_leak
+        shell: bash
+
+  docs-are-true:
+    name: every documented transcript still runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      # README.md, the thirteen pages under docs/, and the four example transcripts.
+      # A stale example fails the build; a number that varies with the key is
+      # elided as `…` rather than invented.
+      - name: re-run the console blocks
+        run: cargo test --locked -p swp-test-suite --test docs_examples
+        shell: bash
+
+  release-readiness:
+    name: release readiness
+    runs-on: ubuntu-latest
+    # Informational until the OWNER placeholder in Cargo.toml is replaced, because
+    # the check below refuses that placeholder — correctly, and while the
+    # repository address is undecided the refusal would only make every run red.
+    # Drop this line once the address exists, and it becomes a gate.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: check
+        run: sh scripts/check-release.sh
+        shell: bash

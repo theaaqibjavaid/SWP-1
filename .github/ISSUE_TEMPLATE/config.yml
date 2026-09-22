@@ -1,0 +1,26 @@
+# What the "New issue" button offers besides the forms in this directory.
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: Questions about using SWP-1
+    url: https://github.com/OWNER/swp/discussions
+    about: >-
+      How do I do X, and what does this number mean. Start with docs/FAQ.md and
+      docs/TROUBLESHOOTING.md; both are written from the questions that recurred.
+
+  - name: A documentation page that is unclear
+    url: https://github.com/OWNER/swp/issues/new?template=documentation.yml
+    about: Correct-and-unreadable is a documentation issue, not a support ticket.
+
+  - name: A security problem
+    url: https://github.com/OWNER/swp/security/advisories/new
+    about: >-
+      Private advisory, not an issue. A public issue is a disclosure. What counts as
+      a security problem for a provenance tool — and what is the designed behaviour
+      — is in SECURITY.md.
+
+  - name: Sponsoring the maintenance of this project
+    url: https://github.com/sponsors/OWNER
+    about: >-
+      What sponsorship buys, and the four things it explicitly does not.

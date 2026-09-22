@@ -1,0 +1,55 @@
+name: A verdict that looks wrong
+description: A false positive, a missed detection, or an evidence level you disagree with
+labels: ["accuracy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most valuable report this project can receive, and the hardest to
+        write, because it usually needs the two trees that were compared. Read
+        `docs/REPORTS.md` first: the ladder and the coincidence bound are the tool's
+        own explanation of what it is prepared to claim.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which way is it wrong
+      options:
+        - It found evidence in code that shares nothing with my project (false positive)
+        - It missed code that does carry my release (missed detection)
+        - The count is right and the level is not (grading disagreement)
+        - The count itself is wrong
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What the report said
+      description: |
+        The full text rendering, or `swp report --format json`. The numbers that
+        matter are the confirmed sites, the keyed bits per site, the probes that
+        reached a tag comparison, and both coincidence bounds.
+      render: console
+    validations:
+      required: true
+  - type: textarea
+    id: expectation
+    attributes:
+      label: Why that is wrong, and what you expected instead
+      description: |
+        For a false positive: what the two trees have in common that is not
+        authorship — a shared scaffold, a generated file, a well-known constant. The
+        false-positive suite runs against boilerplate, generated clients and real
+        open-source shapes precisely because those are the shapes that collide; if
+        yours is not in that list, that is the finding.
+    validations:
+      required: true
+  - type: input
+    id: sites
+    attributes:
+      label: How many sites did the release carry
+      description: >-
+        `swp inspect releases` prints it. Four bits per site means a small release can
+        only support a weak claim, and `POSSIBLE` is defined to mean that chance is a
+        live explanation.
+    validations:
+      required: false

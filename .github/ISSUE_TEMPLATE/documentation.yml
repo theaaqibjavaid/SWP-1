@@ -1,0 +1,50 @@
+name: Documentation
+description: A page that is wrong, unclear, or claims more than the measurement supports
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Documentation defects in this repository are product defects. Every `console`
+        block in `README.md`, the thirteen pages under `docs/` and the four example
+        transcripts is re-run against the current build by the `docs_examples` test,
+        so a stale example is a failing build; a sentence that overclaims is not
+        caught by anything, which is why this form exists.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong with it
+      options:
+        - It claims something the tool does not do
+        - It describes behaviour that is not what the build does
+        - It is correct and unreadable
+        - Something is missing that a user needs
+        - A transcript or number is stale
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: Which page and section
+      placeholder: docs/REPORTS.md, "The ladder"
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: Quote the sentence
+      description: >-
+        Verbatim. If it is a claim about what the tool can detect, also say what you
+        ran that made it look wrong, and what the report actually said.
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: What should it say instead
+      description: >-
+        A proposed sentence is more useful than a complaint. If you cannot propose
+        one, say what the documentation should stop claiming instead — narrowing a
+        claim is an acceptable outcome here, and is often the correct one.
+    validations:
+      required: false

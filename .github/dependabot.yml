@@ -1,0 +1,57 @@
+# Dependency updates, opened as pull requests so CI decides them.
+#
+# This is the one place in the project where a machine is allowed to propose a
+# change to `Cargo.lock` and to the workflow pins. It is worth stating why that is
+# not in tension with the offline promise: `swp` itself opens no socket and fetches
+# nothing at run time, and a dependency bump is a source change that the same
+# suites then test. The direct dependency list is twenty-one lines and `cargo tree`
+# contains no HTTP client anywhere, which is a property worth keeping, so an update
+# that adds a crate gets read rather than merged.
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+      timezone: Etc/UTC
+    # Patch and minor together; a major bump of a cryptographic or grammar
+    # dependency is a decision, and a pull request that bundles nine of them is not
+    # a way to make one.
+    groups:
+      rustcrypto:
+        patterns:
+          - sha2
+          - hmac
+          - subtle
+          - zeroize
+          - ed25519-dalek
+          - getrandom
+      grammars:
+        patterns:
+          - tree-sitter
+          - tree-sitter-javascript
+          - tree-sitter-typescript
+          - tree-sitter-python
+      containers:
+        patterns:
+          - zip
+          - tar
+          - flate2
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies

@@ -1,0 +1,60 @@
+name: A language this build refuses
+description: Ask for, or offer, an adapter for a language SWP-1 does not claim
+labels: ["adapter", "language"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SWP-1 ships JavaScript, TypeScript and Python, and refuses everything else with
+        `NO_SAFE_LOCATIONS` rather than scanning source it cannot re-read after
+        rewriting it. `docs/LANGUAGE-ADAPTERS.md` is the specification of what an
+        adapter has to prove; this form is the two questions it cannot answer for you.
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: Go
+    validations:
+      required: true
+  - type: textarea
+    id: shapes
+    attributes:
+      label: What the literals look like there
+      description: >-
+        The equivalent spellings an adapter must treat as the same literal: integer
+        and float forms, radix and underscore separators, the string quote set, raw
+        and interpolated strings, byte strings, character literals. Concretely, with
+        examples from real code, because this table is what detection is keyed on.
+    validations:
+      required: true
+  - type: dropdown
+    id: grammar
+    attributes:
+      label: Is there a tree-sitter grammar
+      options:
+        - Yes, maintained
+        - Yes, unmaintained or forked
+        - No
+        - I do not know
+    validations:
+      required: true
+  - type: textarea
+    id: reparse
+    attributes:
+      label: Can a rewritten literal be re-proved
+      description: >-
+        The product's rule is that a site is only embedded when the file re-parses
+        afterwards and the value is unchanged. Say what makes that hard here: a
+        preprocessor, a macro layer, significant whitespace, a parser that accepts
+        what the compiler rejects, or a constant folder that changes what a literal
+        means in context.
+    validations:
+      required: true
+  - type: checkboxes
+    id: intent
+    attributes:
+      label: Are you going to write it
+      options:
+        - label: I intend to open a pull request for this adapter
+        - label: I can test it against a real codebase I am allowed to describe
+        - label: I have read CONTRIBUTING.md, including the Contributor Licence Agreement
