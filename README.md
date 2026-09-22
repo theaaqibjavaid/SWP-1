@@ -1,15 +1,43 @@
-# SWP-1 — Universal Source Provenance Watermark System
+# SWP-1 · Universal Source Provenance Watermark System
 
-**Source Watermark Protocol v1**, a command line tool named `swp`.
+**Source Watermark Protocol v1** — a command line tool named `swp`.
+
+[![CI](https://github.com/OWNER/swp/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/swp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/OWNER/swp)](https://github.com/OWNER/swp/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](rust-toolchain.toml)
+[![Platforms: Windows · Linux · macOS](https://img.shields.io/badge/platforms-windows%20%C2%B7%20linux%20%C2%B7%20macos-lightgrey)](docs/GETTING-STARTED.md)
 
 SWP-1 embeds an owner-keyed watermark into the *literals* of a source tree — the
 numbers and strings a program computes with — in a way that survives the editing
-that real code undergoes, and then answers one question about a tree somebody
-hands you: **does this carry one of my releases, and how strong is the
-evidence?** It answers it with an explainable report, a machine-readable document,
-and an exit code, offline, on a machine that never runs the code it is reading.
+real code undergoes, and then answers one question about a tree somebody hands
+you: **does this carry one of my releases, and how strong is the evidence?** It
+answers with an explainable report, a machine-readable document, and an exit
+code — offline, on a machine that never runs the code it is reading.
 
 It is a provenance instrument. It is not DRM, and it does not pretend otherwise.
+
+| | |
+| --- | --- |
+| **Install** | `cargo install --path crates/swp-cli --locked`, or a [prebuilt binary](https://github.com/OWNER/swp/releases) |
+| **Language** | Rust 2021, MSRV 1.85, no network code path |
+| **Licence** | [Apache-2.0](LICENSE) |
+| **Protocol** | `SWP-1` · report schema `SWP-1-report-v1` |
+| **Ask** | [discussions](https://github.com/OWNER/swp/discussions) · [SUPPORT.md](SUPPORT.md) |
+| **Report a vulnerability** | [SECURITY.md](SECURITY.md), privately |
+
+## Contents
+
+* [What that distinction costs, stated up front](#what-that-distinction-costs-stated-up-front)
+* [Install](#install)
+* [Sixty seconds](#sixty-seconds)
+* [What it does](#what-it-does)
+* [Documentation](#documentation)
+* [What is in the box](#what-is-in-the-box)
+* [How the examples are the real thing](#how-the-examples-are-the-real-thing)
+* [Constraints this project accepted, on purpose](#constraints-this-project-accepted-on-purpose)
+* [Contributing, sponsorship and licence](#contributing-sponsorship-and-licence)
+* [Status](#status)
 
 ## What that distinction costs, stated up front
 
@@ -28,6 +56,38 @@ be produced without the project's root secret, an authenticated manifest of wher
 they were placed, and a graded report whose coincidence bound says how much of the
 finding chance could explain. [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) is the
 honest version of the list above, attack by attack.
+
+## Install
+
+Rust 1.85 or newer. The build fetches only the twenty-one crates listed under
+`[workspace.dependencies]` — no HTTP client among them, and no build script that
+reaches a network.
+
+```sh
+cargo install --path crates/swp-cli --locked
+swp --version
+```
+
+Prebuilt binaries for Windows, Linux and macOS x64 are on the
+[releases page](https://github.com/OWNER/swp/releases), with a `SHA256SUMS`
+covering every artifact of that release:
+
+```sh
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+A release's section of [CHANGELOG.md](CHANGELOG.md) *is* its release notes, and
+[docs/VALIDATION.md](docs/VALIDATION.md) records an installation of exactly this
+kind — a build directory that had never held one, the installed binary rather than
+`cargo run`, three sample projects written for the run, and nothing copied out of
+this repository.
+
+One platform difference is worth knowing before you choose a machine for the store:
+on Windows the root secret is sealed with DPAPI under your own credential; on
+Linux and macOS it is a file with `0600` permissions and is not encrypted at rest.
+That is stated where the guarantee is described —
+[docs/SECURITY.md](docs/SECURITY.md) — and it is the first item on
+[the roadmap](ROADMAP.md#now).
 
 ## Sixty seconds
 
@@ -84,25 +144,41 @@ failure — `0` means a fully examined candidate holds no evidence, and `10` mea
 part of it was never examined. [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)
 walks through all of it, one step at a time.
 
-## What is in the box
+## What it does
 
-| crate | what it owns |
-| --- | --- |
-| `swp-core` | the protocol's vocabulary: sites, radii, canonicalization, limits, the error model. No dependencies |
-| `swp-crypto` | sealing, key derivation, ed25519 signing. Primitives are borrowed from the standard ecosystem; nothing here invents one |
-| `swp-identity` | the project id, the public identity document, the store on disk |
-| `swp-adapters` | the language adapters: tree-sitter grammars for JavaScript, TypeScript, Python, plus the dialect table |
-| `swp-manifest` | the signed artifacts: plan, manifest, release record |
-| `swp-embedding` | the walk, the candidate harvest, constellation selection, and the rewrite-and-re-prove loop |
-| `swp-detection` | scanning a candidate: fragments, exact renderings, fingerprint, structure |
-| `swp-evidence` | the ladder, the report document, the text renderer |
-| `swp-cli` | the seven commands, the parser, the help pages |
-| `swp-test-suite` | everything §42's matrix asks for, driven against the real product |
+**Protect a tree.** `swp generate` plans a release and prints every refusal with
+its reason; `swp protect` writes it and, for each chosen site, rewrites the
+literal, re-parses the file and re-proves the value is unchanged before counting
+it. A signed private manifest records where the sites are; a public release record
+carries a fingerprint of the tree, which a scanner can check without the secret.
 
-The dependency direction is one-way: `swp-cli` over the services over
-`swp-core`/`swp-crypto`, and only `swp-adapters` links a parser. Adding a
-language therefore cannot require touching the protocol, and a change to the
-evidence ladder cannot change how a fragment is rendered.
+**Re-examine your own tree.** `swp verify` authenticates the manifest and reports
+whether each site still carries its code. It is the command that belongs in CI,
+and it exits non-zero when a protected tree no longer matches its release.
+
+**Judge somebody else's tree.** `swp scan` takes a directory or an archive —
+`.zip`, `.tar.gz`, `.gz` — extracts it into a private temporary directory, refuses
+path traversal and symlink entries, and never executes anything it finds. It
+answers over five channels: keyed fragments, exact renderings, canonicalized
+renderings, the release fingerprint, and structure.
+
+**Say how strong the evidence is, and what it is worth.** The ladder runs
+`NONE · WEAK · POSSIBLE · PROBABLE · STRONG · VERY_STRONG`, and each rung is a
+stated rule rather than a heuristic. Beside the level, a report prints the
+coincidence bound — how much of the finding chance could produce — and the looser
+bound that assumes nothing about which spans may be one span. The level is not a
+finding about authorship, and [docs/REPORTS.md](docs/REPORTS.md) says what each
+field may be used to claim.
+
+**Keep the evidence.** `swp verify --save` stores the report that produced a
+verdict, `swp report` re-renders a stored one without re-scanning anything, and a
+document can be exported with `swp report --output <name>`.
+
+**Three languages, one refusal, and a rule about the difference.** JavaScript,
+TypeScript and Python have real tree-sitter adapters sharing a dialect table of
+equivalent literal spellings. Everything else — `examples/generic` is C, shell and
+SQL — is refused with `NO_SAFE_LOCATIONS` and nothing written, because a scan that
+cannot re-read what it rewrote cannot re-prove it either.
 
 ## Documentation
 
@@ -122,6 +198,41 @@ evidence ladder cannot change how a fragment is rendered.
 | [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) | building, testing and changing this repository |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | what was measured, in a clean environment, with results |
 | [examples/](examples) | four protected trees, each with the transcript that proves it |
+
+Around the protocol documentation sits the repository's own set:
+
+| file | what it is |
+| --- | --- |
+| [CHANGELOG.md](CHANGELOG.md) | what shipped, and what a release deliberately does not include |
+| [ROADMAP.md](ROADMAP.md) | now, next, later — and the list of things this will not become |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | how to build it, what CI rejects, the rules the shape is made of |
+| [CLA.md](CLA.md) | the contributor licence agreement, including what it grants the maintainers |
+| [SECURITY.md](SECURITY.md) | how to report, what counts as a vulnerability here, the backport policy |
+| [SUPPORT.md](SUPPORT.md) | where to ask, and what to attach |
+| [SPONSORS.md](SPONSORS.md) | the tiers, and the four things sponsorship does not buy |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | the standard, and how it is enforced |
+| [MAINTAINERS.md](MAINTAINERS.md) | who answers for what |
+| [LICENSE](LICENSE) · [NOTICE](NOTICE) | Apache-2.0, and the third-party surface it is built against |
+
+## What is in the box
+
+| crate | what it owns |
+| --- | --- |
+| `swp-core` | the protocol's vocabulary: sites, radii, canonicalization, limits, the error model. No dependencies |
+| `swp-crypto` | sealing, key derivation, ed25519 signing. Primitives are borrowed from the standard ecosystem; nothing here invents one |
+| `swp-identity` | the project id, the public identity document, the store on disk |
+| `swp-adapters` | the language adapters: tree-sitter grammars for JavaScript, TypeScript, Python, plus the dialect table |
+| `swp-manifest` | the signed artifacts: plan, manifest, release record |
+| `swp-embedding` | the walk, the candidate harvest, constellation selection, and the rewrite-and-re-prove loop |
+| `swp-detection` | scanning a candidate: fragments, exact renderings, fingerprint, structure |
+| `swp-evidence` | the ladder, the report document, the text renderer |
+| `swp-cli` | the seven commands, the parser, the help pages |
+| `swp-test-suite` | everything §42's matrix asks for, driven against the real product |
+
+The dependency direction is one-way: `swp-cli` over the services over
+`swp-core`/`swp-crypto`, and only `swp-adapters` links a parser. Adding a
+language therefore cannot require touching the protocol, and a change to the
+evidence ladder cannot change how a fragment is rendered.
 
 ## How the examples are the real thing
 
@@ -154,8 +265,40 @@ source.
   extracted into a private temporary directory, path traversal and symlink
   entries are refused, and the extraction is deleted on exit.
 * **If a location cannot be embedded safely, it is skipped.** Never forced, ever.
-* **Nothing is published.** `publish = false` in every manifest; this workspace is
-  proprietary and self-contained.
+* **Open source, with the commercial path said out loud.** The eight library crates
+  and the command line tool are published under Apache-2.0; only `swp-test-suite`
+  stays out of the registry, because it is this project's measurement harness
+  rather than anything a user would depend on. [CLA.md](CLA.md) is what lets a
+  contribution reach a product that is not Apache-2.0, and
+  [SPONSORS.md](SPONSORS.md) states what funding buys — attention, and time — and
+  what it will never buy.
+
+## Contributing, sponsorship and licence
+
+* **Start with [CONTRIBUTING.md](CONTRIBUTING.md).** It says how to build this,
+  which five kinds of change get reviewed differently, and why a stale
+  documentation example is a build failure on purpose.
+* **Contributions need the [CLA](CLA.md)**, and that agreement is written to be
+  read rather than clicked: §2 grants a perpetual, irrevocable, sublicensable
+  right to relicense a derivative, which is the entire reason it exists instead of
+  a `Signed-off-by:` line. Declining it is a legitimate position, and
+  [CONTRIBUTING.md](CONTRIBUTING.md#the-cla-and-the-dco) says what happens if you
+  hold it.
+* **Sponsorship funds maintenance; it does not unlock the tool.**
+  [SPONSORS.md](SPONSORS.md) has the tiers — pre-release builds, a 48-hour
+  acknowledgement on a support request, backport engineering for a fork of yours,
+  a direct engineering channel — and says plainly that a security patch is never
+  gated, because a provenance tool whose unpaid users run a known-broken detector
+  is not a tool worth buying.
+* **Report a security problem through [SECURITY.md](SECURITY.md)**, not an issue.
+  What counts as a vulnerability here is narrower than it looks — removal by
+  somebody who holds the source is documented behaviour — and the list of what
+  does count is on that page.
+* **Licence.** Apache-2.0, with [NOTICE](NOTICE) naming every third-party component
+  this build links. The protocol, the `SWP-1` name and the report schema are not
+  licensed for reuse as identity: a fork that changes the wire format should change
+  what it calls itself, because a report that claims `SWP-1-report-v1` while
+  meaning something else is the one outcome this project cannot afford.
 
 ## Status
 
