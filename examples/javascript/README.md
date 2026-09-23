@@ -130,8 +130,8 @@ many of those an unrelated tree holding the same addresses would be expected to
 confirm by accident. Both figures move from run to run, because which literals
 carry a site is keyed, so they are not quoted here — and neither is a probability
 that anybody copied anything.
-[`../../docs/REPORTS.md`](../../docs/REPORTS.md) sets out what each number in a
-report may and may not be used for.
+[`../../docs/USER-GUIDE.md`](../../docs/USER-GUIDE.md#reading-a-report) sets out
+what each number in a report may and may not be used for.
 
 ```console
 $ swp scan ../plain
@@ -199,5 +199,5 @@ example, and `git status` should never show `.swp/private/`.
 
 - [`../../docs/GETTING-STARTED.md`](../../docs/GETTING-STARTED.md) — the same sequence, step by step
 - [`../../docs/CLI.md`](../../docs/CLI.md) — every option used above
-- [`../../docs/REPORTS.md`](../../docs/REPORTS.md) — what each report line means
-- [`../../docs/LANGUAGE-ADAPTERS.md`](../../docs/LANGUAGE-ADAPTERS.md) — what JavaScript gets from its parser
+- [`../../docs/USER-GUIDE.md`](../../docs/USER-GUIDE.md#reading-a-report) — what each report line means
+- [`../../docs/DEVELOPER-GUIDE.md`](../../docs/DEVELOPER-GUIDE.md#adding-a-language-adapter) — what a language gets from its parser

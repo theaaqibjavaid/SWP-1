@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Documentation defects in this repository are product defects. Every `console`
-        block in `README.md`, the thirteen pages under `docs/` and the four example
+        block in `README.md`, every page under `docs/` and the four example
         transcripts is re-run against the current build by the `docs_examples` test,
         so a stale example is a failing build; a sentence that overclaims is not
         caught by anything, which is why this form exists.
@@ -26,7 +26,7 @@ body:
     id: page
     attributes:
       label: Which page and section
-      placeholder: docs/REPORTS.md, "The ladder"
+      placeholder: docs/USER-GUIDE.md, "Reading a report"
     validations:
       required: true
   - type: textarea

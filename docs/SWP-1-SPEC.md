@@ -4,7 +4,8 @@ Version 1.0.0. This is the normative description of what SWP-1 writes into a
 source tree, what it records about that writing, and what a scan may conclude from
 either. Where a sentence here says "must", the implementation enforces it and a
 test exists; where it says "does not", that is a boundary the design chose, and
-[THREAT-MODEL.md](THREAT-MODEL.md) states what it costs.
+[SECURITY.md](SECURITY.md#attacks-and-what-still-gets-through) states what it
+costs.
 
 ## 1. Scope, and what a protocol is doing here
 
@@ -24,7 +25,7 @@ changing a literal's spelling — and also why detection **requires** the secret
 There is no mode in which SWP-1 scans for your watermark using only public
 artifacts: the public release record proves that a manifest is yours, and the
 manifest lists where the sites are, but only the key derives what each site must
-carry. See [§13](#13-what-must-be-trusted).
+carry. See [What must be trusted](#13-what-must-be-trusted).
 
 ## 2. Vocabulary
 
@@ -32,9 +33,9 @@ carry. See [§13](#13-what-must-be-trusted).
 | --- | --- |
 | **literal** | a number or string in source text. `LiteralClass` is `integer` or `string`; a float is never a site, because "same value" is not decidable for one across spellings |
 | **fragment** | the bits a rewritten literal carries, `tag_bits` of them |
-| **family** | the way a fragment is spelled — one of seven (see [§6](#6-fragment-families)) |
+| **family** | the way a fragment is spelled — one of seven (see [Fragment families](#6-fragment-families)) |
 | **site** | one literal carrying one fragment, addressed by its surroundings rather than by its own text |
-| **radius key** | one of the four digests that address a site (see [§4](#4-site-identity-the-four-radius-keys)) |
+| **radius key** | one of the four digests that address a site (see [Site identity](#4-site-identity-the-four-radius-keys)) |
 | **constellation** | the set of sites one release embeds, and the spacing rule among them |
 | **plan** | a private, unsigned record of what a run intended, including every refusal |
 | **manifest** | the signed private record of what was embedded: every address, both literals, the family and width |
@@ -151,13 +152,13 @@ indistinguishable. Rendering and decoding are strict inverses — a decoder acce
 only the canonical form the encoder emits, so a candidate cannot claim a tag by
 being *near* the shape.
 
-**Which** family a site ends up using is part of the keyed decision in §7 rather
+**Which** family a site ends up using is part of the keyed decision in [Selection](#7-selection) rather
 than a property of the literal: the families a site supports are tried from a
 start point derived from its own keyed priority, so a project's watermark spreads
 across the seven instead of exhausting one at a time. A literal that could be
 written either as a concatenation or with escapes therefore reports a different
 `family` in two projects cut from the same tree, which is why the reports elide it
-([`REPORTS.md`](REPORTS.md)).
+([Reading a report](USER-GUIDE.md#reading-a-report)).
 
 **Dialect.** The bounds are per-language, not global: JavaScript and TypeScript
 cap integers at 2^53 − 1 because a number there is an IEEE-754 double, while
@@ -241,7 +242,7 @@ declared grammar as a promise.
    this run, and validate the result;
 3. walk `[protect] targets` under `[limits]`, dropping excluded paths and anything
    no adapter claims;
-4. harvest candidates, select the constellation ([§7](#7-selection)), prove every
+4. harvest candidates, select the constellation ([Selection](#7-selection)), prove every
    rewrite in memory;
 5. write the plan, the manifest and the release record — **before** any source
    file is modified;
@@ -281,7 +282,7 @@ which would be a lie.
    `Address without its code`, and asserting nothing), or `absent`; plus the two
    qualifications `refactored` (found through a name-abstracted key only) and
    `moved` (found in a different file than the manifest named);
-8. hand the tally to the ladder ([§12](#12-evidence)) and render the report.
+8. hand the tally to the ladder ([Evidence](#12-evidence)) and render the report.
 
 Observations per site are capped at 64, with the recorded rendering force-kept, so
 a pathological candidate cannot make one site expensive without bound.
@@ -362,9 +363,9 @@ table; [TROUBLESHOOTING.md](TROUBLESHOOTING.md) is the prose.
 * **Structural region matching.** `STRUCTURAL_MATCH` means "address present, code
   absent", and the report line is labelled accordingly. Region shingling is not
   implemented, and `max_shingles_per_region` is a limit on a feature that does not
-  exist yet — recorded in [VALIDATION.md](VALIDATION.md) rather than hidden.
+  exist yet — stated here rather than hidden.
 * **L2/L3 fingerprints.** Declared in the level grammar, never written, never
-  comparable ([§9](#9-fingerprints)).
+  comparable ([Fingerprints](#9-fingerprints)).
 * **Key sharing, delegation, or a registry.** One project, one secret, one store.
   There is no third party, no online service, and no way for one project to
   verify another's fragments.

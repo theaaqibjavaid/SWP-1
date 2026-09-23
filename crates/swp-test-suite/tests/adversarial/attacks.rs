@@ -697,8 +697,9 @@ fn functions(body: &str) -> Vec<(String, String)> {
 /// * **Framing.** If A's private manifest leaks, anyone can paste A's rendered
 ///   fragments into an innocent tree. Does A's scanner then point at that tree? If
 ///   it does, the blast radius of a leaked manifest is bigger than "they can remove
-///   my watermark" — it is "they can make my tool accuse a stranger" — and SECURITY
-///   and THREAT-MODEL have to carry that sentence. Measured, not assumed away.
+///   my watermark" — it is "they can make my tool accuse a stranger" — and the
+///   attack list in `docs/SECURITY.md` has to carry that sentence. Measured, not
+///   assumed away.
 /// * **Attribution.** The same tree then holds A's fragments *and* B's. Each scanner
 ///   should see its own and none of the other's. If B's scanner confirms anything in
 ///   a tree planted only with A's text, keyed addresses name a fragment rather than
@@ -808,8 +809,8 @@ fn fragments_planted_from_two_projects_are_attributed_and_not_confused() {
         "  {}",
         if with_a.detected() {
             "A's scanner DID report a finding on a tree that is not A's code. A leaked manifest \
-             is therefore a framing tool as well as a removal tool, and SECURITY.md and \
-             THREAT-MODEL.md have to say so in those words."
+             is therefore a framing tool as well as a removal tool, and the attack list in \
+             docs/SECURITY.md has to say so in those words."
         } else {
             "A's scanner reported no finding on the planted tree: the fragments alone are not a \
              constellation, and the coincidence bound is the sentence that says so. A leaked \

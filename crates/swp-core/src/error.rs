@@ -105,7 +105,7 @@ impl ErrorCode {
                  no file of this language can be read. This is a property of the build rather \
                  than of your project: check `swp --version`, and if it persists report the \
                  language and platform. To protect a language no adapter claims, see \
-                 docs/LANGUAGE-ADAPTERS.md."
+                 docs/DEVELOPER-GUIDE.md#adding-a-language-adapter."
             }
             ErrorCode::InvalidManifest => {
                 "Re-run with --release <id> naming an intact release under .swp/public/releases/. If the file is genuinely corrupt, restore it from your provenance backup; a manifest cannot be regenerated without the root secret."

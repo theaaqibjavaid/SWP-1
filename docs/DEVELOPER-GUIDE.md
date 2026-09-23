@@ -152,8 +152,8 @@ pages obey is small:
 The transcripts are produced by `scripts/capture-docs.sh` (`SWP=target/release/swp
 sh scripts/capture-docs.sh /tmp/out`) and re-executed by the test on every run,
 against the four projects under `examples/`. Two floor assertions keep the check
-from thinning out: at least sixty blocks and at least forty distinct commands must
-be covered.
+from thinning out when a page is edited: at least forty blocks and at least forty
+distinct commands must be covered.
 
 The practical rule when you change output: run the suite, read the diff it prints,
 and fix the *page* only if the new output is what you meant. A failure that shows a
@@ -181,29 +181,110 @@ text and `--formt json` has to answer with `Did you mean --format?`.
 4. Write the help text in `crates/swp-cli/src/help.rs` — that file is the only
    source for `swp help`, `swp help <command>` and the exit-code table, and all
    three are quoted by documentation the test checks.
-5. Quote the new output in [CLI.md](CLI.md) and, if it is a report, in
-   [REPORTS.md](REPORTS.md), with a real transcript.
+5. Quote the new output in [CLI.md](CLI.md) with a real transcript, and if it adds
+   a report field, in [Reading a report](USER-GUIDE.md#reading-a-report).
 
 ## Adding a language adapter
 
-[LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md) is the full adapter contract: the
-`Adapter` trait in `swp-adapters/src/adapter.rs`, the token and role model in
-`canon.rs`, the literal-form rules in `literal.rs` and `forms.rs`, and the safety
-gate in `safety.rs`. Three constraints decide whether an adapter is honest:
+An adapter lives in `crates/swp-adapters` and nowhere else. It is the only crate
+that links a parser and the only place a language has a name; everything above it
+consumes three types — `Analysis`, `swp_core::canon::Token`,
+`swp_core::site::FormFamily` — none of which inspects a spelling.
 
-* it must report which literals it can normalize *by value*, and the canonicalizer
-  falls back to the raw spelling when it cannot — the loss is documented, not
-  hidden;
-* it must return the innermost statement and enclosing scope for a byte offset,
-  because those two spans are the site's four addresses;
-* `safety.rs` must reject any edit that changes parse shape or value, and the
-  adapter's own test file must include the round-trip case for every form it
-  claims.
+The files that make up the layer:
 
-An adapter that cannot satisfy those is not added; the generic tokenizer in
-`generic.rs` handles the files instead, at a lower guarantee, and the report says
-which adapter ran. The fallback exists so that "unsupported" is a graded
-condition rather than a crash.
+| file | owns |
+| --- | --- |
+| `adapter.rs` | the `LanguageAdapter` trait, `Edit`, `Proof`, the `Registry` |
+| `analyze.rs` | `Analysis`, `CandidateSite`, `Capabilities` |
+| `ts.rs` | the `Grammar` table and the AST pass every parsed language shares |
+| `js.rs`, `py.rs` | per-language grammar tables and identifier-binding rules |
+| `dialect.rs` | per-language facts about numbers and strings |
+| `literal.rs`, `forms.rs` | literal parsing, the seven fragment families, render and decode dispatch |
+| `safety.rs` | which positions a rewrite may not touch |
+| `generic.rs` | the lexical fallback, described below |
+
+### The contract
+
+`trait LanguageAdapter: Send + Sync` has ten methods. Five are yours to write —
+`name`, `capabilities`, `extensions`, `analyze`, `dialect` — and `identifies` has a
+default (extension match) you override only for a name-based rule like a shebang.
+The four defaults are not convenience, they are the reason an adapter cannot
+drift: `canonicalize` delegates to `swp_core::canon::canonicalize` so that location
+ids stay comparable across languages, and `render`/`extract`/`validate` run the
+shared family engine and the shared re-parse proof. Override `render` or `extract`
+only to *narrow* what the shared engine offers; a rendering your `extract` cannot
+decode back is a watermark that exists in a manifest and nowhere in the world.
+
+Two rules about the data you produce:
+
+* `name()` is recorded in every site of every release. Renaming it after a release
+  exists means that release cannot re-parse its own manifests.
+* `Capabilities` (`analyze.rs`) is a promise, and the report degrades to it. Say
+  `scopes: false` if you cannot tell a local name from a free one; say
+  `reparse: false` if you cannot re-parse your own output, in which case `validate`
+  is no longer a proof. Claiming more than you deliver makes a report print a
+  level the evidence does not reach.
+
+`analyze` must return the innermost statement and the enclosing scope for a byte
+offset, because those two spans, abstracted four ways, are a site's four
+addresses; and it must report which literals it can normalize by value, since the
+canonicalizer falls back to the raw spelling where you cannot and records the loss.
+
+### The four steps
+
+1. A `Grammar` table in `crates/swp-adapters/src/<lang>.rs`, plus the two
+   functions nobody can write for you: `role_of` and `scan_bindings`. JavaScript's
+   and Python's tables are ~15 lines inside 200–340-line modules; the module *is*
+   the language's binding rules, and that is the work.
+2. A `Dialect` constant: the literal facts, each verifiable from the language's
+   specification rather than from what the tool would find convenient.
+3. One registry line: `Box::new(AstAdapter::new("<lang>", || &<LANG>))` in
+   `Registry::standard()` in `adapter.rs`. It is the only registration point.
+4. Tests, in this order: the token-stream guard in
+   `crates/swp-adapters/tests/token_stream.rs`, the per-language round-trip in
+   `crates/swp-test-suite/tests/detection/roundtrip.rs` (one fixture per form the
+   adapter claims), and a `parsed_languages()` assertion. Expect the canon and
+   round-trip tests to find real bugs in step 1; that is what they are for.
+
+A language whose literals cannot be classified without resolving types — a macro
+system, an evaluation-time metaprogram, an implicit conversion that changes what
+`+` means — does not need a bigger adapter. It needs the refusal below, or an
+`analyze` that records exactly which literals it could classify and refuses the
+rest with a reason a reader can act on.
+
+### What the promise costs
+
+"Without modifying the core protocol" is true of the protocol and the engine: no
+schema changes, no derivation changes, nothing upstream learns your language's
+name. Beyond the adapter and the registry line you also touch the places that
+*record* what this build supports, each of which fails loudly when a language
+lands and stays quiet otherwise — which is why they are lists rather than logic
+derived from the registry:
+
+| place | what it asserts |
+| --- | --- |
+| `crates/swp-adapters/tests/token_stream.rs` | that `parsed_languages()` is exactly the set claimed |
+| `crates/swp-test-suite/tests/detection/roundtrip.rs` | one fixture and one `Dialect` row per language |
+| `crates/swp-test-suite/src/project.rs` | language name → fixture builder |
+| `crates/swp-test-suite/tests/docs/examples.rs` | the example trees the documented transcripts are re-produced against |
+| the `NO_SAFE_LOCATIONS` message in `swp-core/src/error.rs` | the languages this build parses, named next to "add an adapter" |
+| `README.md`, `docs/GETTING-STARTED.md` | the prose a user reads to decide whether their language works today |
+
+A new language also needs an example tree under `examples/` and its row in
+[VALIDATION.md](VALIDATION.md), in the same change as the adapter.
+
+### Why "unsupported" is a refusal, not a weaker scan
+
+`generic.rs` is a hand-written lexical scanner whose `Capabilities::LEXICAL` says
+`scopes: false`, `reparse: false`, evidence capped at `MODERATE`. Its
+`extensions()` is empty, so `Registry::for_path` never selects it silently — a
+file becomes source only when a real grammar covers it. Both walks admit a path
+only when `for_path` returns an adapter (`swp-embedding/src/walk.rs`) and name the
+omission otherwise, because on a language this build cannot re-parse, `validate`
+cannot prove the surrounding code unchanged. So an unsupported project is refused
+outright rather than covered with weaker tools, and a report never needs a
+footnote about which half of a tree was guessed at.
 
 ## Adding an evidence kind or moving the ladder
 
@@ -246,6 +327,6 @@ quote it re-run by `docs_examples` rather than edited until they pass.
 
 ---
 
-Next: [LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md) for the adapter contract,
-[INTEGRATION.md](INTEGRATION.md) for CI and packaging,
+Next: [SWP-1-SPEC.md](SWP-1-SPEC.md) for the protocol,
+[SECURITY.md](SECURITY.md) for the attack surface,
 [VALIDATION.md](VALIDATION.md) for the measurements this page points at.

@@ -28,7 +28,7 @@ Third-party components
 --------------------------------------------------------------------------------
 
 SWP-1 is built from source against the following crates. Each is listed here
-because the threat model's [§10, "Parser exploitation"](docs/THREAT-MODEL.md#10-parser-exploitation)
+because [docs/SECURITY.md](docs/SECURITY.md#attacks-and-what-still-gets-through)
 treats the dependency list as part of the trusted surface: the binary you run
 links exactly these, and `swp` opens no socket in any code path. The
 authoritative versions are in `Cargo.lock`.

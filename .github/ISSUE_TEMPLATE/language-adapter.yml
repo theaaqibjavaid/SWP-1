@@ -7,7 +7,8 @@ body:
       value: |
         SWP-1 ships JavaScript, TypeScript and Python, and refuses everything else with
         `NO_SAFE_LOCATIONS` rather than scanning source it cannot re-read after
-        rewriting it. `docs/LANGUAGE-ADAPTERS.md` is the specification of what an
+        rewriting it. The "Adding a language adapter" section of
+        `docs/DEVELOPER-GUIDE.md` is the specification of what an
         adapter has to prove; this form is the two questions it cannot answer for you.
   - type: input
     id: language

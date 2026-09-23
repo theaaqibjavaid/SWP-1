@@ -245,7 +245,7 @@ the parser: `swp protect` publishes a new one, and the source that carries the
 older release's sites is unchanged either way.
 
 A record that fails as `PROTOCOL_VERSION_UNSUPPORTED` (exit `6`) is not damage.
-It was written by a newer build; see [FAQ.md](FAQ.md) on the version rules.
+It was written by a newer build; the rules are in [Versioning](SWP-1-SPEC.md#14-versioning).
 
 ## `protect` refused to write anything
 
@@ -268,9 +268,9 @@ the strongest thing it knows how to do.
 
 If part of the tree *is* a supported language, name it:
 `swp protect --target src/js`, or `[protect] targets` in the config. If it is not
-any of them, [LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md) is the specification
-for adding one, and it is a real extension point rather than a fork: the protocol
-knows nothing about your language's syntax.
+any of them, [Adding a language adapter](DEVELOPER-GUIDE.md#adding-a-language-adapter)
+is what it takes to write one, and it is a real extension point rather than a
+fork: the protocol knows nothing about your language's syntax.
 
 ## A warning that is not a failure
 
@@ -308,9 +308,12 @@ Check these in order. Each has a line in a report that settles it:
    evidence as well as runs that did not.
 
 The opposite confusion — a scan that found something in a tree you are sure is
-unrelated — is answered by the report's coincidence bound and by
-[REPORTS.md](REPORTS.md#three-readings-of-the-same-tool), which works through a real near miss:
-address collisions with none of the codes, graded `NONE`.
+unrelated — is answered by the report's coincidence bound: address collisions
+with none of the codes are graded `NONE`, and a single chance confirmation is
+graded `WEAK` and holds the verdict at `INCONCLUSIVE`. [Reading a
+report](USER-GUIDE.md#reading-a-report) has the rules;
+`cargo test -p swp-test-suite --test false_positive` prints the measured cases,
+thirty scans of unrelated corpora included.
 
 ## When you think the tool is wrong
 
@@ -358,6 +361,6 @@ that is the bug worth reporting.
 
 ---
 
-Next: [FAQ.md](FAQ.md) for the questions that do not fit a transcript,
-[CLI.md](CLI.md#exit-codes) for the code table,
+Next: [USER-GUIDE.md](USER-GUIDE.md#reading-a-report) for what every field of a
+report means, [CLI.md](CLI.md#exit-codes) for the code table,
 [SECURITY.md](SECURITY.md) for what is trusted and what is protected.

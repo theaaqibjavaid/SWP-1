@@ -287,8 +287,9 @@ exit 0
 That is the same Python source this build also protects, in a tree `swp protect`
 never touched: two files examined, no fragment of the release reproduced, and the
 scan still exits `0`, because a file with no adapter is *not source to this tool*
-rather than a hole in coverage. [REPORTS.md](REPORTS.md) draws that distinction
-where it matters.
+rather than a hole in coverage. [Scanning an archive, a directory or one
+file](USER-GUIDE.md#scanning-an-archive-a-directory-or-one-file) says where that
+line sits.
 
 ### If your language is not supported
 
@@ -303,8 +304,9 @@ exit 15
 
 Nothing was written, and no weaker scan was attempted on your behalf.
 [`../examples/generic/README.md`](../examples/generic/README.md) is that
-transcript in full, and [LANGUAGE-ADAPTERS.md](LANGUAGE-ADAPTERS.md) is how to
-make your language one of the three.
+transcript in full, and [Adding a language
+adapter](DEVELOPER-GUIDE.md#adding-a-language-adapter) is how to make your
+language one of the three.
 
 ## 10. Backing up
 
@@ -340,8 +342,8 @@ branch you can drop is the careful way to try it.
 
 ## Next
 
-* [USER-GUIDE.md](USER-GUIDE.md) — the workflows: CI, monorepos, re-protecting, archives
+* [USER-GUIDE.md](USER-GUIDE.md) — the workflows, and every field of a report
 * [CLI.md](CLI.md) — every command, option and exit code
-* [REPORTS.md](REPORTS.md) — what each number in a report may be used for
-* [SECURITY.md](SECURITY.md) and [THREAT-MODEL.md](THREAT-MODEL.md) — what this resists, and what it does not
+* [SECURITY.md](SECURITY.md) — what this resists, what it does not, and how to report a problem
+* [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — what each error asks of you
 * [../examples/javascript/README.md](../examples/javascript/README.md) — this page's sequence, one language deeper

@@ -82,7 +82,7 @@ const MODULES: usize = 12;
 /// protocol's **default** four-bit width. Nothing here lowers `tag_bits` to make
 /// a family reachable: reaching it at the width a real project ships at is the
 /// point, and the difficulty of doing so is itself one of the measurements
-/// (`docs/LANGUAGE-ADAPTERS.md` quotes it).
+/// (this suite is where it is measured).
 const FORMS_CONFIG: &str = "[protect]\ntargets = [\"src\"]\ntarget_sites = 48\ntag_bits = 4\n\
                             embed_strings = true\n";
 

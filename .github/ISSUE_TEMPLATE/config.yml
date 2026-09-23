@@ -6,8 +6,9 @@ contact_links:
   - name: Questions about using SWP-1
     url: https://github.com/theaaqibjavaid/SWP-1/discussions
     about: >-
-      How do I do X, and what does this number mean. Start with docs/FAQ.md and
-      docs/TROUBLESHOOTING.md; both are written from the questions that recurred.
+      How do I do X, and what does this number mean. Start with
+      docs/TROUBLESHOOTING.md and the "Reading a report" section of
+      docs/USER-GUIDE.md.
 
   - name: A documentation page that is unclear
     url: https://github.com/theaaqibjavaid/SWP-1/issues/new?template=documentation.yml

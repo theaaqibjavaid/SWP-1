@@ -61,7 +61,7 @@ the protocol expected, and evaluates to the same value.
 **Evidence.** A detection run produces typed evidence items — keyed fragment,
 exact rendering, canonical-only rendering, moved site, fingerprint agreement,
 structural agreement — and an evidence level from a ladder whose every rung is a
-stated rule, not a heuristic: `NONE`, `WEAK`, `POSSIBLE`, `PROBABLE`, `STRONG`,
+stated rule, not a heuristic: `NONE`, `WEAK`, `MODERATE`, `STRONG`,
 `VERY_STRONG`. Alongside the level, a report carries the coincidence bound: how
 many of these hits an unrelated tree would be expected to produce by chance, and
 — printed next to it rather than hidden behind it — the looser bound that makes no
@@ -96,14 +96,15 @@ These are absences with reasons, not a backlog:
 - **No language beyond the three adapters and one generic fallback.** A `generic`
   candidate that reaches `swp protect` is refused with `NO_SAFE_LOCATIONS` and
   nothing written, because a scan that cannot re-parse what it rewrote cannot
-  re-prove it either. [LANGUAGE-ADAPTERS.md](docs/LANGUAGE-ADAPTERS.md) says how
-  to write the fourth adapter.
+  re-prove it either. [Adding a language
+  adapter](docs/DEVELOPER-GUIDE.md#adding-a-language-adapter) says how to write
+  the fourth one.
 - **No daemon, no service, no upload.** No network code path exists in the
   binary. There is no telemetry to opt out of.
 - **No claim of removal-resistance.** `swp inspect fragments` can enumerate every
-  site. The threat model says so in as many words
-  ([THREAT-MODEL.md](docs/THREAT-MODEL.md)), and the adversarial suite exists to
-  keep that sentence true.
+  site. [Attacks, and what still gets
+  through](docs/SECURITY.md#attacks-and-what-still-gets-through) says so in as
+  many words, and the adversarial suite exists to keep that sentence true.
 - **No key management system.** The root secret is sealed by the operating
   system, and the store is a directory. That is a documented boundary, not an
   integration point.
@@ -121,8 +122,8 @@ These are absences with reasons, not a backlog:
   conflict is a manual decision, not something the tool should make silently.
 - **Detection has a floor.** Fragments carry four bits each, so a candidate whose
   literals were re-spelled outside the dialect table leaves the fingerprint and
-  structure channels and nothing else; the report shows that as `WEAK` or
-  `POSSIBLE`, and `POSSIBLE` is defined to mean "this could be chance."
+  structure channels and nothing else; the report shows that as `WEAK` at best,
+  and `WEAK` is defined as a lead worth looking at rather than proof of copying.
 - **Reimplementation is out of scope.** A rewrite from memory that removes every
   protected literal leaves nothing to key on, and produces the same report as an
   original. `NO_PROVENANCE_DETECTED` is not a finding of originality.

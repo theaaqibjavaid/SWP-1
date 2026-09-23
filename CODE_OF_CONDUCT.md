@@ -32,7 +32,8 @@ is nothing like yours.
   it in the project's name damages it.
 * *Treating a security report as a joke, or a researcher as an adversary.*
   "Your tool can be defeated" is the expected state of the art for a watermark, and
-  [THREAT-MODEL.md](docs/THREAT-MODEL.md) already says it. It is not an insult and
+  [docs/SECURITY.md](docs/SECURITY.md#attacks-and-what-still-gets-through) already
+  says it. It is not an insult and
   should not be answered like one.
 * *Publicly debugging somebody else's deployment.* A `scan` result about code
   somebody owns is evidence in a private dispute. Do not turn an issue thread into
@@ -59,7 +60,7 @@ effect of driving them out of the project.
 ## Reporting
 
 Report to **aaqib100javaid@gmail.com**, or to any maintainer you are comfortable
-approaching; the list of who that is lives in [MAINTAINERS.md](MAINTAINERS.md).
+approaching; [`.github/CODEOWNERS`](.github/CODEOWNERS) names them.
 More than one maintainer reads a report unless you ask otherwise, so say in your
 report whether you would rather it be handled by one named person. The identity of
 a reporter is not shared with the person reported about without their agreement.

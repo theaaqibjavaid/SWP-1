@@ -39,7 +39,7 @@
 //! The steps are protocol conventions, not measurements: they are chosen so that
 //! one 4-bit fragment cannot on its own produce more than `WEAK`, and so that a
 //! level above `WEAK` needs either several addresses or several independent files.
-//! They are stated here as constants, listed in `docs/REPORTS.md`, and their
+//! They are stated here as constants, listed in `docs/SWP-1-SPEC.md`, and their
 //! behaviour against the §24 partial-copy sweep is recorded in `docs/VALIDATION.md`
 //! rather than asserted in prose here.
 //!

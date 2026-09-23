@@ -124,7 +124,7 @@ pub fn form_project(root: &Path) -> Vec<String> {
 ///
 /// Nothing here lowers `tag_bits` to make a family reachable: reaching it at the
 /// width a real project ships at is the point, and the difficulty of doing so is
-/// itself one of the measurements `docs/LANGUAGE-ADAPTERS.md` quotes. Two suites
+/// itself one of the measurements the suites that read this table report. Two suites
 /// and the locator's own ground-truth test read this one definition, so a table
 /// about "the form corpus" and a table about "the shapes a writer emits" cannot
 /// quietly become tables about two different constellations.

@@ -238,7 +238,7 @@ that must never be committed or shared.
 ## Reading the rest
 
 - [`../../docs/GETTING-STARTED.md`](../../docs/GETTING-STARTED.md) — the same sequence, step by step
-- [`../../docs/LANGUAGE-ADAPTERS.md`](../../docs/LANGUAGE-ADAPTERS.md) — every family and every refusal rule
+- [`../../docs/DEVELOPER-GUIDE.md`](../../docs/DEVELOPER-GUIDE.md#adding-a-language-adapter) — every family and every refusal rule
 - [`../../docs/CLI.md`](../../docs/CLI.md) — every option used above
-- [`../../docs/REPORTS.md`](../../docs/REPORTS.md) — what each report line means
-- [`../../docs/THREAT-MODEL.md`](../../docs/THREAT-MODEL.md) — why the clean scan above is the expected result, not a failure
+- [`../../docs/USER-GUIDE.md`](../../docs/USER-GUIDE.md#reading-a-report) — what each report line means
+- [`../../docs/SECURITY.md`](../../docs/SECURITY.md#attacks-and-what-still-gets-through) — why the clean scan above is the expected result, not a failure

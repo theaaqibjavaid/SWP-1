@@ -1,4 +1,4 @@
-//! §41 — every `console` block in the documentation is a transcript this build
+//! Every `console` block in the documentation is a transcript this build
 //! still produces.
 //!
 //! The rule the section states is that a documented command must have been run,
@@ -25,7 +25,7 @@
 //!
 //! Nothing here compares a transcript against a stored snapshot. The four trees
 //! are protected from scratch under a fresh root secret on every run, which is
-//! what §41's "validated against the real implementation" asks for, and the only
+//! what "validated against the real implementation" asks for, and the only
 //! thing a block may quote is what the fresh run printed.
 
 use std::cell::RefCell;
@@ -36,7 +36,7 @@ use std::rc::Rc;
 
 use swp_test_suite::TempDir;
 
-/// The four trees §40 requires, in the order `scripts/capture-docs.sh` protects
+/// The four example trees, in the order `scripts/capture-docs.sh` protects
 /// them in: `javascript` scans a *protected* TypeScript tree, so TypeScript has
 /// to have run before it.
 const EXAMPLES: [&str; 4] = ["typescript", "python", "javascript", "generic"];
@@ -53,28 +53,23 @@ fn examples_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples")
 }
 
-/// The repository root, which is where the §36 pages are relative to.
+/// The repository root, which every page below is relative to.
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The §36 documentation set: each page, and the example its unlabelled `console`
-/// blocks quote. The list doubles as §36's completeness gate — a page that is
-/// missing fails here, with the same message shape as a page that lost its
-/// transcripts — because a document index nobody checks is an index that drifts.
-const PAGES: [(&str, &str); 14] = [
+/// Every page the documentation test checks, and the example project its
+/// unlabelled `console` blocks quote. This list *is* the page index: adding a page
+/// here is how it becomes checked, and deleting a page without deleting its entry
+/// fails the run.
+const PAGES: [(&str, &str); 9] = [
     ("README.md", "javascript"),
     ("docs/GETTING-STARTED.md", "javascript"),
     ("docs/USER-GUIDE.md", "javascript"),
     ("docs/CLI.md", "javascript"),
-    ("docs/SWP-1-SPEC.md", "javascript"),
-    ("docs/INTEGRATION.md", "javascript"),
-    ("docs/LANGUAGE-ADAPTERS.md", "javascript"),
-    ("docs/SECURITY.md", "javascript"),
-    ("docs/THREAT-MODEL.md", "javascript"),
-    ("docs/REPORTS.md", "javascript"),
     ("docs/TROUBLESHOOTING.md", "javascript"),
-    ("docs/FAQ.md", "javascript"),
+    ("docs/SECURITY.md", "javascript"),
+    ("docs/SWP-1-SPEC.md", "javascript"),
     ("docs/DEVELOPER-GUIDE.md", "javascript"),
     ("docs/VALIDATION.md", "javascript"),
 ];
@@ -679,9 +674,9 @@ fn every_documented_transcript_is_one_this_build_still_produces() {
     let mut transcripts: BTreeMap<String, BTreeMap<String, Shot>> = BTreeMap::new();
     let mut blocks_checked = 0usize;
 
-    // The four example READMEs, then the §36 pages. Both are checked by the same
-    // rule because both quote the same tool: a transcript in `docs/CLI.md` can go
-    // stale exactly the way one in `examples/python/README.md` can.
+    // The four example READMEs, then the documentation pages. Both are checked by
+    // the same rule because both quote the same tool: a transcript in `docs/CLI.md`
+    // can go stale exactly the way one in `examples/python/README.md` can.
     let mut pages: Vec<(PathBuf, String, bool)> = EXAMPLES
         .iter()
         .map(|example| {
@@ -701,7 +696,7 @@ fn every_documented_transcript_is_one_this_build_still_produces() {
     for (path, default_example, is_example) in pages {
         if !path.exists() {
             failures.push(format!(
-                "{}: the documentation page §36 or §40 requires is missing",
+                "{}: a page listed in PAGES is missing from the tree",
                 path.display()
             ));
             continue;
@@ -733,20 +728,20 @@ fn every_documented_transcript_is_one_this_build_still_produces() {
         failures.join("\n\n")
     );
     assert!(
-        blocks_checked >= 60,
-        "only {blocks_checked} documented block(s) were checked, across the four examples and \
-         §36's {} pages. §40 asks each example page to quote real output and §41 asks the manual \
-         to quote the same kind of transcript, so a low count here reads as pages that lost \
-         theirs.",
+        blocks_checked >= 40,
+        "only {blocks_checked} documented block(s) were checked, across the four example pages \
+         and the {} documentation pages listed in PAGES. Every one of them is asked to quote \
+         output this build actually printed, so a low count here reads as pages that lost their \
+         transcripts rather than as a shorter manual.",
         PAGES.len()
     );
 }
 
-/// §41's other half. The test above proves that a quoted *output* is one this
-/// build printed; it cannot see a command the manual mentions in prose without
-/// quoting it, and that is where an interface change leaves a body: a page that
-/// tells the reader to run `swp scan --languages` is wrong whether or not it
-/// shows the error.
+/// The other half of the documentation contract. The test above proves that a
+/// quoted *output* is one this build printed; it cannot see a command the pages
+/// mention in prose without quoting it, and that is where an interface change
+/// leaves a body: a page that tells the reader to run `swp scan --languages` is
+/// wrong whether or not it shows the error.
 ///
 /// So every backticked command in every page is handed to the real parser. What
 /// this proves is that the verb exists, that the option exists, and that the
@@ -900,7 +895,7 @@ fn command_words(snippet: &str) -> Option<Vec<String>> {
     (!words.is_empty()).then_some(words)
 }
 
-/// A check that cannot fail is not a check, and §41's rule is worth nothing if the
+/// A check that cannot fail is not a check, and the rule above is worth nothing if the
 /// matcher above is generous enough to wave anything through. So the two rules it
 /// rests on — `…` stands for what the key decides, and everything else has to be a
 /// line the product really printed — are tested against transcripts written here

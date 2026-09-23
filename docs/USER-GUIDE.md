@@ -3,8 +3,8 @@
 [GETTING-STARTED.md](GETTING-STARTED.md) gets one project protected. This page is
 about the cases that come after: what the store holds and which parts of it you
 must never commit, how many sites to ask for, what happens when you protect the
-same tree twice, how to run this in CI, how to scan an archive, and every key in
-the configuration file.
+same tree twice, how to read a report field by field, how to run this in CI, and
+every key in the configuration file.
 
 ## Where everything lives
 
@@ -71,10 +71,8 @@ Two knobs, and the trade-off between them is the whole design:
 * **Sites** spread the watermark across files. A constellation inside one file is
   one `rm` away from nothing, which is why `init`'s suggestion aims at spread and
   why a scan of a *partial* copy — three files out of forty — can still reach a
-  finding. `STRONG` wants four confirmations in at least two files — or six, which
-  is the bar when count is the only argument available — and `VERY_STRONG` wants
-  eight in at least three, so a single file carrying a whole release buys a lower
-  grade than the same number of sites spread across the project.
+  finding. Spread raises the grade too: see
+  [The levels, and the cap on them](#the-levels-and-the-cap-on-them).
 * **Tag bits** decide how much each site proves: at 4 bits one site is 1-in-16 by
   chance; at 8 bits, 1-in-256. Wider tags cost capacity, because a family has to
   be able to spell that many distinct renderings inside the literal's radius.
@@ -133,6 +131,98 @@ of it; `--latest` is how you check the current one.
 
 A second protect is never destructive to your code: the rewrites are equivalent
 by construction, re-parsed and refused otherwise.
+
+## Reading a report
+
+`swp scan` and `swp verify` write the same document, `SWP-1-report-v1`, and
+`swp scan ./copy --format json` prints it. Twelve top-level fields:
+
+| field | meaning |
+| --- | --- |
+| `schema`, `protocol` | `SWP-1-report-v1` and `SWP-1`. A stored report whose schema this build cannot read is refused, not guessed at |
+| `run` | the command that produced it, when, and which build wrote it |
+| `candidate` | how you named it, what kind it was, `files_scanned`, `bytes_scanned`, `partial` |
+| `result` | `PROVENANCE_DETECTED`, `NO_PROVENANCE_DETECTED`, `INCONCLUSIVE` |
+| `evidence_level` | `NONE`, `WEAK`, `MODERATE`, `STRONG`, `VERY_STRONG` |
+| `explanation` | one sentence per rule that fired, with its measured numbers |
+| `releases` | one tally per release the candidate was judged against, strongest first |
+| `evidence` | the observations themselves, `EV-000` upward |
+| `omissions` | paths the walk did not examine, with the reason |
+| `notes` | caveats about the run: widths probed, containers opened, caps reached |
+| `limitations` | the claims no report supports, printed inside the document |
+
+Read `candidate.partial` before you read `result`. While it is `true`, part of the
+candidate was never examined, so "no provenance" would be unsound — and the tool
+says `INCONCLUSIVE` and exits `10` instead of clearing the tree.
+
+### The release tally
+
+`releases[]` holds the arithmetic, in three groups that are easy to mix up:
+
+* **What the release published:** `sites`, `tag_bits`.
+* **What the candidate reproduced:** `fragments` (address present *with* its
+  code), `stripped` (address present, code absent), `absent` (no matching span) —
+  plus four overlapping views of the fragments: `exact_renderings` (byte-for-byte
+  the recorded rendering), `canonical_only` (reached only through the
+  rename-tolerant radii), `moved` (found in a file other than the one protected),
+  `renderings` (span wider than one token). Those four describe the same
+  confirmations; they do not add up to `fragments`.
+* **What the search cost:** `files`, `bits`, `probes`, `literals_tried`,
+  `windows_tried`, `chance`, `guarantee`, `fingerprint`.
+
+`fingerprint` is `match`, `no-match` or `not-comparable`; the third means the
+candidate and the release were not graded at the same canonicalization level, so
+no comparison happened rather than one failing.
+
+`chance` is how many confirmations an unrelated tree is expected to produce by
+luck over the comparisons this scan actually performed; `guarantee` is
+`fragments − chance`. A negative result is auditable because it prints the same
+counts: the `NEGATIVE_CONTROL` item states how hard the scan looked, and a scan
+that tried 12 literals in one file is a weaker statement than one that tried 18
+literal and 11 rendering hypotheses across two.
+
+### Evidence items
+
+`evidence[]` records how something was seen, so one site can produce several
+items. Each carries an id, the release it matched, where in the candidate it was
+found (file, line, the matched text, span width, which of the four keyed radii
+reproduced it), where the same site sits in your release, and a `basis` sentence
+holding the measured numbers. Seven kinds:
+
+| kind | earned by | asserts provenance |
+| --- | --- | --- |
+| `EXACT_SOURCE_MATCH` | the candidate's canonicalized tree hashes to the release fingerprint | yes |
+| `WATERMARK_FRAGMENT_MATCH` | a keyed address holds a literal that decodes to this project's code for it | yes |
+| `PARTIAL_WATERMARK_MATCH` | some but not all of a release's sites are accounted for | yes |
+| `CANONICAL_MATCH` | the address was reproduced only through the rename-tolerant radii | yes |
+| `STRUCTURAL_MATCH` | the address is present and the code is not | **no** |
+| `TOKEN_MATCH` | the matched span is a multi-token rendering, not a lone literal | yes |
+| `NEGATIVE_CONTROL` | nothing of this release was reproduced, with the probe counts | no — it asserts absence |
+
+A `STRUCTURAL_MATCH` is the one to read carefully: a copy of your source from
+before protection and a copy with the fragments deliberately removed look
+identical, so it is reported and weighted as nothing.
+
+### The levels, and the cap on them
+
+| level | needs, on counts alone |
+| --- | --- |
+| `NONE` | no fragment confirmed |
+| `WEAK` | 1 confirmed site |
+| `MODERATE` | 2 |
+| `STRONG` | 4 across at least 2 files, or 6 anywhere |
+| `VERY_STRONG` | 8 across at least 3 files |
+
+The level is graded from confirmed *sites*, never by counting items, so one
+statement pasted under two renderings cannot inflate it. `guarantee` then caps it
+— `1.5` for `MODERATE`, `3.0` for `STRONG`, `6.0` for `VERY_STRONG` — and the cap
+only ever lowers, never raises. A matching fingerprint short-circuits both rules.
+
+The verdict clears the same two tests: `PROVENANCE_DETECTED` needs `guarantee`
+above zero *and* a level of at least `MODERATE`, or a fingerprint match. So a
+single 4-bit confirmation prints as `WEAK` evidence while the command still exits
+`0`. A lead is not a finding, and a verdict may not claim more than its evidence
+level already said.
 
 ## In CI
 
@@ -255,6 +345,6 @@ on a branch you can drop is the careful way to try it.
 
 ## Next
 
-* [CLI.md](CLI.md) — the option-level detail
-* [REPORTS.md](REPORTS.md) — reading a `verify` or `scan` document field by field
+* [CLI.md](CLI.md) — every command, option and exit code
 * [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — the error table, symptom first
+* [SWP-1-SPEC.md](SWP-1-SPEC.md) — the protocol behind the fields above
