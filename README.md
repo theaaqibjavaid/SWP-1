@@ -306,7 +306,10 @@ source.
 
 ## Status
 
-Protocol v1.0.0, implemented end to end: embed, verify, scan, report. Three
+Protocol v1.0.0, implemented end to end: embed, verify, scan, report. The first
+public build carries `1.0.0-beta.1`: the protocol is settled and a tree protected by
+this build verifies against the release after it, so what the beta withholds is the
+endorsement rather than the functionality. Three
 languages with real parser adapters, one refusal that is a design decision, and a
 test suite that includes an adversarial section whose job is to defeat the
 watermark. [docs/VALIDATION.md](docs/VALIDATION.md) lists what has been measured

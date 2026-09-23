@@ -112,12 +112,16 @@ being worse off.
 
 **Supported versions.** A release line is supported for security fixes until a
 later minor line supersedes it by two releases, or until the protocol it writes is
-no longer readable — whichever comes first. At the time of writing:
+no longer readable — whichever comes first. At the time of writing the only build is
+a pre-release, which changes what "supported" costs: a fix found in a beta is
+published as the next beta *and* in `1.0.0`, and a beta is superseded the moment
+`1.0.0` ships. Run the stable build in anything you depend on.
 
 | version | supported |
 | --- | --- |
-| 1.0.x | yes |
-| < 1.0 | no releases precede 1.0.0 |
+| 1.0.0-beta.1 and later betas | yes |
+| 1.0.0 onward | yes, from the first stable release |
+| before 1.0.0-beta.1 | no build predates it |
 
 ## A note on scope
 

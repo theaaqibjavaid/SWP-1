@@ -864,7 +864,7 @@ fn command_words(snippet: &str) -> Option<Vec<String>> {
     }
     let mut words: Vec<String> = body.split_whitespace().map(str::to_string).collect();
     // A line that begins with the word `swp` is just as often the banner this tool
-    // prints — `swp SWP-1 · swp 1.0.0 · …` — as it is a command someone typed, so
+    // prints — `swp SWP-1 · swp <version> · …` — as it is a command someone typed, so
     // the second word has to be a verb before anything is parsed.
     const VERBS: [&str; 11] = [
         "init",

@@ -310,7 +310,7 @@ identity .swp/public/identity.json
   project     swp1-…
   display     javascript
   protocol    SWP-1 · schema 1 · canonicalizer 1
-  generator   swp-cli 1.0.0
+  generator   swp-cli 1.0.0-beta.1
   verify key  … (ed25519, 32 bytes)
 
   This file is public by design: the verify key authenticates this project's

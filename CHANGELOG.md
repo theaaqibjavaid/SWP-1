@@ -20,11 +20,17 @@ every claim of that kind here was run before it was written
 Nothing. An entry appears here between a change being merged and the tag that
 carries it, and not before.
 
-## [1.0.0] - 2026-09-22
+## [1.0.0-beta.1] - 2026-09-23
 
-The first release that is end to end: a tree can be protected, a protected tree
-can be re-examined, and a tree somebody else hands you can be judged — from an
-offline machine that never runs the code it is reading.
+The first build offered for use outside this repository: a tree can be protected, a
+protected tree can be re-examined, and a tree somebody else hands you can be judged
+— from an offline machine that never runs the code it is reading.
+
+The `-beta` is doing work, so it is worth saying which part. Everything below is
+complete rather than stubbed, and the protocol token is `SWP-1-report-v1` in this
+build and in the release after it, so a tree protected here verifies there. What a
+pre-release withholds is the endorsement: `1.0.0` is this number once somebody has
+run it against their own work and the findings held up.
 
 ### Added
 
@@ -128,5 +134,5 @@ These are absences with reasons, not a backlog:
   protected literal leaves nothing to key on, and produces the same report as an
   original. `NO_PROVENANCE_DETECTED` is not a finding of originality.
 
-[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0
+[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.1

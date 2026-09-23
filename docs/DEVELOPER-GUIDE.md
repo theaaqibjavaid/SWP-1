@@ -12,7 +12,7 @@ tool rather than using it — for the latter see
 
 Eight library crates, one crate that is both a library and the `swp` binary, and
 one test crate: ten in all. `crates/*` is the whole
-member list of the root `Cargo.toml`, which pins `version = "1.0.0"`,
+member list of the root `Cargo.toml`, which pins `[workspace.package] version`,
 `edition = "2021"`, `rust-version = "1.85"` and `license = "Apache-2.0"` for all
 of them at once, and which sets `publish = ["crates.io"]` for every crate but
 `swp-test-suite` — that one says `publish = false` in its own manifest, because it
