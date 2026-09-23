@@ -10,14 +10,12 @@ else's copy of the software worse.
 
 Sponsor here: <https://github.com/sponsors/theaaqibjavaid>
 
-![Sponsor SWP-1](.github/sponsors/assets/swp-sponsor-banner.svg)
-
 ## Why this exists
 
 SWP-1's security argument is cryptographic, not secret. The watermark is keyed to
 a root secret that lives on *your* machine, and the code that derives and checks
 it is readable by anyone precisely so that it can be audited
-([docs/SECURITY.md](docs/SECURITY.md), [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)).
+([docs/SECURITY.md](docs/SECURITY.md)).
 Publishing the implementation costs the project nothing in protection and gains it
 review.
 
@@ -29,12 +27,10 @@ that gets done on a schedule rather than when there is time.
 
 ## The tiers
 
-This page is the promise; the amounts on it are the amounts, and
-[`.github/sponsors/TIERS.md`](.github/sponsors/TIERS.md) is the sheet of field
-values to paste into GitHub's form — `scripts/check-release.sh` fails if the tier
-names or prices in the two files disagree. Three amounts are monthly, in US
-dollars, and the same for everyone at that level; the Supporter row below is a
-one-time amount.
+This page is the promise. The amounts on it are the amounts; the same numbers are
+what GitHub's sponsor form is configured with, and a change here means a change
+there in the same sitting. Three amounts are monthly, in US dollars, and the same
+for everyone at that level; the Supporter row below is a one-time amount.
 
 ### Supporter — $25, once
 
@@ -81,7 +77,7 @@ Everything in Tier 2, plus:
   maintainers, and a sponsor's position is stated, weighted, and answered with a
   reason. Language adapters and integration surfaces are the usual ask, and the
   usual answer is yes when the work is real.
-* Priority on integration and adapter work that the public roadmap wants anyway.
+* Priority on integration and adapter work the project's issue list already wants.
 * **A public brand acknowledgment** in `README.md` and the release notes of every
   version your funding covered.
 * Option to be named in the security advisory for an issue you reported.
@@ -114,9 +110,10 @@ Stated because the alternative is a promise the project cannot keep.
 ## Other ways to help that cost nothing
 
 Report a false positive with a reproducing tree. Write the fourth language adapter
-([docs/LANGUAGE-ADAPTERS.md](docs/LANGUAGE-ADAPTERS.md) is the spec). Run
-`swp verify` in CI and tell us when it disagrees with you. Answer a question in
-issues — the [FAQ](docs/FAQ.md) is assembled from those. Fix a sentence that claims
+([docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md#adding-a-language-adapter) is
+the spec). Run `swp verify` in CI and tell us when it disagrees with you. Answer a
+question in [the discussions](https://github.com/theaaqibjavaid/SWP-1/discussions)
+— the pages that confuse people show up there first. Fix a sentence that claims
 too much; that is a documentation bug, and the ones here are treated as product
 bugs.
 

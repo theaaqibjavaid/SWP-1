@@ -9,8 +9,9 @@ back.
 **[docs/SECURITY.md](docs/SECURITY.md)** is the design document: the life of the
 root secret, the key derivation, what sealing does on each platform, and what is
 trusted. Read that one first if you are trying to understand the exposure rather
-than report it. **[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md)** walks the ten
-attacks, what each one costs, and what is left over.
+than report it. Its [Attacks, and what still gets
+through](docs/SECURITY.md#attacks-and-what-still-gets-through) section walks the
+ten attacks, what each one costs, and what is left over.
 
 ## What is, and is not, a security problem here
 
@@ -25,8 +26,9 @@ loud which half is a bug.
 * **A rewrite that changes every protected literal leaves nothing to key on.** A
   reimplementation from memory produces the same report as an original, and
   `NO_PROVENANCE_DETECTED` is not a finding of originality.
-* **A `WEAK` or `POSSIBLE` verdict on a tree that is not yours.** The report prints
-  the coincidence bound precisely because chance is expected at low site counts.
+* **A `WEAK` lead on a tree that is not yours, or an `INCONCLUSIVE` scan of one.**
+  The report prints the coincidence bound precisely because chance is expected at
+  low site counts.
 * **Detection being defeated by picking literal spellings outside the dialect
   table.** That narrows the channels; it does not break the signature scheme, and
   the fingerprint and structure channels exist for this case.
@@ -65,7 +67,7 @@ on the repository, https://github.com/theaaqibjavaid/SWP-1/security/advisories/n
 the details out of a public issue while the fix is written.
 
 If you would rather not use GitHub, write to **aaqib100javaid@gmail.com**, the
-security contact named in [MAINTAINERS.md](MAINTAINERS.md). No OpenPGP key is
+project's security contact. No OpenPGP key is
 published for that address, so treat ordinary email as unencrypted: ask for a key
 before sending anything you would not put in a public issue, and a private security
 advisory is the better route for exactly that reason.
@@ -110,12 +112,16 @@ being worse off.
 
 **Supported versions.** A release line is supported for security fixes until a
 later minor line supersedes it by two releases, or until the protocol it writes is
-no longer readable — whichever comes first. At the time of writing:
+no longer readable — whichever comes first. At the time of writing the only build is
+a pre-release, which changes what "supported" costs: a fix found in a beta is
+published as the next beta *and* in `1.0.0`, and a beta is superseded the moment
+`1.0.0` ships. Run the stable build in anything you depend on.
 
 | version | supported |
 | --- | --- |
-| 1.0.x | yes |
-| < 1.0 | no releases precede 1.0.0 |
+| 1.0.0-beta.1 and later betas | yes |
+| 1.0.0 onward | yes, from the first stable release |
+| before 1.0.0-beta.1 | no build predates it |
 
 ## A note on scope
 

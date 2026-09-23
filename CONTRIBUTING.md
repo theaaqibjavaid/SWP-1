@@ -6,9 +6,9 @@ checks will reject, which rules the codebase is shaped by, and what you agree to
 when you send code.
 
 Start with the honest framing. SWP-1 is a provenance instrument, not DRM, and its
-documentation is not permitted to blur that
-([THREAT-MODEL.md](docs/THREAT-MODEL.md) is the attack-by-attack version,
-[FAQ.md](docs/FAQ.md) the short one). A very
+documentation is not permitted to blur that —
+[docs/SECURITY.md](docs/SECURITY.md#attacks-and-what-still-gets-through) states
+what each attack leaves unpunished. A very
 large share of the work in this repository is the work of *not overclaiming*: the
 evidence ladder has stated rungs, the report prints the coincidence bound beside
 the verdict, and the test suite includes a section whose job is to defeat the
@@ -60,7 +60,7 @@ cargo test --locked -p swp-test-suite --test docs_examples
 ```
 
 The last one is the project's odd rule, and it is load-bearing. Every `console`
-block in `README.md`, in the thirteen pages under `docs/` and in the four example
+block in `README.md`, in every page under `docs/` and in the four example
 transcripts is re-executed against the current build, with fresh root secrets, and
 compared line by line. Add a flag, change a wording, alter what `protect` prints,
 and you may have to update a documented example — which is the intended
@@ -102,7 +102,8 @@ map, is [DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md).
 ## Adding a language
 
 That is the most useful contribution available, and it is deliberately walled off
-from the rest of the protocol. [LANGUAGE-ADAPTERS.md](docs/LANGUAGE-ADAPTERS.md)
+from the rest of the protocol. [Adding a language
+adapter](docs/DEVELOPER-GUIDE.md#adding-a-language-adapter)
 is the specification of what an adapter must prove — including the part that
 matters more than parsing: after the rewrite, the file must re-parse, canonicalize
 to what the protocol expected, and evaluate to the same value. C, Java, Go, Ruby
@@ -143,7 +144,8 @@ that works.
 If you changed behaviour, the pull request should contain the test that fails
 without it — including for documentation, where the test is `docs_examples`. If
 you changed what a report can claim, say so in the description and expect a
-reviewer to read the wording in [REPORTS.md](docs/REPORTS.md) line by line.
+reviewer to read the wording in [Reading a
+report](docs/USER-GUIDE.md#reading-a-report) line by line.
 
 Squash-merging is fine. Do not rebase a branch after review comments have been
 answered against it; force-pushing over a reviewed commit makes a review that no
@@ -157,8 +159,9 @@ Technical disagreement is the point of the thing; contempt is not.
 
 ## Getting help
 
-[FAQ.md](docs/FAQ.md) covers the questions that recur,
 [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) covers every error the tool prints,
-and [SUPPORT.md](SUPPORT.md) says where to ask. If you think you have found a
+[docs/USER-GUIDE.md](docs/USER-GUIDE.md#reading-a-report) every field of a report,
+and [the discussions](https://github.com/theaaqibjavaid/SWP-1/discussions) is where
+a question belongs before it becomes an issue. If you think you have found a
 security problem rather than a bug, use the route in [SECURITY.md](SECURITY.md)
 instead of an issue.

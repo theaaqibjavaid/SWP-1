@@ -125,9 +125,9 @@ changes what a report is worth.
 So: adding a language is the extension point, and it is a real one — a grammar, a
 [`Dialect`](../../crates/swp-adapters/src/dialect.rs), and an extension list, with
 every family, radius rule and refusal shared from there.
-[`../../docs/LANGUAGE-ADAPTERS.md`](../../docs/LANGUAGE-ADAPTERS.md) walks through
-what an adapter has to answer. What no adapter does is make an unsupported
-language supported by guessing over it.
+[`../../docs/DEVELOPER-GUIDE.md`](../../docs/DEVELOPER-GUIDE.md#adding-a-language-adapter)
+walks through what an adapter has to answer. What no adapter does is make an
+unsupported language supported by guessing over it.
 
 ## Reading it as a check on the tool
 
@@ -145,7 +145,7 @@ so first.
 
 ## Reading the rest
 
-- [`../../docs/LANGUAGE-ADAPTERS.md`](../../docs/LANGUAGE-ADAPTERS.md) — what adding C, shell or SQL would take
+- [`../../docs/DEVELOPER-GUIDE.md`](../../docs/DEVELOPER-GUIDE.md#adding-a-language-adapter) — what adding C, shell or SQL would take
 - [`../../docs/CLI.md`](../../docs/CLI.md) — the exit-code contract this page leans on
 - [`../../docs/TROUBLESHOOTING.md`](../../docs/TROUBLESHOOTING.md) — the same messages, from the other side
 - [`../python`](../python) — the partly-unsupported case, with its transcript

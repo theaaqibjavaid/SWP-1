@@ -6,10 +6,9 @@ body:
     attributes:
       value: |
         Three things make the difference between a triaged bug and a thread of
-        guesses: the version, the command exactly as typed with its full output, and
-        the smallest tree that still does it. `SUPPORT.md` at the top of the
-        repository has the details, and the same three items are what a maintainer
-        will ask you for.
+        guesses: the version, the command exactly as typed with its full output
+        (including the `exit N` line), and the smallest tree that still does it.
+        Never attach anything from `.swp/private/`.
   - type: input
     id: version
     attributes:

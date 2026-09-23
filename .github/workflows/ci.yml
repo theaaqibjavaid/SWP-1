@@ -90,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
-      # README.md, the thirteen pages under docs/, and the four example transcripts.
+      # README.md, every page under docs/, and the four example transcripts.
       # A stale example fails the build; a number that varies with the key is
       # elided as `…` rather than invented.
       - name: re-run the console blocks

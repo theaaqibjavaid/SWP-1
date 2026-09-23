@@ -7,7 +7,7 @@ build if this page lists an option its command would reject.
 
 ```console
 $ swp help
-swp SWP-1 · swp 1.0.0 · report schema SWP-1-report-v1
+swp SWP-1 · swp 1.0.0-beta.1 · report schema SWP-1-report-v1
 
 Usage: swp <command> [options]
 
@@ -245,7 +245,8 @@ code from the secret, reads the current source, and reports what it finds.
 
 Exit `0` means every site is present and still carries its code. It does **not**
 mean the tree is unchanged — that is not what a watermark can say. See
-[REPORTS.md](REPORTS.md) for the verdicts and the per-site statuses.
+[Reading a report](USER-GUIDE.md#reading-a-report) for the verdicts and the
+per-site statuses.
 
 ### `swp scan <candidate>`
 
@@ -381,6 +382,6 @@ See [USER-GUIDE.md](USER-GUIDE.md#the-limits-section).
 ## Reading the rest
 
 - [GETTING-STARTED.md](GETTING-STARTED.md) — the sequence above, run against a real tree
-- [REPORTS.md](REPORTS.md) — every field of a text or JSON report
+- [USER-GUIDE.md](USER-GUIDE.md#reading-a-report) — every field of a text or JSON report
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — what each error asks you to do
 - [`../examples/javascript/README.md`](../examples/javascript/README.md) — a transcript that stays honest because a test re-runs it

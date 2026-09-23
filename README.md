@@ -24,7 +24,7 @@ It is a provenance instrument. It is not DRM, and it does not pretend otherwise.
 | **Language** | Rust 2021, MSRV 1.85, no network code path |
 | **Licence** | [Apache-2.0](LICENSE) |
 | **Protocol** | `SWP-1` · report schema `SWP-1-report-v1` |
-| **Ask** | [discussions](https://github.com/theaaqibjavaid/SWP-1/discussions) · [SUPPORT.md](SUPPORT.md) |
+| **Ask** | [discussions](https://github.com/theaaqibjavaid/SWP-1/discussions) · [open an issue](https://github.com/theaaqibjavaid/SWP-1/issues/new/choose) |
 | **Report a vulnerability** | [SECURITY.md](SECURITY.md), privately |
 
 ## Contents
@@ -55,14 +55,15 @@ SWP-1 does **not** guarantee, and its documentation is not allowed to claim:
 What it does provide is technical provenance evidence: keyed fragments that cannot
 be produced without the project's root secret, an authenticated manifest of where
 they were placed, and a graded report whose coincidence bound says how much of the
-finding chance could explain. [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) is the
-honest version of the list above, attack by attack.
+finding chance could explain. [Attacks, and what still gets
+through](docs/SECURITY.md#attacks-and-what-still-gets-through) is the honest
+version of the list above, attack by attack.
 
 ## Install
 
-Rust 1.85 or newer. The build fetches only the twenty-one crates listed under
-`[workspace.dependencies]` — no HTTP client among them, and no build script that
-reaches a network.
+Rust 1.85 or newer. The build fetches only the packages the root `Cargo.toml`
+lists under `[workspace.dependencies]` and their transitive closure — no HTTP
+client among them, and no build script that reaches a network.
 
 ```sh
 cargo install --path crates/swp-cli --locked
@@ -78,17 +79,15 @@ sha256sum -c SHA256SUMS --ignore-missing
 ```
 
 A release's section of [CHANGELOG.md](CHANGELOG.md) *is* its release notes, and
-[docs/VALIDATION.md](docs/VALIDATION.md) records an installation of exactly this
-kind — a build directory that had never held one, the installed binary rather than
-`cargo run`, three sample projects written for the run, and nothing copied out of
-this repository.
+[docs/VALIDATION.md](docs/VALIDATION.md) lists what has been measured, the suite
+that measured it, and the command that reproduces the number.
 
 One platform difference is worth knowing before you choose a machine for the store:
 on Windows the root secret is sealed with DPAPI under your own credential; on
 Linux and macOS it is a file with `0600` permissions and is not encrypted at rest.
 That is stated where the guarantee is described —
-[docs/SECURITY.md](docs/SECURITY.md) — and it is the first item on
-[the roadmap](ROADMAP.md#now).
+[docs/SECURITY.md](docs/SECURITY.md#the-one-secret-start-to-finish) — and it is the
+largest known weakness of the store on those platforms.
 
 ## Sixty seconds
 
@@ -164,12 +163,12 @@ answers over five channels: keyed fragments, exact renderings, canonicalized
 renderings, the release fingerprint, and structure.
 
 **Say how strong the evidence is, and what it is worth.** The ladder runs
-`NONE · WEAK · POSSIBLE · PROBABLE · STRONG · VERY_STRONG`, and each rung is a
-stated rule rather than a heuristic. Beside the level, a report prints the
-coincidence bound — how much of the finding chance could produce — and the looser
-bound that assumes nothing about which spans may be one span. The level is not a
-finding about authorship, and [docs/REPORTS.md](docs/REPORTS.md) says what each
-field may be used to claim.
+`NONE · WEAK · MODERATE · STRONG · VERY_STRONG`, and each rung is a stated count
+rather than a heuristic. Beside the level, a report prints the coincidence bound —
+how much of the finding chance could produce — and the looser bound that assumes
+nothing about which spans may be one span. The level is not a finding about
+authorship, and [Reading a report](docs/USER-GUIDE.md#reading-a-report) says what
+each field may be used to claim.
 
 **Keep the evidence.** `swp verify --save` stores the report that produced a
 verdict, `swp report` re-renders a stored one without re-scanning anything, and a
@@ -186,18 +185,13 @@ cannot re-read what it rewrote cannot re-prove it either.
 | page | what it answers |
 | --- | --- |
 | [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) | install it, protect a project, scan a copy, back it up |
-| [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | the workflows: CI, re-protecting, archives, monorepos, the config file |
+| [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | the workflows, and every field of a report |
 | [docs/CLI.md](docs/CLI.md) | every command, option, exit code and error message |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | what each error asks of you, symptom first |
+| [docs/SECURITY.md](docs/SECURITY.md) | the secret's life, hostile input, and ten attacks measured against this build |
 | [docs/SWP-1-SPEC.md](docs/SWP-1-SPEC.md) | the protocol itself: fragments, identities, artifacts, detection, versioning |
-| [docs/INTEGRATION.md](docs/INTEGRATION.md) | using it per language, and which layer does what |
-| [docs/LANGUAGE-ADAPTERS.md](docs/LANGUAGE-ADAPTERS.md) | writing an adapter for a language this build does not claim |
-| [docs/SECURITY.md](docs/SECURITY.md) | the secret's life, the cryptographic design, what is trusted |
-| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | ten attacks, their impact, the mitigation, and the residue |
-| [docs/REPORTS.md](docs/REPORTS.md) | every field of a report, and what each may be used to claim |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | what each error asks of you |
-| [docs/FAQ.md](docs/FAQ.md) | the questions that do not fit elsewhere |
-| [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) | building, testing and changing this repository |
-| [docs/VALIDATION.md](docs/VALIDATION.md) | what was measured, in a clean environment, with results |
+| [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) | building, testing and changing this repository, including writing a language adapter |
+| [docs/VALIDATION.md](docs/VALIDATION.md) | what has been measured, and the command that reproduces each number |
 | [examples/](examples) | four protected trees, each with the transcript that proves it |
 
 Around the protocol documentation sits the repository's own set:
@@ -205,14 +199,11 @@ Around the protocol documentation sits the repository's own set:
 | file | what it is |
 | --- | --- |
 | [CHANGELOG.md](CHANGELOG.md) | what shipped, and what a release deliberately does not include |
-| [ROADMAP.md](ROADMAP.md) | now, next, later — and the list of things this will not become |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | how to build it, what CI rejects, the rules the shape is made of |
 | [CLA.md](CLA.md) | the contributor licence agreement, including what it grants the maintainers |
-| [SECURITY.md](SECURITY.md) | how to report, what counts as a vulnerability here, the backport policy |
-| [SUPPORT.md](SUPPORT.md) | where to ask, and what to attach |
-| [SPONSORS.md](SPONSORS.md) | the tiers, and the five things sponsorship does not buy |
+| [SECURITY.md](SECURITY.md) | how to report privately, what counts as a vulnerability here, the backport policy |
+| [SPONSORS.md](SPONSORS.md) | the tiers, and what sponsorship does not buy |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | the standard, and how it is enforced |
-| [MAINTAINERS.md](MAINTAINERS.md) | who answers for what |
 | [LICENSE](LICENSE) · [NOTICE](NOTICE) | Apache-2.0, and the third-party surface it is built against |
 
 ## What is in the box
@@ -277,14 +268,15 @@ source.
 ## Contributing, sponsorship and licence
 
 * **Start with [CONTRIBUTING.md](CONTRIBUTING.md).** It says how to build this,
-  which five kinds of change get reviewed differently, and why a stale
-  documentation example is a build failure on purpose.
+  what gets reviewed and by whom, and why a stale documentation example is a build
+  failure on purpose.
 * **Contributions need the [CLA](CLA.md)**, and that agreement is written to be
-  read rather than clicked: its §2 grants a perpetual, irrevocable,
-  sublicensable right to relicense a derivative, which is the entire reason it
-  exists instead of a `Signed-off-by:` line. Declining it is a legitimate
-  position, and [CONTRIBUTING.md](CONTRIBUTING.md#the-cla-and-the-dco) says what
-  happens if you hold it.
+  read rather than clicked: its
+  [grant of copyright licence](CLA.md#2-licence-to-the-maintainers) is
+  perpetual, irrevocable and sublicensable, which is the entire reason it exists
+  instead of a `Signed-off-by:` line. Declining it is a legitimate position, and
+  [CONTRIBUTING.md](CONTRIBUTING.md#the-cla-and-the-dco) says what happens if you
+  hold it.
 * **Sponsorship funds maintenance; it does not unlock the tool.**
   [SPONSORS.md](SPONSORS.md) has the three monthly tiers and what each one is —
   $10 for pre-release builds, $100 for a 48-hour acknowledgement on a support request
@@ -296,6 +288,16 @@ source.
   What counts as a vulnerability here is narrower than it looks — removal by
   somebody who holds the source is documented behaviour — and the list of what
   does count is on that page.
+* **Ask in [discussions](https://github.com/theaaqibjavaid/SWP-1/discussions) or
+  an issue**, and attach three things: `swp --version`, the full transcript
+  including the `exit N` line, and the smallest tree that reproduces it. Never
+  attach `.swp/private/`, and never paste a root key into anything; a project id,
+  a path or a report is safe to publish, and
+  [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#reporting-a-failure) says what
+  else a maintainer needs. There is no support SLA for unpaid use — what a tier
+  buys is stated in [SPONSORS.md](SPONSORS.md) — and maintenance is currently the
+  owner plus one maintainer, which [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) says
+  out loud where that fact limits what it can promise.
 * **Licence.** Apache-2.0, with [NOTICE](NOTICE) naming every third-party component
   this build links. The protocol, the `SWP-1` name and the report schema are not
   licensed for reuse as identity: a fork that changes the wire format should change
@@ -304,8 +306,12 @@ source.
 
 ## Status
 
-Protocol v1.0.0, implemented end to end: embed, verify, scan, report. Three
+Protocol v1.0.0, implemented end to end: embed, verify, scan, report. The first
+public build carries `1.0.0-beta.1`: the protocol is settled and a tree protected by
+this build verifies against the release after it, so what the beta withholds is the
+endorsement rather than the functionality. Three
 languages with real parser adapters, one refusal that is a design decision, and a
 test suite that includes an adversarial section whose job is to defeat the
-watermark. [docs/VALIDATION.md](docs/VALIDATION.md) records what was measured and
-what is still a limitation rather than a TODO.
+watermark. [docs/VALIDATION.md](docs/VALIDATION.md) lists what has been measured
+and the command that reproduces each number; CHANGELOG.md says, in plain sight,
+what this release deliberately does not include.

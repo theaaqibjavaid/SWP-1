@@ -1,7 +1,7 @@
 # Code owners: who is asked to review what.
 #
-# The names here are the roles in MAINTAINERS.md. Two people, one of whom owns the
-# repository, the settings, and three of the four roles — so this file records who
+# Two people, one of whom owns the repository, the settings, and most of the
+# roles — so this file records who
 # is *asked*, which is not the same claim as who is *able* to merge. GitHub will
 # request a review from the owner on almost every pull request including their own,
 # and nothing here stops that owner merging it. Anyone weighing a contribution to
@@ -37,4 +37,3 @@
 # commercial commitment made in the name of the entity that takes the money, so it
 # is not a review a second maintainer can approve on the owner's behalf.
 /SPONSORS.md                            @theaaqibjavaid
-/.github/sponsors/                      @theaaqibjavaid

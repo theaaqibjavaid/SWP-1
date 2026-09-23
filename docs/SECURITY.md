@@ -10,17 +10,18 @@ one. The only thing standing between a stranger and the codes your sites carry
 is the 256-bit root secret, and it is the only artifact in this system whose loss
 or theft changes what the tool can prove.
 
-This page is the counterpart of [`THREAT-MODEL.md`](THREAT-MODEL.md), which works
-attack by attack. Here the organizing question is "where is the secret, and what
-holds it there". The rules the secret produces are in the spec's
-[§3 Keys and identities](SWP-1-SPEC.md#3-keys-and-identities) and
-[§4 Site identity](SWP-1-SPEC.md#4-site-identity-the-four-radius-keys).
+This page answers "where is the secret, and what holds it there", then works
+attack by attack in [Attacks, and what still gets
+through](#attacks-and-what-still-gets-through). The rules the secret produces are
+in the spec's [Keys and identities](SWP-1-SPEC.md#3-keys-and-identities) and [Site
+identity](SWP-1-SPEC.md#4-site-identity-the-four-radius-keys).
 
 ---
 
 ## Contents
 
 * [What is being protected, and from whom](#what-is-being-protected-and-from-whom)
+* [Attacks, and what still gets through](#attacks-and-what-still-gets-through)
 * [The one secret, start to finish](#the-one-secret-start-to-finish)
 * [The key hierarchy](#the-key-hierarchy)
 * [What is signed, and what a signature does not buy](#what-is-signed-and-what-a-signature-does-not-buy)
@@ -54,10 +55,48 @@ Four adversaries, and what stands in each one's way:
 
 | adversary | wants | stopped by | not stopped |
 | --- | --- | --- | --- |
-| a copier of your published source | to use it undetected | the keyed constellation in the literals themselves; the codes are not computable without your secret | a rewrite thorough enough to remove every site — see [attack 3](THREAT-MODEL.md#3-intentional-watermark-removal) in [`THREAT-MODEL.md`](THREAT-MODEL.md) |
+| a copier of your published source | to use it undetected | the keyed constellation in the literals themselves; the codes are not computable without your secret | a rewrite thorough enough to remove every site — see [Attacks, and what still gets through](#attacks-and-what-still-gets-through) |
 | a thief of your repository | to forge or strip evidence | `.swp/private/` being gitignored *and* ACLed; the manifest holding no tags | reading a stolen manifest as a map of where to cut, which is exactly what it is |
 | the owner of a tree you scan | to make your scan lie or crash | the bounds, the name checks, the never-execute rule, and the fact that a candidate's own `.swp/` is never consulted | making the scan inconclusive, which is a real cost and is reported |
 | someone who wants to frame you | to make an innocent tree carry your marks | they need your root secret, or your private manifest, for that site list is keyed and theirs is not | planting *their* fragments into a tree you then scan — which the coincidence bound keeps at a lead rather than a finding |
+
+## Attacks, and what still gets through
+
+Ten attacks, what each one achieves against this build, and the suite that
+measures it. Run them yourself with
+`cargo test -p swp-test-suite --test <name>`.
+
+The outcomes below are the shape of one measured run: a synthetic 12-module tree
+protected to 24 sites, built in debug, scanned under a root secret minted for that
+run. Confirmed-site counts and verdicts are what the run fixes; which literal
+carries a site, and therefore the probe and chance figures, are the key's choice
+and move between runs. [VALIDATION.md](VALIDATION.md) has the numbers this build
+prints, and the commands that printed them.
+
+| attack | what it gets | measured by |
+| --- | --- | --- |
+| Casual copying — a fork, a vendor directory, one pasted file | nothing. An unedited copy reproduces the keyed addresses *and* the exact renderings, and its canonicalized tree hashes to the release fingerprint | `detection_matrix` |
+| Normal refactoring — renames, reformatting, moving a function between files | nothing much. Addresses are computed over abstraction-normalized surroundings, so the statement is found while its text is not | `detection_matrix` |
+| Intentional removal by somebody who holds the source | a win, at a visible cost. `swp inspect fragments` lists every site, so the marks are unobtrusive rather than secret; removing them leaves `stripped` addresses, which a report prints and the ladder weighs as nothing | `adversarial_removal` |
+| Watermark discovery from published source alone | everything it needs to start: a shape search over the literals finds the sites without your secret | `adversarial_removal` |
+| Theft of your private manifest | a removal tool, not a forgery tool. It names every site and carries no tags, so it cannot make a new statement confirm | `adversarial_removal` |
+| Theft of the root secret | total. The holder can compute your codes and sign records in your name; the blast radius is bounded by the OS account the seal is tied to | `secret_leak`, `crates/swp-crypto/src/seal.rs` |
+| False-positive attacks — an unrelated tree made to resemble yours | a lead, not a finding. Chance confirmations are covered by the coincidence bound, which holds the verdict at `INCONCLUSIVE` | `false_positive`, `collision` |
+| Source poisoning — their code lifted into your project before protection | your release can come to cover their code, so a later scan says *yours* about a fragment you absorbed. Protect reviewed source, not pasted source | `adversarial_removal` |
+| A malicious repository as scan input | time and memory, if the bounds did not exist. They do: every ceiling reached is recorded as an omission, and a scan that was stopped says `INCONCLUSIVE` | `resource_limits` |
+| Parser exploitation — a file aimed at the tree-sitter grammars | the residue this page cannot argue away: the grammars are C. Input is bounded and never executed; memory safety is the parsers' problem, not this design's | `resource_limits` |
+
+And the shorter list of what none of them buys. Without your root secret, an
+attacker cannot:
+
+* compute a code for a location your manifest does not already name, and so
+  cannot make a *new* statement confirm;
+* sign a release record or manifest that `swp verify` accepts — one flipped
+  character is `INVALID_MANIFEST` and exit `5`;
+* make your scanner accuse a tree of carrying your release without that tree
+  carrying code from your release;
+* read your project's identity out of a public copy, only the id you published;
+* make an inconclusive scan look like a clean one.
 
 ## The one secret, start to finish
 
@@ -271,7 +310,7 @@ identity .swp/public/identity.json
   project     swp1-…
   display     javascript
   protocol    SWP-1 · schema 1 · canonicalizer 1
-  generator   swp-cli 1.0.0
+  generator   swp-cli 1.0.0-beta.1
   verify key  … (ed25519, 32 bytes)
 
   This file is public by design: the verify key authenticates this project's
@@ -313,13 +352,13 @@ exit 0
 ```
 
 So a stolen private manifest is a **removal tool**: it tells an attacker exactly
-which statements to normalize and what to write instead, and the measured cost of
-that is in [`THREAT-MODEL.md`](THREAT-MODEL.md) — a full revert of the protected
-files takes a 24-site release to zero. What it is not, on the evidence this build
-has, is a **framing tool**: fragments planted from one project into an unrelated
-tree were scanned by both owners' keys and confirmed nothing for either, because
-the planted renderings are not a constellation and the coincidence bound says so.
-Its confidentiality therefore does not come from anything keyed inside it. The
+which statements to normalize and what to write instead, and a full revert of the
+protected files took a measured 24-site release to zero confirmed sites. What it
+is not, on the evidence this build has, is a **framing tool**: fragments planted
+from one project into an unrelated tree were scanned by both owners' keys and
+confirmed nothing for either, because the planted renderings are not a
+constellation and the coincidence bound says so. Its confidentiality therefore
+does not come from anything keyed inside it. The
 public release record carries a digest of the manifest, and a digest of a
 guessable document is testable in one hash by anyone holding a candidate tree —
 the record's own source comment says this out loud. The manifest is private
@@ -489,8 +528,8 @@ documentation defers. SWP-1 does not guarantee:
 * **proof of authorship by itself** — a watermark shows that a tree carries the
   marks of *your release*, and needs its own corroboration to say who wrote it;
 * **detection after arbitrary rewriting** — a rewrite thorough enough to remove
-  every site removes them, and the measured rate of that is in
-  [`THREAT-MODEL.md`](THREAT-MODEL.md);
+  every site removes them; [Attacks, and what still gets
+  through](#attacks-and-what-still-gets-through) has the measured case;
 * **detection after complete reimplementation** — code written fresh from an
   understanding of the algorithm carries no literal of yours;
 * **immunity from deliberate watermark removal** — the marks are unobtrusive, not
@@ -508,7 +547,8 @@ terms a reader can check, that survives being forwarded, and that says
 
 ---
 
-Related: [`THREAT-MODEL.md`](THREAT-MODEL.md) ·
-[`SWP-1-SPEC.md`](SWP-1-SPEC.md) · [`CLI.md`](CLI.md) ·
-[`REPORTS.md`](REPORTS.md) · [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) ·
-[`INTEGRATION.md`](INTEGRATION.md) · [`VALIDATION.md`](VALIDATION.md)
+Related: [`SWP-1-SPEC.md`](SWP-1-SPEC.md) — the protocol these rules come from ·
+[`USER-GUIDE.md`](USER-GUIDE.md#reading-a-report) — what a report may be used to
+claim · [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) ·
+[`VALIDATION.md`](VALIDATION.md) · [`../SECURITY.md`](../SECURITY.md) — how to
+report a problem here

@@ -118,42 +118,48 @@ if grep -rln "\[legal entity name\]\|\[contact email\]\|\[name · \|fill in befo
     --exclude-dir=.git --exclude-dir=target --exclude-dir=.swp --exclude-dir=.github \
     --exclude=check-release.sh . 2>/dev/null; then
     bad "an unfilled field remains in the files above"
-    note "SECURITY.md, CLA.md §9, NOTICE and MAINTAINERS.md name real parties now"
+    note "SECURITY.md, CLA.md §9 and NOTICE name real parties now"
 else
     ok "no unfilled legal or policy field in the tree"
 fi
 
-printf '\n== the sponsorship page and the paste sheet say the same thing ==\n'
-# SPONSORS.md is the promise and .github/sponsors/TIERS.md is what gets pasted into
-# GitHub's form. Two documents describing one arrangement will drift, and the way
-# they drift is the expensive kind: a tier whose price on GitHub does not match the
-# price in the repository. Four levels are compared: three monthly tiers and the
-# one-time level, which is a row in both files and not a tier anywhere. Each page
-# writes them in its own punctuation — `### Tier 1 — Builder · $10 a month` there,
-# `## Tier 1 · Builder — US$10 / month` here — and this compares what is left
-# after the punctuation, failing if either side yields fewer than four.
+printf '\n== the sponsorship page names four levels, and one account ==\n'
+# SPONSORS.md is the only place a tier is written down; GitHub's own sponsor-tier
+# form is filled from it by hand. That leaves two ways for the promise to go wrong,
+# and this checks both. First, the four levels have to be there and have to carry a
+# price each — three monthly tiers plus the one-time level, which is a row and not a
+# tier. The page writes them in one fixed shape, and a rewrite that breaks that
+# shape yields fewer than four rows rather than a silent pass.
 PAGE=$(
     sed -n 's/^### Tier \([0-9]\) — \(.*\) · \(\$[0-9]*\) a month.*/tier \1 \2 \3/p' SPONSORS.md
     sed -n 's/^### Supporter — \(\$[0-9]*\), once.*/supporter \1 once/p' SPONSORS.md
 )
-SHEET=$(
-    sed -n 's/^## Tier \([0-9]\) · \(.*\) — US\(\$[0-9]*\) \/ month.*/tier \1 \2 \3/p' .github/sponsors/TIERS.md
-    sed -n 's/^## Supporter — one-time, US\(\$[0-9]*\).*/supporter \1 once/p' .github/sponsors/TIERS.md
-)
 PAGE=$(printf '%s\n' "$PAGE" | sort)
-SHEET=$(printf '%s\n' "$SHEET" | sort)
 ROWS=$(printf '%s\n' "$PAGE" | grep -c . || true)
-if [ "$PAGE" != "$SHEET" ] || [ "$ROWS" -lt 4 ]; then
-    bad "the sponsorship page and the paste sheet do not agree on four levels"
-    echo "SPONSORS.md says:"; echo "$PAGE"   | sed 's/^/        /'
-    echo ".github/sponsors/TIERS.md says:"; echo "$SHEET" | sed 's/^/        /'
-    note "SPONSORS.md wants '### Tier 1 — Builder · \$10 a month' and"
-    note "'### Supporter — \$25, once'; TIERS.md wants"
-    note "'## Tier 1 · Builder — US\$10 / month' and '## Supporter — one-time, US\$25'"
-    note "the price a sponsor sees on GitHub has to be the price the page promises"
-else
-    ok "three monthly tiers and the one-time level match, name and price"
+if [ "$ROWS" -ne 4 ]; then
+    bad "the sponsorship page states $ROWS level(s), not the four it promises"
     echo "$PAGE" | sed 's/^/        /'
+    note "the page wants '### Tier 1 — Builder · \$10 a month' and"
+    note "'### Supporter — \$25, once'; this check reads those two shapes"
+else
+    ok "three monthly tiers and the one-time level, each with a price"
+    echo "$PAGE" | sed 's/^/        /'
+fi
+# Second, and the one that loses money rather than face: the account the page sends
+# a sponsor to has to be the account GitHub pays. They are written in two files with
+# no reason to agree, and a renamed or replaced account makes every link on the page
+# a donation to somebody else.
+PAYS=$(sed -n 's/^github: *\([^ ]*\) *$/\1/p' .github/FUNDING.yml | head -n1)
+LINKS=$(sed -n 's|.*https://github\.com/sponsors/\([A-Za-z0-9-]*\).*|\1|p' SPONSORS.md | sort -u)
+if [ -z "$PAYS" ]; then
+    bad ".github/FUNDING.yml names no github: account"
+elif [ "$LINKS" != "$PAYS" ]; then
+    bad "the page sends sponsors somewhere other than the account that is paid"
+    echo "FUNDING.yml pays:      $PAYS" | sed 's/^/        /'
+    echo "SPONSORS.md links to:  ${LINKS:-nothing}" | sed 's/^/        /'
+    note "every sponsor link on the page has to name the account that receives it"
+else
+    ok "the sponsor link on the page is the account that is paid: $PAYS"
 fi
 
 printf '\n== the sources contain no built artefacts ==\n'

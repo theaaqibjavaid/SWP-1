@@ -6,9 +6,10 @@ body:
     attributes:
       value: |
         This is the most valuable report this project can receive, and the hardest to
-        write, because it usually needs the two trees that were compared. Read
-        `docs/REPORTS.md` first: the ladder and the coincidence bound are the tool's
-        own explanation of what it is prepared to claim.
+        write, because it usually needs the two trees that were compared. Read the
+        "Reading a report" section of `docs/USER-GUIDE.md` first: the ladder and the
+        coincidence bound are the tool's own explanation of what it is prepared to
+        claim.
   - type: dropdown
     id: kind
     attributes:

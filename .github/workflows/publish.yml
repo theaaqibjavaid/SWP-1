@@ -66,11 +66,11 @@ jobs:
               # --no-verify is not a shortcut here; it is the only option that works
               # before the first publish. Verifying a package builds it from unpacked
               # tarballs with its workspace dependencies rewritten to registry
-              # versions, so swp-crypto can only verify once swp-core 1.0.0 is
-              # actually on crates.io — which a dry run, by definition, never puts
-              # there. What this path does prove is the thing most often wrong: the
-              # manifest resolves, `Cargo.lock` is current, and the crate packages
-              # with the files its licence and metadata claim.
+              # versions, so swp-crypto can only verify once swp-core at the version
+              # being published is actually on crates.io — which a dry run, by
+              # definition, never puts there. What this path does prove is the thing
+              # most often wrong: the manifest resolves, `Cargo.lock` is current, and
+              # the crate packages with the files its licence and metadata claim.
               cargo publish -p "$c" --dry-run --no-verify --locked
             else
               echo "::notice::publishing $c"
