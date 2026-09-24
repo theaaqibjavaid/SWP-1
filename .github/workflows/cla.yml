@@ -24,7 +24,7 @@ jobs:
       # proposed is never executed. That is the only reason this workflow exists in
       # this form; a `pull_request` trigger would let a pull request approve itself
       # by editing its own copy of `CLA/signatures/`.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: look for a signature for every author
         id: check

@@ -32,7 +32,7 @@ jobs:
     # publishes anything — and the gate is the one step that runs a shell against
     # the checked-out tree.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag }}
 
