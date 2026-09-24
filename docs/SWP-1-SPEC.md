@@ -193,8 +193,11 @@ project's intuition about "why is this one not watermarked" can disagree.
 ## 8. Artifacts
 
 Five documents, four schemas. `schema` is the numeric `1` inside the private and
-public artifacts; a report's `schema` is the string `SWP-1-report-v1` because a
-report is rendered for humans as well as machines and names its own shape.
+public artifacts; a report's `schema` is the string `SWP-1-report-v2` because a
+report is rendered for humans as well as machines and names its own shape. The
+second version is the coincidence arithmetic: the tally records the distinct keyed
+codes it billed as well as the windows it saw, and the probability the verdict
+cleared (§12).
 
 | path | document | signed |
 | --- | --- | --- |
@@ -202,7 +205,7 @@ report is rendered for humans as well as machines and names its own shape.
 | `.swp/public/releases/<id>.json` | ids, created, `source_revision`, `fingerprint` + `fingerprint_level`, `private_manifest_digest`, `watermark` (target sites, tag bits, sites embedded/skipped, canonicalizer version, form set, adapters), generator, signature | yes |
 | `.swp/private/manifests/<id>.json` | per site: four location ids and which is primary, file, line hint, language, adapter, grammar, class, family, width, `original`, `rendered`; plus the tree fingerprint | yes |
 | `.swp/private/plans/<id>.json` | intended sites and every refusal, with reason | **no** |
-| `.swp/private/reports/<name>.json` | a saved `verify` or `scan` result, `SWP-1-report-v1` | no |
+| `.swp/private/reports/<name>.json` | a saved `verify` or `scan` result, `SWP-1-report-v2` | no |
 
 A signature is ed25519 over the document's **canonical JSON with the `signature`
 field removed**: keys byte-sorted, no whitespace, no floats, integers as decimal
@@ -304,18 +307,43 @@ found:
 
 The ladder turns counts into a level: `MODERATE` at 2 fragments, `STRONG` at 4
 fragments across ≥2 files (or 6 anywhere), `VERY_STRONG` at 8 across ≥3 files. A
-fingerprint match short-circuits to `VERY_STRONG`. Independently, the report
-computes a coincidence bound — per site, `1 − (1 − 2^−w)^n` for the `n` windows that
-reached that address, summed, with a looser union bound `Σ n·2^−w` printed beside
-it as the assumption-free number — and caps the level at `MODERATE` below 1.5,
-`STRONG` below 3.0, `VERY_STRONG` at or above 6.0 expected accidental
-confirmations. The final level is `min(counts, cap)`, and a verdict requires a
-non-zero bound with a level of at least `MODERATE`, or an exact fingerprint match.
+fingerprint match short-circuits to `VERY_STRONG`.
 
-A report prints both figures, because the two answer different questions: how much
-of what was found the count of fragments supports, and how much of it chance could
-have produced anyway. Neither is a probability that anybody copied anything, and
-the `limitations` section of every report says so in the report's own voice.
+Independently, the report measures how much of that count chance could have
+produced anyway. Per site it bills the `d` **distinct keyed codes** the candidate
+offered at that address — not the `n` windows that reached it, because three spans
+that reproduce one address by carrying one repeated literal are one chance at this
+project's tag, not three — and sums `1 − (1 − 2^−w)^d` over sites. That sum, `λ`, is
+an upper bound on the expected number of accidental confirmations by linearity of
+expectation, and it holds without any independence assumption. The looser,
+assumption-free union bound `Σ n·2^−w` is printed beside it as the number that
+holds without even the distinct-codes step; the gap between the two measures what
+the repeated spans were paying for, and it is small — 1.8% of `λ` at 4 tag bits,
+0.5% at 6, 0.1% at 8, measured on the look-alike trees §28's collision suite
+builds. Counting distinct codes is required for the bound to be admissible, not
+because it is large.
+
+The verdict then asks the one question left that arithmetic can answer: how likely
+is it that an unrelated tree with exactly these chances produces *at least* the
+fragments this scan counted? Taking `λ` as a Poisson mean, a level above `WEAK`
+needs that probability under **1e-3**, `STRONG` under **1e-5** and `VERY_STRONG`
+under **1e-8**. The final level is `min(counts, probability cap)`, and
+`PROVENANCE_DETECTED` requires the 1e-3 floor together with a level of at least
+`MODERATE`, or an exact fingerprint match; a scan that clears neither says
+`INCONCLUSIVE` rather than accusing anybody. The floors are measurements rather than
+round numbers, and `λ` is conservative in a quantified way: on 2,790 unrelated
+cross-scans its own mean came out **2.7–3.3× above** the observed mean
+confirmation count at every tag width tried — the null count is Poisson-shaped, so
+the model is the right one and only its mean is inflated, always in the direction
+that withholds a verdict. `VALIDATION.md` carries the record, including what the
+gate costs: on a 12-site constellation it accepts no finding below 10 confirmations
+at 4 bits, 6 at 6 bits, or 4 at 8.
+
+A report prints all three figures, because they answer different questions: how
+much of what was found the count of fragments supports, how much of it chance could
+have produced anyway, and how likely that chance was to reach the count this scan
+observed. None of them is a probability that anybody copied anything, and the
+`limitations` section of every report says so in the report's own voice.
 
 ## 13. What must be trusted
 
@@ -346,6 +374,16 @@ kind, a report field, a limit key. They may not: change canonicalization or the
 derivation framing, reuse a family's encoding, or reinterpret an existing field.
 Any of those is v2, and a v2 build must be able to read a v1 release record well
 enough to say so.
+
+The report's schema token moves on its own axis, because what has to stay stable
+in a report is what its numbers *mean* rather than which fields carry them. Adding
+a field is compatible inside a report schema; changing the rule that turns
+evidence into a level, or a level into a verdict, is not, and gets a new token —
+which is what `SWP-1-report-v2` records (§12). A build reads one report schema and
+refuses the rest, so a saved document is never re-graded under arithmetic its
+author did not apply. None of this touches the protocol token or the artifact
+schemas: a tree protected under `SWP-1` verifies under `SWP-1`, whatever report the
+scan that checked it wrote.
 
 ## 15. Errors
 

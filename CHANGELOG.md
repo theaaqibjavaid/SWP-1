@@ -5,7 +5,7 @@ All notable changes to SWP-1 are documented here. The format follows
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — with one
 addition the product needs and semver alone does not supply: the protocol
 carries its own version (`SWP-1`), the report carries its own schema tag
-(`SWP-1-report-v1`), and a change to either is a change to a *document format*
+(`SWP-1-report-v2`), and a change to either is a change to a *document format*
 rather than to a function. See
 [the spec's versioning section](docs/SWP-1-SPEC.md#14-versioning) for what each of
 the three numbers is allowed to do to the other two.
@@ -17,8 +17,55 @@ every claim of that kind here was run before it was written
 
 ## [Unreleased]
 
-Nothing. An entry appears here between a change being merged and the tag that
-carries it, and not before.
+An entry appears here between a change being merged and the tag that carries it,
+and not before.
+
+### Changed
+
+**The verdict is decided by a probability, not by a margin.** A tally used to
+clear when its confirmations exceeded the coincidence bound by `1.5`, `3.0` or
+`6.0`. That rule was measured accusing unrelated code — 13 times across the 5,790
+foreign cross-scans of the collision and look-alike suites, which was enough to
+leave the §28 collision test red in 5 runs of 100. A finding now has to be
+improbable rather than merely above an expectation: the probability that chance
+alone produced the count has to clear `1e-3`, and a grade above `WEAK`, `STRONG`
+and `VERY_STRONG` needs `1e-3`, `1e-5` and `1e-8` respectively. What it costs is
+stated beside what it buys: of the 2,100 findings the old rule reached on the
+measured corpus, 1,903 survive the gate (90.6%; 80% at a 4-bit tag, 95% at 6, 97%
+at 8), and no scan in those 5,310 was called a finding by the new rule and not by
+the old. The residual rate is bounded, not zero — see
+[docs/VALIDATION.md](docs/VALIDATION.md).
+
+**The coincidence bound is built from distinct keyed codes, not from spans.**
+Three spans that reproduce one address while carrying one repeated literal are one
+chance at this project's tag, not three, so the sum no longer needs those draws to
+be independent to be admissible. This moves the bound by 1.8% at a 4-bit tag, 0.5%
+at 6 and 0.1% at 8; the `2^−w` arithmetic itself is unchanged, and neither number
+is why the verdicts moved.
+
+**Reports are `SWP-1-report-v2`.** The document gained the two fields the gate
+reads — `draws`, and `coincidence_probability`, the figure the verdict cleared —
+and a `SWP-1-report-v1` file is now refused with `PROTOCOL_VERSION_UNSUPPORTED`
+rather than re-read under a rule that grades it differently. A tree protected by
+`1.0.0-beta.1` still verifies with this build: the identity, manifest, release and
+plan schemas are unchanged and every derivation is pinned. What does not survive
+is a *saved report*, which is a record of one build's arithmetic; re-run `swp scan`
+or `swp verify` to get the current one.
+
+### Added
+
+**A tally prints the arithmetic behind its own grade.** Each release section of a
+report now names the spans that reached a tag comparison, the distinct codes they
+carried, the bound over them, the looser bound that assumes nothing about spans
+sharing an address, and the probability the verdict had to beat — so a reader can
+check a grade without reimplementing it.
+
+**`swp-test-suite --example verdict-model`.** A harness that drives the built
+binary over look-alike projects, copies at several fractions, refactorings and
+site-removal attacks, at a chosen tag width, and prints the production tally for
+every scan. It is what prints the gate's costs and its false-positive rate in
+[docs/VALIDATION.md](docs/VALIDATION.md), so those numbers are reproducible rather
+than transcribed.
 
 ## [1.0.0-beta.1] - 2026-09-23
 
@@ -27,10 +74,11 @@ protected tree can be re-examined, and a tree somebody else hands you can be jud
 — from an offline machine that never runs the code it is reading.
 
 The `-beta` is doing work, so it is worth saying which part. Everything below is
-complete rather than stubbed, and the protocol token is `SWP-1-report-v1` in this
-build and in the release after it, so a tree protected here verifies there. What a
-pre-release withholds is the endorsement: `1.0.0` is this number once somebody has
-run it against their own work and the findings held up.
+complete rather than stubbed, and a tree protected by this build verifies against
+the releases that follow it — the identity, manifest, release and plan schemas are
+`1`, and every derivation they depend on is pinned. What a pre-release withholds
+is the endorsement: `1.0.0` is this number once somebody has run it against their
+own work and the findings held up.
 
 ### Added
 

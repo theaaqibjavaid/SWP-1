@@ -246,6 +246,10 @@ older release's sites is unchanged either way.
 
 A record that fails as `PROTOCOL_VERSION_UNSUPPORTED` (exit `6`) is not damage.
 It was written by a newer build; the rules are in [Versioning](SWP-1-SPEC.md#14-versioning).
+A *saved report* can fail this way when it is older and the report schema has
+moved since — the document records the arithmetic the build that wrote it graded
+with, and this build refuses to re-grade it. Re-run `swp scan` or `swp verify` for
+a current report; the release the old one describes is untouched.
 
 ## `protect` refused to write anything
 

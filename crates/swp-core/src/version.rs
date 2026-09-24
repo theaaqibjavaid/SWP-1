@@ -43,7 +43,12 @@ pub struct SchemaVersion(pub u16);
 impl SchemaVersion {
     pub const MANIFEST_V1: SchemaVersion = SchemaVersion(1);
     pub const IDENTITY_V1: SchemaVersion = SchemaVersion(1);
-    pub const REPORT_V1: SchemaVersion = SchemaVersion(1);
+    /// The report format that grades a verdict on a coincidence probability and
+    /// carries the numbers behind it (`draws`, `coincidence_probability`). It is
+    /// `SWP-1-report-v2`, and a stored `v1` document is refused rather than
+    /// re-graded by rules it was not written under — the reader names the schema it
+    /// found, so the superseded number never has to be sayable here.
+    pub const REPORT_V2: SchemaVersion = SchemaVersion(2);
     pub const PLAN_V1: SchemaVersion = SchemaVersion(1);
 }
 

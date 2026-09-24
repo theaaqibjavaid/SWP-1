@@ -75,7 +75,10 @@ Two knobs, and the trade-off between them is the whole design:
   [The levels, and the cap on them](#the-levels-and-the-cap-on-them).
 * **Tag bits** decide how much each site proves: at 4 bits one site is 1-in-16 by
   chance; at 8 bits, 1-in-256. Wider tags cost capacity, because a family has to
-  be able to spell that many distinct renderings inside the literal's radius.
+  be able to spell that many distinct renderings inside the literal's radius. The
+  verdict gate is where the difference shows: measured on a 12-site constellation
+  of look-alike projects, it withholds any finding below 10 confirmations at 4
+  bits, 6 at 6 bits, and 4 at 8 ([docs/VALIDATION.md](VALIDATION.md)).
 
 Ask for more than the tree can hold and the tool gives you what it can: the JS
 example's three files hold 10 of the 12 requested, and the gap is 21 refusals, each
@@ -134,12 +137,15 @@ by construction, re-parsed and refused otherwise.
 
 ## Reading a report
 
-`swp scan` and `swp verify` write the same document, `SWP-1-report-v1`, and
-`swp scan ./copy --format json` prints it. Twelve top-level fields:
+`swp scan` and `swp verify` write the same document, `SWP-1-report-v2`, and
+`swp scan ./copy --format json` prints it. What makes it the second version is the
+arithmetic behind a verdict: the tally records the distinct keyed codes it billed
+for chance as well as the spans it looked at, and it prints the probability the
+verdict had to clear. Twelve top-level fields:
 
 | field | meaning |
 | --- | --- |
-| `schema`, `protocol` | `SWP-1-report-v1` and `SWP-1`. A stored report whose schema this build cannot read is refused, not guessed at |
+| `schema`, `protocol` | `SWP-1-report-v2` and `SWP-1`. A stored report whose schema this build cannot read is refused, not guessed at |
 | `run` | the command that produced it, when, and which build wrote it |
 | `candidate` | how you named it, what kind it was, `files_scanned`, `bytes_scanned`, `partial` |
 | `result` | `PROVENANCE_DETECTED`, `NO_PROVENANCE_DETECTED`, `INCONCLUSIVE` |
@@ -167,8 +173,8 @@ says `INCONCLUSIVE` and exits `10` instead of clearing the tree.
   rename-tolerant radii), `moved` (found in a file other than the one protected),
   `renderings` (span wider than one token). Those four describe the same
   confirmations; they do not add up to `fragments`.
-* **What the search cost:** `files`, `bits`, `probes`, `literals_tried`,
-  `windows_tried`, `chance`, `guarantee`, `fingerprint`.
+* **What the search cost:** `files`, `bits`, `probes`, `draws`, `literals_tried`,
+  `windows_tried`, `chance`, `guarantee`, `coincidence_probability`, `fingerprint`.
 
 `fingerprint` is `match`, `no-match` or `not-comparable`; the third means the
 candidate and the release were not graded at the same canonicalization level, so
@@ -176,10 +182,17 @@ no comparison happened rather than one failing.
 
 `chance` is how many confirmations an unrelated tree is expected to produce by
 luck over the comparisons this scan actually performed; `guarantee` is
-`fragments − chance`. A negative result is auditable because it prints the same
-counts: the `NEGATIVE_CONTROL` item states how hard the scan looked, and a scan
-that tried 12 literals in one file is a weaker statement than one that tried 18
-literal and 11 rendering hypotheses across two.
+`fragments − chance`. The comparisons it counts are `draws`, not `probes`: `draws`
+is the distinct keyed codes the candidate presented, so three spans that reproduce
+one address by carrying one repeated literal are billed as one chance at this
+project's tag rather than three. Alongside them sits
+`coincidence_probability` — the chance, given that bound, that an unrelated tree
+produces this scan's confirmation count or more. It is the number the verdict
+turns on; `guarantee` is printed because it is how much of the finding the count
+supports, not because it decides anything. A negative result is auditable because
+it prints the same counts: the `NEGATIVE_CONTROL` item states how hard the scan
+looked, and a scan that tried 12 literals in one file is a weaker statement than
+one that tried 18 literal and 11 rendering hypotheses across two.
 
 ### Evidence items
 
@@ -214,14 +227,18 @@ identical, so it is reported and weighted as nothing.
 | `VERY_STRONG` | 8 across at least 3 files |
 
 The level is graded from confirmed *sites*, never by counting items, so one
-statement pasted under two renderings cannot inflate it. `guarantee` then caps it
-— `1.5` for `MODERATE`, `3.0` for `STRONG`, `6.0` for `VERY_STRONG` — and the cap
-only ever lowers, never raises. A matching fingerprint short-circuits both rules.
+statement pasted under two renderings cannot inflate it. `coincidence_probability`
+then caps it, and the floor rises with the claim: below `1e-3` for anything above
+`WEAK`, below `1e-5` for `STRONG`, below `1e-8` for `VERY_STRONG`. The cap only
+ever lowers, never raises — arithmetic about chance is not a substitute for having
+the fragments. A matching fingerprint short-circuits both rules.
 
-The verdict clears the same two tests: `PROVENANCE_DETECTED` needs `guarantee`
-above zero *and* a level of at least `MODERATE`, or a fingerprint match. So a
-single 4-bit confirmation prints as `WEAK` evidence while the command still exits
-`0`. A lead is not a finding, and a verdict may not claim more than its evidence
+The verdict clears the same two tests: `PROVENANCE_DETECTED` needs
+`coincidence_probability` under `1e-3` *and* a level of at least `MODERATE`, or a
+fingerprint match. Evidence that clears neither test is still printed — a single
+4-bit confirmation appears as `WEAK` evidence — but the verdict over it is
+`INCONCLUSIVE`, which is exit `10` rather than the `0` of a tree this scan can
+clear. A lead is not a finding, and a verdict may not claim more than its evidence
 level already said.
 
 ## In CI
@@ -231,7 +248,7 @@ The exit codes are the contract, and they are stable enough to branch on:
 | command | `0` | non-zero |
 | --- | --- | --- |
 | `swp verify` | every site of the release is present with its code | `5` sites lost or stripped; `10` the tree was not fully read |
-| `swp scan <candidate>` | a fully examined candidate holds no evidence | `1` evidence found; `10` part of the candidate was never examined |
+| `swp scan <candidate>` | a fully examined candidate holds no evidence | `1` evidence found; `10` the scan cannot say — part of the candidate was never examined, or what it found is a lead the coincidence floor will not carry as a finding |
 | `swp protect` | the constellation was decided, proved and recorded | `15` nothing safe to embed; `7` a limit stopped it |
 | `swp init`, `swp generate` | done | `2`, `3`, `14` as in [CLI.md](CLI.md#exit-codes) |
 

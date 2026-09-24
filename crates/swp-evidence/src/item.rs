@@ -113,7 +113,7 @@ impl EvidenceItem {
             basis,
             strength,
             protocol: SWP_PROTOCOL_NAME.to_string(),
-            schema: SchemaVersion::REPORT_V1.0,
+            schema: SchemaVersion::REPORT_V2.0,
         }
     }
 
@@ -397,6 +397,7 @@ mod tests {
             found_text: Some("(995 + 5)".into()),
             found_tokens: tokens,
             probes: 1,
+            distinct_codes: 1,
         }
     }
 

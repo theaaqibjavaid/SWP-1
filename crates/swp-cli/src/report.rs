@@ -52,7 +52,7 @@ use crate::ctx::Ctx;
 use crate::output::{self, Sink};
 
 /// The `schema` field the index document carries. A re-rendered report keeps its
-/// own `SWP-1-report-v1`, because it *is* that document.
+/// own schema token, because it *is* that document.
 const INDEX_SCHEMA: &str = "SWP-1-report-index-v1";
 
 /// What `swp report` can emit: an index of the store, or one stored document.
@@ -473,7 +473,7 @@ mod tests {
             run: swp_evidence::Run {
                 command: command.to_string(),
                 created_at: "2026-09-21T10:00:00Z".to_string(),
-                generator: "SWP-1 · swp 1.0.0 · report schema SWP-1-report-v1".to_string(),
+                generator: "SWP-1 · swp 1.0.0 · report schema SWP-1-report-v2".to_string(),
             },
             candidate: swp_evidence::Candidate {
                 described: "./copy".to_string(),
@@ -504,11 +504,13 @@ mod tests {
                     bits: 32,
                     tag_bits: 16,
                     probes: 40,
+                    draws: 2,
                     literals_tried: 900,
                     windows_tried: 1200,
                     fingerprint: "no-match".to_string(),
                     chance: 0.0006,
                     guarantee: 32.0,
+                    coincidence_probability: 1.8e-7,
                     level,
                     reasons: vec![],
                 })
@@ -524,7 +526,7 @@ mod tests {
                     basis: format!("site {i} carries its 16-bit code"),
                     strength: EvidenceLevel::Strong,
                     protocol: SWP_PROTOCOL_NAME.to_string(),
-                    schema: swp_core::SchemaVersion::REPORT_V1.0,
+                    schema: swp_core::SchemaVersion::REPORT_V2.0,
                 })
                 .collect(),
             omissions: vec![],

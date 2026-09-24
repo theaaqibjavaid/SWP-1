@@ -23,7 +23,7 @@ It is a provenance instrument. It is not DRM, and it does not pretend otherwise.
 | **Install** | `cargo install --path crates/swp-cli --locked`, or a [prebuilt binary](https://github.com/theaaqibjavaid/SWP-1/releases) |
 | **Language** | Rust 2021, MSRV 1.85, no network code path |
 | **Licence** | [Apache-2.0](LICENSE) |
-| **Protocol** | `SWP-1` · report schema `SWP-1-report-v1` |
+| **Protocol** | `SWP-1` · report schema `SWP-1-report-v2` |
 | **Ask** | [discussions](https://github.com/theaaqibjavaid/SWP-1/discussions) · [open an issue](https://github.com/theaaqibjavaid/SWP-1/issues/new/choose) |
 | **Report a vulnerability** | [SECURITY.md](SECURITY.md), privately |
 
@@ -301,7 +301,7 @@ source.
 * **Licence.** Apache-2.0, with [NOTICE](NOTICE) naming every third-party component
   this build links. The protocol, the `SWP-1` name and the report schema are not
   licensed for reuse as identity: a fork that changes the wire format should change
-  what it calls itself, because a report that claims `SWP-1-report-v1` while
+  what it calls itself, because a report that claims `SWP-1-report-v2` while
   meaning something else is the one outcome this project cannot afford.
 
 ## Status
