@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       dry_run:
-        description: Package without uploading (see the publish step: it cannot verify before the first publish)
+        description: "Package without uploading (see the publish step: it cannot verify before the first publish)"
         type: boolean
         default: true
 
