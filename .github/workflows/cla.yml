@@ -48,16 +48,22 @@ jobs:
           # responsibility for the change, and they are covered by their own record or
           # by the review. Asking `dependabot[bot]` to sign is asking it to be a
           # person, so every routine update would arrive red.
-          author=$(gh pr view "$PR" --json author -q '.author.login')
-          if printf '%s' "$author" | grep -q '\[bot\]$'; then
-            echo "result=bot" >>"$GITHUB_OUTPUT"
-            echo "$author is a bot account, so no signature is expected from it."
+          author_login=$(gh pr view "$PR" --json author -q '.author.login // ""')
+          author_type=$(gh api "repos/${{ github.repository }}/pulls/$PR" \
+            --jq '.user.type // ""')
+
+          # Bot-authored pull requests do not require a contributor signature.
+          # GitHub may expose Dependabot as `app/dependabot` rather than `dependabot[bot]`.
+          if [ "$author_type" = "Bot" ] ||
+             printf '%s' "$author_login" | grep -Eiq '(\[bot\]$|^app/dependabot$|^dependabot(-preview)?$)'; then
+            echo 'result=bot' >>"$GITHUB_OUTPUT"
+            echo "$author_login is a bot account, so no signature is expected from it."
             exit 0
           fi
 
           emails=$(gh api "repos/${{ github.repository }}/pulls/$PR/commits" \
             --jq '.[].commit.author.email' | sort -u)
-          handles=$(gh pr view "$PR" --json author -q '.author.login')
+          handles="$author_login"
 
           # A record matches either identity, because a contributor may sign with the
           # address on their commits or with the handle on their pull request, and the
