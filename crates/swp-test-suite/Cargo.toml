@@ -27,6 +27,11 @@ walkdir.workspace = true
 base64.workspace = true
 
 [dev-dependencies]
+# The `verdict-model` example reads a scan below the report, where the per-site
+# probe and distinct-code counts live, and scores it under the gate the product
+# uses and the rule it replaced.
+swp-detection.workspace = true
+swp-evidence.workspace = true
 # §45's archive-bomb case has to *build* a hostile container, and the only zip
 # writer available is the one this workspace already vendors for reading them.
 # Test-only: nothing in the shipped product depends on it from here.
