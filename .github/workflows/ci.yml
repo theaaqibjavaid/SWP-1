@@ -27,7 +27,7 @@ jobs:
     name: format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: check formatting
         run: cargo fmt --all --check
@@ -41,7 +41,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       # `-D warnings` rather than RUSTFLAGS, so a build script of a grammar crate
       # cannot fail the run for a lint nobody wrote.
@@ -57,7 +57,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: build
         run: cargo build --workspace --locked
@@ -75,7 +75,7 @@ jobs:
     name: the secret stays out of everything
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       # Separate from the `test` matrix on purpose. It is the one suite whose
       # failure means the project's central promise broke, so it gets its own line
@@ -88,7 +88,7 @@ jobs:
     name: every documented transcript still runs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       # README.md, every page under docs/, and the four example transcripts.
       # A stale example fails the build; a number that varies with the key is
@@ -101,7 +101,7 @@ jobs:
     name: release readiness
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       # check-release.sh packages every manifest with `--offline`, which is the only
       # honest way to ask whether a crate resolves against what the index really has.

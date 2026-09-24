@@ -38,7 +38,7 @@ jobs:
       version: ${{ steps.agree.outputs.version }}
       tag: ${{ steps.agree.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # A tag push checks out the tag; a manual run checks out the tag it names,
           # so the manifest and changelog it reads are the tagged ones.
@@ -155,7 +155,7 @@ jobs:
             binary: swp
             archive: tar
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
       - uses: Swatinem/rust-cache@v2
@@ -227,7 +227,7 @@ jobs:
       VERSION: ${{ needs.checks.outputs.version }}
       REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.ref }}
       - uses: actions/download-artifact@v8
