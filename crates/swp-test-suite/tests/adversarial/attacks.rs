@@ -120,7 +120,7 @@ fn assert_still_a_program(name: &str, root: &Path) {
 /// an adversary with no manifest has to *locate* before they can *delete*.
 ///
 /// Locating is not the hard part, and this suite says so out loud. Every family the
-/// writer uses has a spelling, and a search for those spellings took 36 of 36
+/// writer uses has a spelling, and a search for those spellings took 64 of 64
 /// fragments out of the form corpus while raising **no** flag across the 91
 /// unrelated files of §27's corpora — `locate`'s own tests measure both halves, per
 /// shape and per corpus. So no document may describe the watermark as hidden, and no

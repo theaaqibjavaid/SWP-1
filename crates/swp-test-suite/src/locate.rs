@@ -585,7 +585,7 @@ impl Recall {
 
 /// Compare a shape search against what was actually written. The manifest is used
 /// here as *ground truth after the fact*: the attacker has the tree only, and the
-/// suite has both, which is the only way to report "it found 34 of 36" rather than
+/// suite has both, which is the only way to report "it found 64 of 64" rather than
 /// "it found some".
 pub fn score(flags: &[Flag], renderings: &[String]) -> Recall {
     let mut out = Recall {
@@ -746,7 +746,7 @@ mod tests {
     #[test]
     fn the_search_finds_every_fragment_a_protected_tree_holds() {
         // Ground truth, from the manifest. The measured result on the form corpus is
-        // 36 of 36 located — near-total recall, which is the finding §50 has to
+        // 64 of 64 located — total recall, which is the finding §50 has to
         // carry: concealment is not a property of this protocol, and no document may
         // imply that an attacker would have to guess where to look. It is *asserted*
         // as a floor rather than an equality because a rendering can legitimately

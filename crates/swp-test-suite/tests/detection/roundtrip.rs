@@ -52,6 +52,7 @@ use swp_adapters::{
     STRING_FAMILIES,
 };
 use swp_core::site::FormFamily;
+use swp_test_suite::fixtures::FORMS_CONFIG;
 use swp_test_suite::project::Project;
 
 /// The projects, and what each one is for.
@@ -59,9 +60,12 @@ use swp_test_suite::project::Project;
 /// The first four are the same form-corpus tree with four independent keys, which
 /// is what makes the coverage assertion below a statement about the engine rather
 /// than about luck: the writer's family choice is keyed, so four keys are four
-/// independent draws over a tree built so that every draw can land anywhere. The
-/// rest are the realistic example trees, at the shipped default configuration —
-/// the invariant matters more there than the coverage, because a tree with two
+/// independent draws over a tree built so that every draw can land anywhere. That
+/// clause is a promise about the *corpus*, not about the engine, and it is the one
+/// this file's guard actually tests — see the note above `CORPUS_NUMBERS` for what
+/// happened when the tree offered a family only once.
+/// The rest are the realistic example trees, at the shipped default configuration
+/// — the invariant matters more there than the coverage, because a tree with two
 /// string literals in it cannot be made to prove anything about seven families.
 const PROJECTS: &[(&str, ProjectKind)] = &[
     ("forms-1", ProjectKind::Forms),
@@ -77,14 +81,6 @@ const PROJECTS: &[(&str, ProjectKind)] = &[
 
 const TARGET_SITES: u32 = 24;
 const MODULES: usize = 12;
-
-/// The form corpus with a constellation wide enough to take most of it, at the
-/// protocol's **default** four-bit width. Nothing here lowers `tag_bits` to make
-/// a family reachable: reaching it at the width a real project ships at is the
-/// point, and the difficulty of doing so is itself one of the measurements
-/// (this suite is where it is measured).
-const FORMS_CONFIG: &str = "[protect]\ntargets = [\"src\"]\ntarget_sites = 48\ntag_bits = 4\n\
-                            embed_strings = true\n";
 
 #[derive(Clone, Copy)]
 enum ProjectKind {
@@ -408,6 +404,17 @@ fn every_family_the_writer_emits_the_reader_finds() {
     // long literals or the renderer's reachability changed underneath it, and the
     // table printed above is then describing a different protocol than this file
     // claims to test.
+    //
+    // The floor is five because the corpus cannot be held to seven by a keyed
+    // draw: three families need a shape the writer can only reach where the tree
+    // happens to offer it, so their absence is possible at any `target_sites`.
+    // Measured over 250 draws of the grown corpus (64 sites each), the draws that
+    // miss one of them are 4 in 250 for `radix`, 2 for `mul` and 7 for
+    // `str-adjacent`, and a project has to miss all three at once to fall below
+    // this line — which did not happen in any of those draws, nor in the 194
+    // draws of the corpus that preceded it, where the same three were absent 26,
+    // 15 and 6 times and this assert fired at CI the first time they landed
+    // together.
     for trip in &trips {
         if !trip.label.starts_with("forms-") {
             continue;
@@ -452,7 +459,18 @@ fn note_kind(note: &str) -> &str {
 /// same code that tests them proves nothing. `the_form_corpus_keeps_every_family_
 /// reachable` fails if the two ever disagree, which is the point of writing the
 /// literals twice.
-const CORPUS_NUMBERS: &[i128] = &[720720, 1441440, 48879, 57005, 65535, 2400, 3600, 12, 90, 2];
+///
+/// The factorisation and radix shapes repeat on purpose. Which reachable family
+/// carries a site's code is drawn from the key, so one literal per family buys a
+/// coin flip, not coverage: across 194 keyed draws of the corpus at its first
+/// spelling of each, a single 36-site project was without `radix` 26 times and
+/// without `mul` 15, and a draw that misses three of the seven is the day this
+/// file's coverage guard fires for a reason that has nothing to do with the
+/// reader.
+const CORPUS_NUMBERS: &[i128] = &[
+    720720, 1441440, 2162160, 3603600, 5045040, 48879, 57005, 65535, 51966, 47806, 65261, 2400,
+    3600, 12, 90, 2,
+];
 /// `(text, quote)` for every string literal over sixteen characters in the
 /// corpus, which is the width's modulus and therefore the shortest literal that
 /// can carry a tag at all.
@@ -466,6 +484,12 @@ const CORPUS_STRINGS: &[(&str, char)] = &[
     ("escalation after sixteen hours", '"'),
     ("plan summary, billing and support", '"'),
     ("quota resets at the start of each cycle", '"'),
+    ("invoice closes after fourteen days", '"'),
+    ("refund window is thirty days", '"'),
+    ("billing address must stay current", '"'),
+    ("tax registration id is optional", '"'),
+    ("proration applies on downgrade only", '"'),
+    ("usage alerts fire at eighty percent", '"'),
 ];
 
 #[test]

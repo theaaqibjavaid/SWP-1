@@ -8,12 +8,20 @@
 //
 // - strings longer than sixteen characters, the modulus, so the split-point
 //   families have somewhere to split;
-// - 720720 and 1441440, the least common multiple of 1..=16 and its double, which
-//   is the condition the factorisation family needs (a divisor in every residue
-//   class the tag can select);
-// - 48879, 57005 and 65535, whose hexadecimal spellings (beef, dead, ffff) carry
-//   four letters, which is what the radix family needs at four bits;
+// - 720720, 1441440, 2162160, 3603600 and 5045040 — multiples of the least common
+//   multiple of 1..=16, which is the condition the factorisation family needs (a
+//   divisor in every residue class the tag can select);
+// - 48879, 57005, 65535, 51966, 47806 and 65261, whose hexadecimal spellings
+//   (beef, dead, ffff, cafe, babe, feed) carry at least four letters, which is
+//   what the radix family needs at four bits;
 // - ordinary constants, which can only ever be `add` or `sub`.
+//
+// The factorisation and radix shapes are deliberately repeated. Which of a
+// literal's reachable families carries a site's code is drawn from the key, so a
+// family that hangs on one literal is a coin flip rather than a coverage result —
+// and a corpus that reaches a family at one site per program cannot promise a
+// round-trip matrix will ever exercise it.
+
 //
 // It is a test corpus. Do not copy it into a project and expect a watermark that
 // looks like handwriting.
@@ -81,4 +89,58 @@ export function planSummary(plan) {
 export function quotaNotice(used) {
   const notice = "quota resets at the start of each cycle";
   return used > 90 ? notice : "";
+}
+
+export function renewalStride(intervals) {
+  return Math.floor(2162160 / intervals);
+}
+
+export function meteringStride(intervals) {
+  return Math.floor(3603600 / intervals);
+}
+
+export function ledgerStride(intervals) {
+  return Math.floor(5045040 / intervals);
+}
+
+export function tintKey(value) {
+  return 51966 & value;
+}
+
+export function shadeKey(value) {
+  return 47806 & value;
+}
+
+export function accentKey(value) {
+  return 65261 & value;
+}
+
+export function invoiceNotice(invoice) {
+  const notice = "invoice closes after fourteen days";
+  return invoice.closed ? notice : "";
+}
+
+export function refundWindow(order) {
+  const label = "refund window is thirty days";
+  return order.refundable ? label : "";
+}
+
+export function billingAddress(account) {
+  const label = "billing address must stay current";
+  return account.verified ? label : "";
+}
+
+export function taxId(account) {
+  const optional = "tax registration id is optional";
+  return account.domestic ? "" : optional;
+}
+
+export function prorationNote(change) {
+  const note = "proration applies on downgrade only";
+  return change.downgrade ? note : "";
+}
+
+export function usageAlert(usage) {
+  const alert = "usage alerts fire at eighty percent";
+  return usage.notified ? alert : "";
 }
