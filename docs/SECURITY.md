@@ -120,10 +120,17 @@ payload:
   must show the grant and must show no inherited entries. Anything less is
   reported, and for a private artifact an unconfirmed hardening is an error: the
   store refuses to keep the file and says so — *"refused to keep a private
-  artifact whose access could not be confirmed"*. That check exists because
-  `std::fs::set_permissions` on Windows reports success while changing nothing;
-  a permission call that is not verified is a permission call that did not
-  happen.
+  artifact whose access could not be confirmed"* — and takes the artifact back,
+  because a file it refused to keep is only refused if it is gone. The removal is
+  about the state of the tree, not the secrecy of the bytes: DPAPI has already
+  sealed those. An orphaned `root.key` survives its own failed `swp init`, and
+  since `init` never replaces a project secret, the next run keeps that key while
+  deriving a fresh identity from a new one, and the store then fails its own
+  cross-check until a person deletes `.swp/` by hand. If the removal itself
+  fails, the message says so rather than implying it worked. The read-back exists
+  because `std::fs::set_permissions` on Windows reports success while changing
+  nothing; a permission call that is not verified is a permission call that did
+  not happen.
 
 So the `permissions verified` in `swp init`'s output is not a claim that the ACL
 *should* be tight — it is the parsed read-back of `icacls` after the change. On

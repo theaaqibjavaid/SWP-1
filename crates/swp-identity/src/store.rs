@@ -13,7 +13,9 @@
 //!   anything that references it, every artifact is written atomically, and
 //!   `init` refuses to overwrite an existing key — because a second, different
 //!   secret landing in `.swp/private` silently invalidates every manifest the
-//!   first one ever signed.
+//!   first one ever signed. For the same reason a private artifact whose access
+//!   could not be confirmed is removed on the way out: a write the store
+//!   refused has to leave nothing behind for the next run to explain.
 //! * **Discovery is lexical, not trust-based.** `discover` walks up from a
 //!   directory to find the enclosing project. The scanner never calls it on
 //!   candidate input: a third-party repository containing its own `.swp/` must
@@ -482,7 +484,9 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<(), SwpError> {
 /// sibling temporary file, are flushed, then replace the target atomically.
 /// Private files are additionally hardened, and an unverifiable hardening is an
 /// error rather than a warning — the whole value of the private tier rests on
-/// it.
+/// it. The file that could not be verified is removed on the way out, so the
+/// error is the only thing the caller is left with; see
+/// [`reject_unconfirmed_private`].
 fn atomic_write(path: &Path, bytes: &[u8], private: bool) -> Result<(), SwpError> {
     let parent = path
         .parent()
@@ -508,20 +512,46 @@ fn atomic_write(path: &Path, bytes: &[u8], private: bool) -> Result<(), SwpError
         SwpError::io(format!("cannot replace {}: {e}", path.display()))
     })?;
     if private {
-        let outcome = harden_permissions(path);
-        if !outcome.is_verified() {
-            return Err(SwpError::new(
-                ErrorCode::SecretUnavailable,
-                format!(
-                    "refused to keep a private artifact whose access could not be confirmed: \
-                     {} — {}",
-                    path.display(),
-                    outcome.detail()
-                ),
-            ));
-        }
+        return reject_unconfirmed_private(path, harden_permissions(path));
     }
     Ok(())
+}
+
+/// Refuse an artifact whose access could not be confirmed, and make the refusal
+/// the whole truth by removing it.
+///
+/// The bytes are already in place by the time the answer comes back, so
+/// "refused to keep" is a promise this function has to honour: keeping the file
+/// leaves the operator to work out from the filesystem which of the two the tool
+/// did. Retention is also the worse half of the choice. A `root.key` that
+/// outlives its own failed `init` is an orphan no later run can clear — measured
+/// on the previous build, the next `swp init` in that tree failed with "root.key
+/// belongs to project X but this store's identity is Y", because `init` keeps an
+/// existing secret while deriving the identity from the fresh one it just made,
+/// and no third run could untangle it.
+///
+/// DPAPI keeps the contents unreadable to other accounts either way, so what
+/// this decides is not confidentiality but whether the store's state matches its
+/// sentence. A removal that itself fails is named as such in the message, because
+/// a sentence that overstates what it managed to do is the exact thing this
+/// function exists to prevent.
+fn reject_unconfirmed_private(path: &Path, outcome: PermissionOutcome) -> Result<(), SwpError> {
+    if outcome.is_verified() {
+        return Ok(());
+    }
+    let detail = outcome.detail();
+    let fate = match fs::remove_file(path) {
+        Ok(()) => "it has been removed".to_string(),
+        Err(e) => format!("removing it failed too, so it is still there: {e}"),
+    };
+    Err(SwpError::new(
+        ErrorCode::SecretUnavailable,
+        format!(
+            "refused to keep a private artifact whose access could not be confirmed: {} — \
+             {detail}; {fate}",
+            path.display()
+        ),
+    ))
 }
 
 fn sorted_entries(dir: &Path) -> Result<Vec<String>, SwpError> {
@@ -675,6 +705,63 @@ mod tests {
         assert!(again.created.is_empty(), "{:?}", again.created);
         // The second, different secret must not have replaced the first.
         assert!(again.store.load_root().unwrap().same_as(&r));
+    }
+
+    /// The store's half of a refusal: an artifact whose access could not be
+    /// confirmed is taken back off the disk, and the sentence says which of the
+    /// two happened. `PermissionOutcome` is the real type and the real shapes
+    /// `harden_permissions` returns on a machine that would not confirm an ACL;
+    /// `swp-crypto`'s tests cover the tool producing them against live processes.
+    #[test]
+    fn an_unconfirmed_private_artifact_is_removed_and_says_so() {
+        let tmp = Tmp::new("rollback");
+        let key = tmp.0.join("root.key");
+        fs::write(&key, b"sealed bytes").unwrap();
+        let e = reject_unconfirmed_private(
+            &key,
+            PermissionOutcome::Unavailable("icacls exited with status 1332".into()),
+        )
+        .unwrap_err();
+        assert_eq!(e.code(), ErrorCode::SecretUnavailable);
+        let rendered = e.render();
+        assert!(rendered.contains("refused to keep"), "{rendered}");
+        assert!(
+            rendered.contains("icacls exited with status 1332"),
+            "the reason was dropped: {rendered}"
+        );
+        assert!(rendered.contains("it has been removed"), "{rendered}");
+        assert!(
+            !key.exists(),
+            "the artifact the store just refused to keep is still on disk"
+        );
+    }
+
+    #[test]
+    fn a_refusal_that_cannot_remove_the_artifact_says_that_it_cannot() {
+        // A directory holding a file is the portable way to make `remove_file`
+        // itself fail, which is the case a message must not paper over.
+        let tmp = Tmp::new("sticky");
+        let held = tmp.0.join("root.key");
+        fs::create_dir(&held).unwrap();
+        fs::write(held.join("inner"), b"x").unwrap();
+        let e = reject_unconfirmed_private(
+            &held,
+            PermissionOutcome::Unverified("could not confirm the new ACL".into()),
+        )
+        .unwrap_err();
+        let rendered = e.render();
+        assert!(rendered.contains("still there"), "{rendered}");
+        assert!(held.exists(), "the message and the filesystem disagree");
+    }
+
+    #[test]
+    fn a_confirmed_hardening_keeps_the_artifact() {
+        let tmp = Tmp::new("kept");
+        let key = tmp.0.join("root.key");
+        fs::write(&key, b"sealed bytes").unwrap();
+        reject_unconfirmed_private(&key, PermissionOutcome::Verified("ACL limited".into()))
+            .unwrap();
+        assert!(key.exists());
     }
 
     #[test]
