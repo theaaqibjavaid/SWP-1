@@ -44,13 +44,15 @@ Check it:
 
 ```console
 $ swp --version
-swp SWP-1 · swp 1.0.0-beta.1 · report schema SWP-1-report-v1
+swp SWP-1 · swp 1.0.0-beta.1 · report schema SWP-1-report-v2
 exit 0
 ```
 
 The three tokens on that line are the three versions a report records: the
-protocol, the build, and the report schema. A report written by a different build
-of the same protocol is still readable, which is the point of naming them apart.
+protocol, the build, and the report schema. A report names the schema it was
+written under, and this build reads that one and no other — a document it cannot
+interpret is refused rather than guessed at, which is why the schema is quoted
+separately from the protocol.
 
 ## 3. Initialize the project
 
@@ -271,9 +273,10 @@ exit 1
 ```
 
 `result` and the exit code are one statement: `1` means evidence was found, `0`
-means a *fully examined* candidate holds none, and `10` means part of the
-candidate was never examined so neither answer is available. A script that reads
-`0` as "clean" without reading `partial` will call an unread tree cleared.
+means a *fully examined* candidate holds none, and `10` means the scan cannot say
+— either part of the candidate was never examined, or what it found is a lead the
+coincidence arithmetic will not carry as a finding. A script that reads `0` as
+"clean" without reading `partial` will call an unread tree cleared.
 
 And a tree that is yours but unprotected, for contrast:
 

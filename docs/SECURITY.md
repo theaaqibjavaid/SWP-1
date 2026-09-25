@@ -81,7 +81,7 @@ prints, and the commands that printed them.
 | Watermark discovery from published source alone | everything it needs to start: a shape search over the literals finds the sites without your secret | `adversarial_removal` |
 | Theft of your private manifest | a removal tool, not a forgery tool. It names every site and carries no tags, so it cannot make a new statement confirm | `adversarial_removal` |
 | Theft of the root secret | total. The holder can compute your codes and sign records in your name; the blast radius is bounded by the OS account the seal is tied to | `secret_leak`, `crates/swp-crypto/src/seal.rs` |
-| False-positive attacks — an unrelated tree made to resemble yours | a lead, not a finding. Chance confirmations are covered by the coincidence bound, which holds the verdict at `INCONCLUSIVE` | `false_positive`, `collision` |
+| False-positive attacks — an unrelated tree made to resemble yours | a lead, not a finding. Chance confirmations are covered by the coincidence probability, which holds the verdict at `INCONCLUSIVE` | `false_positive`, `collision` |
 | Source poisoning — their code lifted into your project before protection | your release can come to cover their code, so a later scan says *yours* about a fragment you absorbed. Protect reviewed source, not pasted source | `adversarial_removal` |
 | A malicious repository as scan input | time and memory, if the bounds did not exist. They do: every ceiling reached is recorded as an omission, and a scan that was stopped says `INCONCLUSIVE` | `resource_limits` |
 | Parser exploitation — a file aimed at the tree-sitter grammars | the residue this page cannot argue away: the grammars are C. Input is bounded and never executed; memory safety is the parsers' problem, not this design's | `resource_limits` |
@@ -538,8 +538,10 @@ documentation defers. SWP-1 does not guarantee:
 * **detection of every possible copy** — a copy below the site budget, or one
   whose files were all excluded from the walk, is not found;
 * **zero false positives** — unrelated trees *do* reproduce keyed addresses and
-  *do* occasionally confirm a single site by chance; what the coincidence bound
-  does is keep those at `INCONCLUSIVE` rather than at a finding.
+  *do* occasionally confirm a single site by chance; the coincidence probability
+  keeps those at `INCONCLUSIVE` rather than at a finding, and the rate the gate
+  leaves behind is bounded by measurement rather than asserted
+  ([VALIDATION.md](VALIDATION.md)).
 
 What SWP-1 provides is technical provenance evidence: an explanation of a scan in
 terms a reader can check, that survives being forwarded, and that says

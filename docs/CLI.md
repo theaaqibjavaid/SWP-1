@@ -7,7 +7,7 @@ build if this page lists an option its command would reject.
 
 ```console
 $ swp help
-swp SWP-1 · swp 1.0.0-beta.1 · report schema SWP-1-report-v1
+swp SWP-1 · swp 1.0.0-beta.1 · report schema SWP-1-report-v2
 
 Usage: swp <command> [options]
 
@@ -287,8 +287,9 @@ exit 1
 ```
 
 For this command `1` is not a failure: it is the finding. `0` means a *fully
-examined* candidate holds no evidence, and `10` means part of the candidate was
-never examined, so neither answer is available. Scripts must read the result
+examined* candidate holds no evidence, and `10` means the scan cannot say —
+either part of the candidate was never examined, or what it found is a lead the
+coincidence floor will not carry as a finding. Scripts must read the result
 field, not the exit code alone.
 
 ### `swp inspect <view>`
@@ -324,7 +325,9 @@ Do not paste them into an issue or a public document.
 
 Lists the saved reports, or re-renders one from the document that was written at
 the time — so a report keeps the grade it was given even after the ladder's rules
-change, because the stored level is printed rather than recomputed.
+change, because the stored level is printed rather than recomputed. A document
+whose report schema this build does not read is refused instead: its grade would
+print correctly beside arithmetic that no longer yields it.
 
 | option | meaning |
 | --- | --- |
@@ -356,7 +359,7 @@ prints for it:
 | `7` | `LIMIT_REACHED` | a `[limits]` ceiling stopped the walk, the parse or the archive |
 | `8` | `UNSUPPORTED_LANGUAGE` | a language was named that no adapter claims |
 | `9` | `INVALID_WATERMARK` | a fragment that cannot be well-formed: bad width, bad family, bad site id |
-| `10` | `INSUFFICIENT_EVIDENCE` / `INCONCLUSIVE` | part of the candidate was not examined, so neither a finding nor a clean answer is available |
+| `10` | `INSUFFICIENT_EVIDENCE` / `INCONCLUSIVE` | this scan cannot say: part of the candidate was not examined, or what it found is a lead the coincidence floor will not carry as a finding |
 | `11` | `UNSAFE_EMBEDDING` | a rewrite that did not provably survive re-parsing; refused, so normally counted as a refusal rather than an error |
 | `12` | `MALFORMED_SOURCE` | a file the parser could not be handed at all |
 | `13` | `PARSER_FAILURE` | the parser itself errored on a file that looked readable |

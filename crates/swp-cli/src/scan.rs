@@ -19,7 +19,7 @@
 //!   the finding to a release rather than to "the project".
 //! * **The document is `swp-evidence`'s, not this command's.** §22 makes the
 //!   evidence engine the thing that decides what a scan means, so the JSON here is
-//!   the engine's `SWP-1-report-v1` verbatim. A second schema for the same facts
+//!   engine's `SWP-1-report-v2` verbatim. A second schema for the same facts
 //!   would be a second place for the §51 boundary to be lost.
 //!
 //! The exit code is the three-way answer a caller can branch on: `0` nothing was
@@ -239,7 +239,7 @@ mod tests {
             r.out, r.err
         );
         let doc = r.json();
-        assert_eq!(doc["schema"], "SWP-1-report-v1");
+        assert_eq!(doc["schema"], swp_evidence::REPORT_SCHEMA);
         assert_eq!(doc["protocol"], "SWP-1");
         assert_eq!(doc["result"], "PROVENANCE_DETECTED");
         assert_eq!(doc["run"]["command"], "scan");
@@ -331,11 +331,14 @@ mod tests {
             "a complete scan must not describe itself as partial:\n{doc:#}"
         );
         if doc["result"] == "INCONCLUSIVE" {
+            let lines = doc["explanation"].as_array().unwrap();
+            let said = |phrase: &str| {
+                lines
+                    .iter()
+                    .any(|l| l.as_str().unwrap_or_default().contains(phrase))
+            };
             assert!(
-                doc["explanation"].as_array().unwrap().iter().any(|l| l
-                    .as_str()
-                    .unwrap_or_default()
-                    .contains("the bound covers them")),
+                said("a verdict must clear") && said("with probability"),
                 "an inconclusive verdict owed its reader the arithmetic behind it:\n{doc:#}"
             );
         }
@@ -364,7 +367,7 @@ mod tests {
         );
         let written = std::fs::read_to_string(&at).unwrap();
         assert!(
-            written.contains("\"schema\": \"SWP-1-report-v1\""),
+            written.contains(&format!("\"schema\": \"{}\"", swp_evidence::REPORT_SCHEMA)),
             "{written}"
         );
         let names = owner.store().report_names().unwrap();

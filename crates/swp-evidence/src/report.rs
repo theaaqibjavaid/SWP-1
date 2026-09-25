@@ -7,11 +7,15 @@
 //!
 //! ## The schema line
 //!
-//! `schema` is `SWP-1-report-v1` and it is checked on load, not assumed. A report
-//! written by a future SWP-2 must fail loudly when a SWP-1 build reads it, because
+//! `schema` is `SWP-1-report-v2` and it is checked on load, not assumed. A report
+//! written by a later protocol must fail loudly when this build reads it, because
 //! the fields that would be new are exactly the fields whose meaning would have
 //! changed underneath: evidence levels are defined by their rules, and a rule that
-//! moved would silently re-grade old evidence.
+//! moved would silently re-grade old evidence. That is also why this token moved
+//! from `v1` to `v2` when the verdict began gating on a coincidence *probability*
+//! and the document gained the two fields that record it (`draws`,
+//! `coincidence_probability`): a report written under the older additive rule is not
+//! a report this build should grade by the new one without saying so.
 //!
 //! ## Sizing
 //!
@@ -29,7 +33,7 @@ use crate::item::{self, EvidenceItem, EvidenceKind};
 use crate::level::{self, Assessment, EvidenceLevel, Outcome, ReleaseTally};
 
 /// The versioned schema name, printed first in both renderings.
-pub const REPORT_SCHEMA: &str = "SWP-1-report-v1";
+pub const REPORT_SCHEMA: &str = "SWP-1-report-v2";
 
 /// How many evidence items the text rendering lists before summarising the rest.
 pub const TEXT_EVIDENCE_ITEMS: usize = 24;
@@ -134,23 +138,30 @@ impl Report {
 
     /// Read a stored report back, refusing anything that is not this schema.
     pub fn from_json(text: &str) -> Result<Self, SwpError> {
-        let report: Report = serde_json::from_str(text)
+        // The two identity fields are read out of the untyped document first, because
+        // a report from another schema differs in its *fields* too, and a missing-field
+        // error would call a foreign document damaged. It is not damage; it is a record
+        // of arithmetic this build does not apply, and it says so.
+        let declared: serde_json::Value = serde_json::from_str(text)
             .map_err(|e| SwpError::invalid_manifest(format!("report: {e}")))?;
-        if report.schema != REPORT_SCHEMA {
-            return Err(SwpError::new(
-                ErrorCode::ProtocolVersionUnsupported,
-                format!(
-                    "report declares schema {:?}; this build reads {REPORT_SCHEMA}",
-                    report.schema
-                ),
-            ));
+        if let Some(schema) = declared.get("schema").and_then(|v| v.as_str()) {
+            if schema != REPORT_SCHEMA {
+                return Err(SwpError::new(
+                    ErrorCode::ProtocolVersionUnsupported,
+                    format!("report declares schema {schema:?}; this build reads {REPORT_SCHEMA}"),
+                ));
+            }
         }
-        if report.protocol != SWP_PROTOCOL_NAME {
-            return Err(SwpError::new(
-                ErrorCode::ProtocolVersionUnsupported,
-                format!("report declares protocol {:?}", report.protocol),
-            ));
+        if let Some(protocol) = declared.get("protocol").and_then(|v| v.as_str()) {
+            if protocol != SWP_PROTOCOL_NAME {
+                return Err(SwpError::new(
+                    ErrorCode::ProtocolVersionUnsupported,
+                    format!("report declares protocol {protocol:?}"),
+                ));
+            }
         }
+        let report: Report = serde_json::from_value(declared)
+            .map_err(|e| SwpError::invalid_manifest(format!("report: {e}")))?;
         Ok(report)
     }
 
@@ -269,9 +280,9 @@ fn limitations(detection: &Detection, assessment: &Assessment) -> Vec<String> {
          protected build produces it identically to an infringing one."
             .to_string(),
         "No probability of copying is stated, because none is computed. The only \
-         number of that kind here is the coincidence bound over the comparisons \
-         actually performed, which is an upper limit on chance, not a likelihood about \
-         a person."
+         numbers of that kind here are the coincidence bound over the comparisons \
+         actually performed and the probability of this many confirmations under it, \
+         which bound chance and not anybody's conduct."
             .to_string(),
         "Absence of evidence is not evidence of absence: a rewrite that removed every \
          protected literal, or a reimplementation from memory, leaves nothing for this \
@@ -325,13 +336,24 @@ fn release_text(tally: &ReleaseTally) -> String {
         tally.bits, tally.tag_bits
     ));
     out.push_str(&format!(
-        "  Hypotheses probed: {} literal(s), {} rendering(s), {} reached a tag comparison\n",
-        tally.literals_tried, tally.windows_tried, tally.probes
+        "  Hypotheses probed: {} literal(s), {} rendering(s), {} span(s) at {} site(s) \
+         reached a tag comparison\n",
+        tally.literals_tried, tally.windows_tried, tally.probes, tally.sites
     ));
     out.push_str(&format!(
-        "  Expected coincidental confirmations: {:.4} (assumption-free bound {:.4})\n",
+        "  Expected coincidental confirmations: {:.4} from {} distinct code(s) ({:.4} if every \
+         span carried its own)\n",
         tally.chance,
+        tally.draws,
         crate::level::union_bound_of_coincidence(tally.probes, tally.tag_bits)
+    ));
+    // The number the verdict was actually gated on, with the floor it had to clear, so
+    // a reader sees how much room the finding left instead of taking the level's word.
+    out.push_str(&format!(
+        "  Probability an unrelated tree produces this many: {:.2e} (a verdict needs < \
+         {:.0e})\n",
+        tally.coincidence_probability,
+        crate::level::COINCIDENCE_MAX_ABOVE_WEAK
     ));
     out.push_str(&format!(
         "  Fingerprint ({}): {}\n",
@@ -428,6 +450,7 @@ mod tests {
             found_text: Some("(995 + 5)".into()),
             found_tokens: tokens,
             probes: if status == SiteStatus::Absent { 0 } else { 1 },
+            distinct_codes: if status == SiteStatus::Absent { 0 } else { 1 },
         }
     }
 
@@ -485,7 +508,18 @@ mod tests {
         assert_eq!(value["protocol"], SWP_PROTOCOL_NAME);
         assert_eq!(value["result"], "PROVENANCE_DETECTED");
         assert!(value["evidence"].is_array());
-        assert_eq!(value["evidence_level"], "VERY_STRONG", "{value:#}");
+        // Eight exact renderings over eight draws at a 4-bit tag are excused by chance
+        // with probability 6.2e-8, which is STRONG's floor and not VERY_STRONG's: the
+        // ladder's counts said VERY_STRONG and the grade says STRONG. See
+        // `level::tests::a_spread_constellation_survives_the_bound_and_is_graded_by_the_counts`.
+        assert_eq!(value["evidence_level"], "STRONG", "{value:#}");
+        // The numbers the verdict was gated on are in the document, not only in prose.
+        let release = &value["releases"][0];
+        assert_eq!(release["draws"], 8, "{release:#}");
+        assert!(
+            release["coincidence_probability"].as_f64().unwrap() < 1e-3,
+            "{release:#}"
+        );
     }
 
     #[test]
@@ -507,15 +541,46 @@ mod tests {
     }
 
     #[test]
+    fn an_older_report_is_refused_as_older_rather_than_as_malformed() {
+        // What a `1.0.0-beta.1` saved report looks like to this build: the v1 token,
+        // and none of the two fields v2 added. Read as JSON it is simply missing data,
+        // which would be reported as a corrupt artifact, so the schema is checked on
+        // the way in and the refusal names the difference between the documents.
+        let mut value: serde_json::Value =
+            serde_json::from_str(&report().to_json()).expect("a report is serializable");
+        value["schema"] = "SWP-1-report-v1".into();
+        for release in value["releases"].as_array_mut().unwrap() {
+            release.as_object_mut().unwrap().remove("draws");
+            release
+                .as_object_mut()
+                .unwrap()
+                .remove("coincidence_probability");
+        }
+        let e = Report::from_json(&value.to_string()).unwrap_err();
+        assert_eq!(e.code(), ErrorCode::ProtocolVersionUnsupported, "{e:?}");
+        assert!(e.message().contains("SWP-1-report-v1"), "{}", e.message());
+    }
+
+    #[test]
     fn the_text_rendering_carries_the_level_the_json_states() {
         let original = report();
         let text = original.to_text(false);
         assert!(text.contains("result    PROVENANCE_DETECTED"), "{text}");
-        assert!(text.contains("Evidence: VERY_STRONG"), "{text}");
+        assert!(text.contains("Evidence: STRONG"), "{text}");
         assert!(text.contains("Watermark fragments: 8/8"), "{text}");
         assert!(text.contains("What this report does not say"), "{text}");
         assert!(text.contains("WATERMARK_FRAGMENT_MATCH"), "{text}");
         assert!(text.contains("Exact renderings: 8"), "{text}");
+        // The bound, the draws behind it and the probability the gate compared are all
+        // on the page, so the verdict can be read without trusting the level word.
+        assert!(
+            text.contains("Expected coincidental confirmations: 0.5000 from 8 distinct code(s)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("Probability an unrelated tree produces this many: 6.22e-8"),
+            "{text}"
+        );
     }
 
     #[test]

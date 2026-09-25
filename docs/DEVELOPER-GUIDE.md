@@ -130,6 +130,19 @@ CI-adjacent conditions on purpose: the ratio between tiers is the claim, and an
 absolute millisecond figure from one busy laptop is not a claim anybody should
 have to defend. Its guard is the ratio, not the time, for exactly that reason.
 
+The measurement behind the verdict gate is not a suite but an example:
+
+```text
+cargo run --release -p swp-test-suite --example verdict-model -- \
+  --iters 30 --matrix 6 --tag-bits 4
+```
+
+It drives the built binary over look-alike projects, copies at several fractions,
+refactorings and site-removal attacks, and prints the production `tally` for every
+scan, which is what the two tables in [VALIDATION.md](VALIDATION.md) are made of.
+It is minutes per tag width, so CI does not run it; the rule is that a number it
+produced is quoted together with the command that produces it.
+
 ## The documentation is a test
 
 A documented command has to be one that was run, and a stale example has to fail
@@ -297,11 +310,19 @@ that justifies it beside it. Changing one changes what a report calls `STRONG`,
 which changes what a *saved* report of a previous build means, so a ladder change
 is a schema discussion, not a commit.
 
-The coincidence arithmetic is `chance_of_coincidence` and its looser sibling, and
-both figures are printed in every report: `chance` for spans sharing an address,
-`loose` for counting every span separately. No percentage is printed, so the
-output is always a count of expected coincidences next to the count observed,
-never a confidence level.
+The coincidence arithmetic is three functions in `level.rs`.
+`chance_of_coincidence` sums, over each site's count of *distinct keyed codes*,
+the chance that one such draw lands on the site's tag — an upper bound on
+accidental confirmations by linearity, needing no independence assumption.
+`union_bound_of_coincidence` is its looser sibling, counting every span as if it
+carried its own code, and it is printed beside the bound as the
+assumption-free figure. `tail_of_coincidence` turns the pair into the number the
+verdict is gated on: the Poisson upper tail of seeing this many confirmations or
+more when the expectation is the bound, recorded as `coincidence_probability`.
+All of them appear in every report. None of them is a probability that anybody
+copied anything — that distinction is one of the `limitations` lines a report
+prints about itself, so a reader meets it in the document rather than in a
+footnote elsewhere.
 
 ## Changing a derivation
 

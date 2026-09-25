@@ -724,6 +724,8 @@ dependencies = [
  "swp-cli",
  "swp-core",
  "swp-crypto",
+ "swp-detection",
+ "swp-evidence",
  "swp-identity",
  "walkdir",
  "zip",

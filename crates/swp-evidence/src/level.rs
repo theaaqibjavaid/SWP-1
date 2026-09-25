@@ -5,19 +5,46 @@
 //! "97.2% probability of copying" would need a model of how often people copy code,
 //! which nobody running this tool has measured for any population. What *is*
 //! computable from a scan is the other side of the question: given how many
-//! candidate spans were offered a tag comparison, and given that a tag is an HMAC
-//! output truncated to `w` bits, the number of confirmations an unrelated tree
-//! should produce by chance is bounded by
+//! candidate literals were offered at this release's addresses, and given that a tag
+//! is an HMAC output truncated to `w` bits, the number of confirmations an unrelated
+//! tree should produce by chance is at most
 //!
 //! ```text
-//! chance = probes × 2^-w
+//! lambda = Σ_s [ 1 − (1 − 2^-w)^d_s ]
 //! ```
 //!
-//! where `probes` counts only spans that reproduced a manifest address. It is a
-//! union bound over the comparisons actually performed, so it is an upper limit on
-//! coincidence rather than a claim about any particular copy, and the report prints
-//! it as that. The level below then asks how many confirmations are left over once
-//! the bound is subtracted, which is the only question arithmetic can answer here.
+//! summed over sites, where `d_s` is how many *distinct keyed codes* the candidate
+//! presented at site `s`. That is an upper bound on the expected count by linearity
+//! of expectation, and it needs no independence assumption to be true: three spans
+//! that reproduce one address by carrying one repeated literal are one chance at this
+//! project's tag, not three. Counting spans instead of codes overstates the bound by
+//! how much those repeats were worth — measured at 1.8% of `lambda` at 4 tag bits,
+//! 0.5% at 6 and 0.1% at 8, so the correction is about the bound being admissible,
+//! not about it being large, and it is the tail gate below that changes verdicts. A
+//! span whose code this build cannot derive is still counted as one, so the statistic
+//! never understates the chances.
+//!
+//! The verdict then asks the one question left that arithmetic can answer: how
+//! likely is it that an unrelated tree with exactly these chances produces *at least*
+//! the confirmations this scan counted? That probability is the upper tail of a
+//! `Poisson(lambda)` count. Two measurements license the model and neither licenses
+//! optimism: across 2,790 unrelated cross-scans the observed confirmation counts were
+//! Poisson-shaped (variance/mean 0.95, 1.01 and 1.00 at 4, 6 and 8 bits), so a
+//! Poisson is the right family; and its mean, `lambda`, came out 2.98x, 2.74x and
+//! 3.26x *above* the observed mean, because draws that share one address are not
+//! independent and a single draw hits an unrelated tree's tag less often than 2^-w.
+//! The bound is therefore conservative by a measured factor and never liberal, so the
+//! error it can make is refusing a verdict rather than granting one — at the cost
+//! `docs/VALIDATION.md` states per tag width. [`ReleaseTally::clears_chance`] is the
+//! line between "this carries our release" and "this is a lead": a scan that cannot
+//! cross it says `INCONCLUSIVE` rather than accusing anybody (§27, §51). The floors
+//! are constants below, and they were read off the measured false-accusation rate
+//! rather than chosen for roundness (
+//! chosen for roundness (§12 of `docs/SWP-1-SPEC.md` and the record in
+//! `docs/VALIDATION.md`). Clearing them is necessary and not sufficient — the verdict
+//! also needs the level to have reached `MODERATE`, so that a two-literal candidate
+//! cannot buy a finding simply by being too small to set a wide bound. A verdict may
+//! say no more than the ladder already said.
 //!
 //! The bound is not always small. A site's address is a digest of the code around
 //! it with the site hidden, abstracted over local names and over every other
@@ -25,14 +52,9 @@
 //! found — and what makes an ordinary one-line `var step = 4;` inside an ordinary
 //! arithmetic function reproduce an address another project published. A scan of an
 //! unrelated tree can therefore record hundreds of probes and a handful of
-//! confirmations, all of it within what chance owes. That is why the bound decides
-//! the *verdict* and not only the level: [`ReleaseTally::clears_chance`] is the
-//! line between "this carries our release" and "this is a lead", and a scan that
-//! cannot cross it says `INCONCLUSIVE` rather than accusing anybody (§27, §51).
-//! Clearing it is necessary and not sufficient — the verdict also needs the level
-//! to have reached `MODERATE`, so that a two-literal candidate cannot buy a finding
-//! simply by being too small to set a wide bound. A verdict may say no more than
-//! the ladder already said.
+//! confirmations, all of it within what chance owes. That is the shape the
+//! probability gate is for: it asks about the *count*, so a candidate that reproduces
+//! many addresses does not buy a verdict by producing many coincidences.
 //!
 //! ## What the ladder is
 //!
@@ -160,12 +182,31 @@ pub const STRONG_MIN_FILES: usize = 2;
 pub const STRONG_SOLO_MIN_FRAGMENTS: usize = 6;
 pub const VERY_STRONG_MIN_FRAGMENTS: usize = 8;
 pub const VERY_STRONG_MIN_FILES: usize = 3;
-/// Confirmations the coincidence bound cannot account for, required at each step
-/// above `WEAK`. `1.5` means "at least one whole event over the bound, and not by
-/// rounding"; the higher steps are `3` and `6`.
-pub const GUARANTEE_ABOVE_WEAK: f64 = 1.5;
-pub const GUARANTEE_FOR_STRONG: f64 = 3.0;
-pub const GUARANTEE_FOR_VERY_STRONG: f64 = 6.0;
+/// The largest coincidental probability each step above `WEAK` will accept, in
+/// place of the additive confirmations-over-the-bound slack this build used to grade
+/// with.
+///
+/// A probability is what the gate compares, because the old subtraction was
+/// width-blind: `1.5` confirmations above the bound meant a very different chance of
+/// an unrelated tree producing them at a 4-bit tag than at an 8-bit one, so the same
+/// rule accused look-alike projects at one width and cleared them at another.
+/// Measured on the rule this one replaced: 6 false accusations in the 3,000 foreign
+/// cross-scans of 100 runs of the §28 suite — 0.20% per scan, 5 runs in 100 red — and
+/// 7 more in 2,790 look-alike scans across the tag widths. On the same scans this
+/// gate accused nobody: 0 in 5,790, which bounds its rate at 5.2e-4 per scan and 3.0%
+/// per §28 run at 95% confidence. That residual is the honest limit of what the
+/// suites show; `docs/VALIDATION.md` states it and how to reproduce it.
+///
+/// What it costs is measured too: 1,903 of the 2,100 findings the old rule reached
+/// survive (90.6%, width by width 80 / 95 / 97%), the loss falling on half-and-under
+/// partial copies and on site-removal attacks at the default 4-bit width, where a
+/// finding now needs 10 confirmations of a 12-site constellation. No scan in the
+/// sample was accused by this rule and cleared by the old one. The higher steps are a
+/// decade and five stricter for the same reason the counts are higher: `STRONG` and
+/// `VERY_STRONG` are words a report says about somebody's code.
+pub const COINCIDENCE_MAX_ABOVE_WEAK: f64 = 1e-3;
+pub const COINCIDENCE_MAX_FOR_STRONG: f64 = 1e-5;
+pub const COINCIDENCE_MAX_FOR_VERY_STRONG: f64 = 1e-8;
 
 /// Everything the ladder reads about one release, as measured numbers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -196,14 +237,25 @@ pub struct ReleaseTally {
     pub tag_bits: u8,
     /// Spans that reached a tag comparison.
     pub probes: u32,
+    /// Distinct keyed codes the candidate presented, summed over sites: the draws
+    /// [`ReleaseTally::chance`] is computed from.
+    pub draws: u32,
     pub literals_tried: u64,
     pub windows_tried: u64,
     /// `"match"`, `"no-match"` or `"not-comparable"`.
     pub fingerprint: String,
-    /// `probes × 2^-tag_bits`: the upper bound on coincidental confirmations.
+    /// `Σ_s [1 − (1 − 2^-tag_bits)^d_s]` over the sites' distinct-code counts: the
+    /// upper bound on coincidental confirmations, assuming nothing about codes being
+    /// independent.
     pub chance: f64,
-    /// Confirmations above that bound.
+    /// Confirmations above that bound. Printed as the size of the excess; the verdict
+    /// is decided by [`ReleaseTally::coincidence_probability`], not by this.
     pub guarantee: f64,
+    /// The probability that an unrelated tree holding these addresses and none of
+    /// this project's codes produces `fragments` confirmations or more: the upper
+    /// tail of `Poisson(chance)`, which is measured to over-predict the null rather
+    /// than under-predict it. This is the number the floors above are compared with.
+    pub coincidence_probability: f64,
     pub level: EvidenceLevel,
     /// The rules that produced `level`, in plain sentences with the numbers in them.
     pub reasons: Vec<String>,
@@ -214,22 +266,25 @@ impl ReleaseTally {
     ///
     /// Two requirements, and the second is not a restatement of the first:
     ///
-    /// * the count has to clear the coincidence bound the candidate's own probe
-    ///   volume sets — `fragments > probes × 2^-w`, which is what `guarantee`
-    ///   measures; and
+    /// * the count has to be one the candidate's own draw volume cannot account
+    ///   for — `Poisson(chance) ≥ fragments` has to come in under
+    ///   [`COINCIDENCE_MAX_ABOVE_WEAK`], which is what
+    ///   [`ReleaseTally::coincidence_probability`] measures; and
     /// * the grade has to reach `MODERATE`, or the §16 fingerprint has to have
     ///   matched.
     ///
-    /// The first rule alone leaves a hole worth naming, because a thin candidate
-    /// makes the bound small: one 4-bit confirmation against two probes scores
-    /// `guarantee ≈ 0.88` and passes, while the ladder is explicit that a single
-    /// fragment is a lead to look at rather than proof of copying. A verdict is
-    /// allowed to say only what its evidence level already says — which is the
-    /// §27 requirement, and the reason `WEAK` and `None` are excluded here rather
-    /// than only in the explanation.
+    /// The first rule alone would be enough at the widths this build emits — a lone
+    /// fragment's best possible probability is one draw's `2^-w`, which is 3.9e-3 at
+    /// the widest supported tag and so cannot cross the floor — but the ladder is a
+    /// protocol convention, not a consequence of the arithmetic, and §23 defines a
+    /// single fragment as "a lead worth manual review" whatever the tag width
+    /// becomes later. A verdict is allowed to say only what its evidence level
+    /// already says — which is the §27 requirement, and the reason `WEAK` and `None`
+    /// are excluded here rather than only in the explanation.
     pub fn clears_chance(&self) -> bool {
         self.fingerprint == "match"
-            || (self.guarantee > 0.0 && self.level >= EvidenceLevel::Moderate)
+            || (self.coincidence_probability < COINCIDENCE_MAX_ABOVE_WEAK
+                && self.level >= EvidenceLevel::Moderate)
     }
 }
 
@@ -263,24 +318,28 @@ pub fn tally(detection: &Detection, position: usize) -> ReleaseTally {
             renderings += 1;
         }
     }
-    let site_probes: Vec<u32> = release.sites.iter().map(|s| s.probes).collect();
+    let site_draws: Vec<u32> = release.sites.iter().map(|s| s.distinct_codes).collect();
+    let draws: u32 = site_draws.iter().sum();
     let probes = release.probes();
-    let chance = chance_of_coincidence(&site_probes, release.tag_bits);
+    let chance = chance_of_coincidence(&site_draws, release.tag_bits);
     let loose = union_bound_of_coincidence(probes, release.tag_bits);
     let fragments = release.confirmed();
     let guarantee = fragments as f64 - chance;
+    let probability = tail_of_coincidence(chance, fragments);
     let (level, mut reasons) = grade(
         fragments,
         files.len(),
         release.fingerprint.matched(),
         chance,
-        guarantee,
+        probability,
     );
     reasons.push(format!(
-        "coincidence bound: {probes} span(s) reached a {}-bit tag comparison at {} site(s), so an \
-         unrelated tree holding those addresses and none of this project's codes is expected to \
-         confirm at most {chance:.4} of them by chance ({loose:.4} if nothing is assumed about \
-         spans sharing an address); {:.4} remain",
+        "coincidence bound: {probes} span(s) carrying {draws} distinct code(s) reached a \
+         {}-bit tag comparison at {} site(s), so an unrelated tree holding those addresses and \
+         none of this project's codes is expected to confirm at most {chance:.4} of them \
+         ({loose:.4} if every span carried its own code) and produces this scan's {fragments} \
+         confirmation(s) or more with probability {probability:.2e}; {:.4} remain above the \
+         expectation",
         release.tag_bits,
         release.total(),
         guarantee.max(0.0)
@@ -300,11 +359,13 @@ pub fn tally(detection: &Detection, position: usize) -> ReleaseTally {
         bits: release.confirmed_bits(),
         tag_bits: release.tag_bits,
         probes: release.probes(),
+        draws,
         literals_tried: release.literals_tried,
         windows_tried: release.windows_tried,
         fingerprint: release.fingerprint.as_str().to_string(),
         chance,
         guarantee,
+        coincidence_probability: probability,
         level,
         reasons,
     }
@@ -313,43 +374,92 @@ pub fn tally(detection: &Detection, position: usize) -> ReleaseTally {
 /// Expected coincidental confirmations for one release, computed where the width
 /// is validated rather than trusted.
 ///
-/// `site_probes` is how many candidate spans reached a tag comparison *at each
-/// site*, so the sum is [`ReleaseTally::probes`]. A site contributes
-/// `1 − (1 − 2^-w)^n`: the chance that at least one of its `n` spans carries this
-/// project's `w`-bit code by luck. Summing the probes instead — the assumption-free
-/// union bound `Σ n × 2^-w` — would say that four spans at one address can produce
-/// four confirmations of the same site, and at a 4-bit tag over a self-similar
-/// candidate it returns a bound larger than the number of sites, which is not a
-/// statement anyone should print about evidence. What the tighter formula buys is
-/// the assumption that spans sharing an address have independent tags, which is
-/// true of unrelated source and false only of a tree that duplicates one
-/// watermarked statement — where it errs by counting a second copy of real
-/// evidence as a second chance to be fooled.
-pub fn chance_of_coincidence(site_probes: &[u32], tag_bits: u8) -> f64 {
+/// `site_draws` is how many *distinct keyed codes* reached a tag comparison *at each
+/// site*, so the sum is [`ReleaseTally::draws`]. A site contributes
+/// `1 − (1 − 2^-w)^d`: the chance that at least one of its `d` codes carries this
+/// project's `w`-bit tag. Two looser statistics are available and neither is used
+/// here: counting the *spans* that reached the address instead of the codes they
+/// carried, which measures 1.8% higher at a 4-bit tag, 0.5% at 6 and 0.1% at 8 on
+/// look-alike trees; and the assumption-free union bound [`union_bound_of_coincidence`]
+/// below, `Σ n × 2^-w`, which is 20% above this at 4 bits, 5% at 6 and 1% at 8, and
+/// which the report prints beside this number rather than grading on.
+///
+/// None of those three is why the verdicts changed. This form needs no independence
+/// assumption at all: it is an upper bound on the expected count by linearity of
+/// expectation, whatever the dependence between sites, and it can only err by counting
+/// a span whose code this build could not derive as one more chance to be fooled. What
+/// it does not do is understate the chances, and the tail gate below is what turns
+/// "an upper bound" into a verdict a reader can rely on.
+pub fn chance_of_coincidence(site_draws: &[u32], tag_bits: u8) -> f64 {
     let rate = match TagWidth::new(tag_bits) {
         Ok(width) => width.null_hit_probability(),
         // A width this build does not know cannot be graded, and must not be
         // graded generously: rate 1.0 means every site it probed is expected.
         Err(_) => 1.0,
     };
-    site_probes
+    site_draws
         .iter()
-        .map(|&n| match n {
+        .map(|&d| match d {
             0 => 0.0,
-            _ => 1.0 - (1.0 - rate).powf(n as f64),
+            _ => 1.0 - (1.0 - rate).powf(d as f64),
         })
         .sum()
 }
 
-/// The same expectation without the independence assumption: an upper bound, and
-/// a loose one. Printed alongside the tight figure so the reader can see how much
-/// of the verdict the assumption carries.
+/// The same expectation with one assumption fewer and no subtraction at all: every
+/// span at every address is billed as one chance, whether or not it carries a code
+/// anything else carries. Printed alongside the tight figure so a reader can see the
+/// bound that needs no account of what repeated — measured at 20% above
+/// [`chance_of_coincidence`] at a 4-bit tag, 5% at 6 bits and 1% at 8, on look-alike
+/// trees where about one site in twenty carries spans that share a code.
 pub fn union_bound_of_coincidence(probes: u32, tag_bits: u8) -> f64 {
     let rate = match TagWidth::new(tag_bits) {
         Ok(width) => width.null_hit_probability(),
         Err(_) => 1.0,
     };
     probes as f64 * rate
+}
+
+/// The probability that a count with expectation `lambda` reaches `events` or more:
+/// the upper tail of a `Poisson(lambda)`, which is what the coincidence floors are
+/// compared against.
+///
+/// A Poisson is the right *shape* here because the events are rare draws over a
+/// large number of candidate literals, and both halves of that were measured rather
+/// than assumed. The shape holds: over 930 unrelated cross-scans at each of 4, 6 and
+/// 8 bits the confirmation count came out with variance/mean 0.95, 1.01 and 1.00, and
+/// 0.86 over the 3,000 foreign scans of §28. The mean does not: `lambda` sits 2.7x to
+/// 3.3x above what an unrelated tree really confirms, because draws sharing one
+/// address are not independent, so this tail is over-predicted by a factor that grows
+/// with the count — at 4 bits it put `P(F >= 1)` at 0.94 where 930 scans measured
+/// 0.62, and `P(F >= 4)` at 0.32 where 7,500 scans measured 0.0076. Never under, at
+/// any bucket measured: the mistake this function can make is refusing a verdict
+/// rather than granting one, and `docs/VALIDATION.md` prints what that costs in
+/// confirmations per tag width.
+pub fn tail_of_coincidence(lambda: f64, events: usize) -> f64 {
+    if events == 0 {
+        // Zero confirmations is what an unrelated tree always produces.
+        return 1.0;
+    }
+    if lambda <= 0.0 {
+        return 0.0;
+    }
+    // 1 − e^-λ Σ_{i<events} λ^i / i!, accumulated term by term so no factorial is
+    // ever formed. A non-finite lower tail means λ is enormous next to `events`,
+    // where the probability is 1 anyway; the guard refuses rather than dividing.
+    let mut term = 1.0f64;
+    let mut sum = 0.0f64;
+    for i in 0..events {
+        if i > 0 {
+            term *= lambda / i as f64;
+        }
+        sum += term;
+    }
+    let kept = (-lambda).exp() * sum;
+    if !kept.is_finite() {
+        return 1.0;
+    }
+    (1.0 - kept).clamp(0.0, 1.0)
 }
 
 /// The ladder, as a function of measured counts, so the same rules grade a scan
@@ -359,7 +469,7 @@ fn grade(
     files: usize,
     fingerprint_matched: bool,
     chance: f64,
-    guarantee: f64,
+    probability: f64,
 ) -> (EvidenceLevel, Vec<String>) {
     let mut reasons = Vec::new();
     if fingerprint_matched {
@@ -372,13 +482,13 @@ fn grade(
         return (EvidenceLevel::VeryStrong, reasons);
     }
     let counted = ladder(fragments, files);
-    // The guarantee can only ever lower the level, never raise it: arithmetic about
-    // coincidence is not a substitute for having the fragments.
-    let allowed = if guarantee >= GUARANTEE_FOR_VERY_STRONG {
+    // Coincidence can only ever lower the level, never raise it: arithmetic about
+    // chance is not a substitute for having the fragments.
+    let allowed = if probability < COINCIDENCE_MAX_FOR_VERY_STRONG {
         EvidenceLevel::VeryStrong
-    } else if guarantee >= GUARANTEE_FOR_STRONG {
+    } else if probability < COINCIDENCE_MAX_FOR_STRONG {
         EvidenceLevel::Strong
-    } else if guarantee >= GUARANTEE_ABOVE_WEAK {
+    } else if probability < COINCIDENCE_MAX_ABOVE_WEAK {
         EvidenceLevel::Moderate
     } else {
         EvidenceLevel::Weak
@@ -386,10 +496,11 @@ fn grade(
     let level = counted.min(allowed);
     if level < counted {
         reasons.push(format!(
-            "{fragments} confirmation(s) against a coincidence bound of {:.4} expected by chance: \
-             the bound cannot rule the extra ones out, so the level is capped at {level} whatever \
-             the count would otherwise have earned (it reached {counted} on counts alone)",
-            chance
+            "{fragments} confirmation(s) against a coincidence bound of {chance:.4} expected by \
+             chance: an unrelated tree produces that many of them or more with probability \
+             {probability:.2e}, which is more than a claim above {level} can stand on, so the \
+             level is capped at {level} whatever the count would otherwise have earned (it \
+             reached {counted} on counts alone)"
         ));
     }
     reasons.extend(explain(fragments, files, level));
@@ -510,21 +621,27 @@ pub fn assess(detection: &Detection) -> Assessment {
     let mut reasons = top.map(|t| t.reasons.clone()).unwrap_or_default();
     if lead && !detected {
         if let Some(t) = top {
-            reasons.push(if t.guarantee <= 0.0 {
+            reasons.push(if t.coincidence_probability >= COINCIDENCE_MAX_ABOVE_WEAK {
                 format!(
                     "{} confirmation(s) against a bound of {:.4} an unrelated tree is expected to \
-                     produce: the bound covers them, so this scan reports the candidate as \
+                     produce: it reaches this many of them with probability {:.2e}, above the \
+                     {:.0e} a verdict must clear, so this scan reports the candidate as \
                      INCONCLUSIVE rather than as carrying this release. Nothing here distinguishes \
                      it from an unrelated project, and a wider tag or a larger constellation would.",
-                    t.fragments, t.chance
+                    t.fragments,
+                    t.chance,
+                    t.coincidence_probability,
+                    COINCIDENCE_MAX_ABOVE_WEAK
                 )
             } else {
                 format!(
-                    "{} confirmation(s) clear the bound of {:.4} an unrelated tree is expected to \
-                     produce, but {level} is the grade a verdict cannot be printed on: a lead this \
+                    "{} confirmation(s) clear the coincidence floor of {:.0e} at probability \
+                     {:.2e}, but {level} is the grade a verdict cannot be printed on: a lead this \
                      thin is reported as evidence to look at and as INCONCLUSIVE, not as this \
                      release being present.",
-                    t.fragments, t.chance
+                    t.fragments,
+                    COINCIDENCE_MAX_ABOVE_WEAK,
+                    t.coincidence_probability
                 )
             });
         }
@@ -581,15 +698,22 @@ mod tests {
             found_text: (status != SiteStatus::Absent).then(|| "(995 + 5)".into()),
             found_tokens: if status == SiteStatus::Absent { 0 } else { 5 },
             probes: if status == SiteStatus::Absent { 0 } else { 1 },
+            distinct_codes: if status == SiteStatus::Absent { 0 } else { 1 },
         }
     }
 
     /// One release made of the given sites, at 4 bits.
     fn release(sites: Vec<SiteMatch>) -> ReleaseDetection {
+        release_at(4, sites)
+    }
+
+    /// The same, at a chosen tag width: the floors are probabilities, so the width a
+    /// release was published at changes what its counts can be claimed to mean.
+    fn release_at(bits: u8, sites: Vec<SiteMatch>) -> ReleaseDetection {
         ReleaseDetection {
             project_id: ProjectId::new("swp1-abcdefghijklmnop").unwrap(),
             release_id: ReleaseId::new("rel-aaaaaaaaaaaa").unwrap(),
-            tag_bits: 4,
+            tag_bits: bits,
             sites,
             fingerprint: FingerprintCheck::NotMatched,
             candidate_files: 3,
@@ -598,9 +722,19 @@ mod tests {
         }
     }
 
-    /// How many spans stood at this site's address.
+    /// How many spans stood at this site's address, each carrying its own code.
     fn probed(mut m: SiteMatch, n: u32) -> SiteMatch {
         m.probes = n;
+        m.distinct_codes = n;
+        m
+    }
+
+    /// How many spans stood at this site's address when they all carried one code —
+    /// the shape a tree has where a statement is repeated, which is what the
+    /// distinct-code count exists for.
+    fn shared(mut m: SiteMatch, n: u32) -> SiteMatch {
+        m.probes = n;
+        m.distinct_codes = 1;
         m
     }
 
@@ -639,10 +773,10 @@ mod tests {
     fn the_coincidence_bound_counts_a_site_once_however_many_spans_reached_it() {
         assert_eq!(chance_of_coincidence(&[], 4), 0.0);
         assert_eq!(chance_of_coincidence(&[0, 0, 0], 4), 0.0);
-        // One span each at sixteen sites: the two formulas agree, at one expected hit.
+        // One code each at sixteen sites: the two formulas agree, at one expected hit.
         assert!((chance_of_coincidence(&[1; 16], 4) - 1.0).abs() < 1e-12);
         assert!((union_bound_of_coincidence(16, 4) - 1.0).abs() < 1e-12);
-        // Sixteen spans at ONE site cannot confirm it sixteen times.
+        // Sixteen codes at ONE site cannot confirm it sixteen times.
         assert!(
             (chance_of_coincidence(&[16], 4) - (1.0 - (15.0f64 / 16.0).powi(16))).abs() < 1e-12
         );
@@ -652,7 +786,7 @@ mod tests {
         let tight = chance_of_coincidence(&[16, 16, 16], 4);
         assert!((tight - 3.0 * (1.0 - (15.0f64 / 16.0).powi(16))).abs() < 1e-9);
         assert!(tight < union_bound_of_coincidence(48, 4));
-        // A huge probe count cannot push the expectation past the sites it covers,
+        // A huge code count cannot push the expectation past the sites it covers,
         // which is the failure a printed bound must never have.
         assert!(chance_of_coincidence(&[100_000; 24], 4) <= 24.0);
         // An unknown width is graded as if every probed site could coincide.
@@ -661,24 +795,87 @@ mod tests {
     }
 
     #[test]
+    fn spans_sharing_a_code_are_one_chance_and_not_the_bound_sixteen_times_over() {
+        // The shape a look-alike tree has: sixteen spans reproduce one address, and
+        // they do it by carrying one repeated statement, so the site was offered one
+        // code rather than sixteen. Measured over 11,400 cross-scans, a site of this
+        // shape confirmed at 2^-w — one draw's rate — while the span count this build
+        // used before predicted 0.57 to 0.64 of a hit at 4 bits.
+        let one_code = chance_of_coincidence(&[1, 1, 1], 4);
+        let counted_spans = chance_of_coincidence(&[16, 16, 16], 4);
+        assert!((one_code - 3.0 / 16.0).abs() < 1e-12, "{one_code}");
+        assert!(counted_spans > 3.0 * one_code);
+        assert!(
+            (union_bound_of_coincidence(48, 4) - 3.0).abs() < 1e-9,
+            "counting spans, three sites at 4 bits expect three coincidences: more than \
+             the sites that exist, which is the inflation removed"
+        );
+    }
+
+    #[test]
+    fn the_coincidence_probability_is_the_upper_tail_of_a_poisson_count() {
+        // No chances at all: nothing can coincide.
+        assert_eq!(tail_of_coincidence(0.0, 1), 0.0);
+        // Zero confirmations is what an unrelated tree always produces.
+        assert_eq!(tail_of_coincidence(3.0, 0), 1.0);
+        // One event over an expectation of ln 2 sits on the 50% line: 1 − e^−λ = 0.5.
+        assert!((tail_of_coincidence(std::f64::consts::LN_2, 1) - 0.5).abs() < 1e-6);
+        // Two events over 0.125: 1 − e^-λ(1 + λ).
+        assert!((tail_of_coincidence(0.125, 2) - 0.007_191).abs() < 1e-6);
+        // Monotone both ways a verdict cares about: a wider bound excuses more,
+        // and a larger count is harder to excuse.
+        assert!(tail_of_coincidence(0.5, 8) > tail_of_coincidence(0.25, 8));
+        assert!(tail_of_coincidence(0.25, 9) < tail_of_coincidence(0.25, 8));
+        // A bound enormous next to the count is certainty, and a count enormous
+        // next to the bound rounds to nothing; neither may come out negative.
+        assert_eq!(tail_of_coincidence(400.0, 8), 1.0);
+        assert!(tail_of_coincidence(0.25, 400) < 1e-300);
+    }
+
+    #[test]
     fn one_fragment_is_weak_even_though_the_ladder_would_not_say_so() {
-        // 1 confirmation, 1 probe, 4 bits -> chance 0.0625, guarantee ~0.94 < 1.5.
-        let (level, _) = grade(1, 1, false, 0.0625, 1.0 - 0.0625);
+        // 1 confirmation over 1 draw at 4 bits: expectation 0.0625, probability 6.1e-2.
+        let (level, _) = grade(1, 1, false, 0.0625, tail_of_coincidence(0.0625, 1));
         assert_eq!(level, EvidenceLevel::Weak);
-        let (eight, _) = grade(8, 4, false, 0.5, 7.5);
+        // The widest tag the protocol emits does not buy the step with one fragment
+        // either: its best case is one draw at 2^-8, a probability of 3.9e-3.
+        let one_draw_at_eight = 1.0 / 256.0;
+        let p = tail_of_coincidence(one_draw_at_eight, 1);
+        assert!(p > COINCIDENCE_MAX_ABOVE_WEAK, "{p}");
+        assert_eq!(
+            grade(1, 1, false, one_draw_at_eight, p).0,
+            EvidenceLevel::Weak
+        );
+        // Where chance cannot reach the count, the counts decide the level.
+        let (eight, _) = grade(8, 4, false, 0.25, tail_of_coincidence(0.25, 8));
         assert_eq!(eight, EvidenceLevel::VeryStrong);
     }
 
     #[test]
     fn a_bound_that_explains_the_hits_caps_the_level_without_inventing_hits() {
-        // 12 address-matched sites at 4 bits, 12 confirmations: chance 0.75 each is
-        // not the shape here, so use a wide probe count that makes the bound bite.
-        let (level, reasons) = grade(4, 1, false, 3.2, 0.8);
+        // Four confirmations at a bound of 3.2: chance accounts for the count, so
+        // the level is WEAK whatever the numbers say about spread.
+        let (level, reasons) = grade(4, 1, false, 3.2, tail_of_coincidence(3.2, 4));
         assert_eq!(level, EvidenceLevel::Weak, "{reasons:?}");
         assert!(
             reasons.iter().any(|r| r.contains("coincidence bound")),
             "{reasons:?}"
         );
+    }
+
+    #[test]
+    fn the_floors_between_weak_and_very_strong_are_decided_by_probability() {
+        // Eight confirmations over eight draws at 4 bits are excused by chance with
+        // probability 6.2e-8: under the additive rule this scan left 7.5 confirmations
+        // above the bound and read as VERY_STRONG, and it now reads as STRONG, which is
+        // what its arithmetic supports. The verdict is unchanged either way.
+        let (strong, reasons) = grade(8, 4, false, 0.5, tail_of_coincidence(0.5, 8));
+        assert_eq!(strong, EvidenceLevel::Strong, "{reasons:?}");
+        assert!(reasons.iter().any(|r| r.contains("capped")), "{reasons:?}");
+        // Ten times the same evidence clears the top floor.
+        let (very, reasons) = grade(10, 4, false, 0.5, tail_of_coincidence(0.5, 10));
+        assert_eq!(very, EvidenceLevel::VeryStrong, "{reasons:?}");
+        assert!(!reasons.iter().any(|r| r.contains("capped")), "{reasons:?}");
     }
 
     #[test]
@@ -752,12 +949,90 @@ mod tests {
             })
             .collect();
         let a = assess(&detection(vec![release(sites)], false));
-        assert_eq!(a.level, EvidenceLevel::VeryStrong, "{:?}", a.reasons);
+        // Eight confirmations over eight draws at 4 bits: chance excuses them with
+        // probability 6.2e-8, which is below STRONG's floor and above VERY_STRONG's,
+        // so the counts say VERY_STRONG and the grade says STRONG. The verdict — which
+        // is what the scan is *claiming* — is unaffected: this is a finding either way.
+        assert_eq!(a.level, EvidenceLevel::Strong, "{:?}", a.reasons);
         assert_eq!(a.outcome, Outcome::ProvenanceDetected);
         assert_eq!(a.releases[0].files, 3);
         assert_eq!(a.releases[0].bits, 32);
-        // Eight confirmations over eight probes at 4 bits leaves 7.5 above the bound.
         assert!(a.releases[0].guarantee > 7.4, "{:?}", a.releases[0]);
+        assert!(
+            a.releases[0].coincidence_probability < 1e-7,
+            "{:?}",
+            a.releases[0]
+        );
+    }
+
+    #[test]
+    fn the_same_constellation_at_a_wide_tag_is_graded_by_the_counts_alone() {
+        // The top rung is still reachable on counts, because at an 8-bit tag eight
+        // confirmations over eight draws sit at probability 2.2e-17 — five decades
+        // below the floor. Width is what the old additive rule ignored.
+        let sites: Vec<SiteMatch> = (0..8)
+            .map(|i| {
+                confirmed_at(match i {
+                    0..=2 => "src/a.js",
+                    3..=5 => "src/b.js",
+                    _ => "src/c.js",
+                })
+            })
+            .collect();
+        let a = assess(&detection(vec![release_at(8, sites)], false));
+        assert_eq!(a.level, EvidenceLevel::VeryStrong, "{:?}", a.reasons);
+        assert!(
+            !a.reasons.iter().any(|r| r.contains("capped")),
+            "{:?}",
+            a.reasons
+        );
+        assert_eq!(a.outcome, Outcome::ProvenanceDetected);
+    }
+
+    #[test]
+    fn a_wide_tag_does_not_let_two_confirmations_become_a_verdict() {
+        // Two sites, each visited by sixteen spans carrying sixteen *different* codes:
+        // 32 real chances at an 8-bit tag. The additive rule this build used before
+        // read the resulting bound (0.123) as slack — 1.88 confirmations clear of it —
+        // and accused, which is the false-positive shape measured at 2.4e-3 per scan at
+        // 8 bits. The probability an unrelated tree produces both of them is 6.8e-3, so
+        // this scan cannot say anything about where the candidate came from.
+        let sites = vec![
+            probed(confirmed_at("src/a.js"), 16),
+            probed(confirmed_at("src/b.js"), 16),
+        ];
+        let a = assess(&detection(vec![release_at(8, sites)], false));
+        assert!(
+            a.releases[0].guarantee > 1.5,
+            "the old rule would have accused this: {:?}",
+            a.releases[0].guarantee
+        );
+        assert_eq!(a.level, EvidenceLevel::Weak, "{:?}", a.reasons);
+        assert_eq!(a.outcome, Outcome::Inconclusive, "{:?}", a.reasons);
+        assert!(a.releases[0].coincidence_probability > COINCIDENCE_MAX_ABOVE_WEAK);
+    }
+
+    #[test]
+    fn repeated_spans_that_share_a_code_no_longer_drown_a_genuine_finding() {
+        // The other side of the same measurement: four sites of one release confirmed
+        // at 4 bits in a candidate that repeats each protected statement sixteen
+        // times. Counting spans set a bound of 4.0, which covered the whole count and
+        // refused the verdict; the four codes the spans actually carry set a bound of
+        // 0.25, whose tail past four is 1.3e-4. This is a copy and now says so.
+        let sites: Vec<SiteMatch> = (0..4)
+            .map(|i| {
+                shared(
+                    confirmed_at(if i < 2 { "src/a.js" } else { "src/b.js" }),
+                    16,
+                )
+            })
+            .collect();
+        let a = assess(&detection(vec![release(sites)], false));
+        assert_eq!(a.releases[0].probes, 64, "the spans the scan looked at");
+        assert_eq!(a.releases[0].draws, 4, "the codes it was really offered");
+        assert!(a.releases[0].chance < 0.26, "{:?}", a.releases[0]);
+        assert_eq!(a.outcome, Outcome::ProvenanceDetected, "{:?}", a.reasons);
+        assert_eq!(a.level, EvidenceLevel::Moderate, "{:?}", a.reasons);
     }
 
     #[test]
@@ -824,39 +1099,75 @@ mod tests {
     }
 
     #[test]
-    fn a_lead_below_the_verdict_floor_is_reported_and_not_claimed_even_when_it_clears() {
-        // The bound is not the only thing a verdict has to clear. Two spans at one
-        // site's address expect 0.121 coincidences, so one confirmation leaves 0.879
-        // of guarantee — the arithmetic is on its side and the ladder is not: one
-        // fragment is WEAK, and WEAK is the level §23 defines as "a lead worth
-        // manual review". A thin candidate must not be able to buy a verdict just
-        // by being thin.
+    fn a_lead_a_verdict_cannot_stand_on_is_reported_and_not_claimed() {
+        // Two spans at one site's address carry two codes, which expect 0.121
+        // coincidences: one confirmation leaves 0.879 of the bound clear in the old
+        // additive reading, and a probability of 0.11 that an unrelated tree produced
+        // it. Both rules refuse it now — a lone fragment is WEAK on the ladder and
+        // nowhere near the floor on the arithmetic — and the scan says so in words.
         let a = assess(&detection(
             vec![release(vec![probed(confirmed_at("src/a.js"), 2)])],
             false,
         ));
         assert_eq!(a.level, EvidenceLevel::Weak);
         assert!(a.releases[0].guarantee > 0.8, "{:?}", a.releases[0]);
+        assert!(
+            a.releases[0].coincidence_probability > COINCIDENCE_MAX_ABOVE_WEAK,
+            "{:?}",
+            a.releases[0]
+        );
         assert_eq!(a.outcome, Outcome::Inconclusive, "{:?}", a.reasons);
         assert!(
             a.reasons
                 .iter()
-                .any(|r| r.contains("clear the bound of") && r.contains("INCONCLUSIVE")),
+                .any(|r| r.contains("with probability") && r.contains("INCONCLUSIVE")),
             "the reason must name the rule that refused it: {:?}",
             a.reasons
         );
 
-        // The floor itself: two fragments of one constellation over two probes clear
-        // both rules, and the verdict follows.
-        let b = assess(&detection(
+        // The floor itself, at the narrowest tag: two fragments of one constellation
+        // over two draws are a 7.2e-3 event, which the counts call MODERATE and the
+        // arithmetic refuses. This is the pair of confirmations the old rule accused
+        // on, and it is why the gate is a probability now.
+        let narrow = assess(&detection(
             vec![release(vec![
                 probed(confirmed_at("src/a.js"), 1),
                 probed(confirmed_at("src/b.js"), 1),
             ])],
             false,
         ));
-        assert_eq!(b.level, EvidenceLevel::Moderate, "{:?}", b.reasons);
-        assert_eq!(b.outcome, Outcome::ProvenanceDetected, "{:?}", b.reasons);
+        assert_eq!(narrow.level, EvidenceLevel::Weak, "{:?}", narrow.reasons);
+        assert_eq!(
+            narrow.outcome,
+            Outcome::Inconclusive,
+            "{:?}",
+            narrow.reasons
+        );
+        assert!(
+            narrow.releases[0].guarantee > 1.8,
+            "{:?}",
+            narrow.releases[0]
+        );
+
+        // The same two sites at an 8-bit tag: 3.0e-5, which clears the floor, and the
+        // verdict follows the evidence.
+        let wide = assess(&detection(
+            vec![release_at(
+                8,
+                vec![
+                    probed(confirmed_at("src/a.js"), 1),
+                    probed(confirmed_at("src/b.js"), 1),
+                ],
+            )],
+            false,
+        ));
+        assert_eq!(wide.level, EvidenceLevel::Moderate, "{:?}", wide.reasons);
+        assert_eq!(
+            wide.outcome,
+            Outcome::ProvenanceDetected,
+            "{:?}",
+            wide.reasons
+        );
     }
 
     #[test]
