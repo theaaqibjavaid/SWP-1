@@ -168,6 +168,16 @@ against the four projects under `examples/`. Two floor assertions keep the check
 from thinning out when a page is edited: at least forty blocks and at least forty
 distinct commands must be covered.
 
+`PAGES` is the index the suite reads, and it is a page's claim to be checked, not
+a directory listing. A page that quotes no output — the Beta 3 design set
+(`docs/BETA3_ARCHITECTURE_AUDIT.md`, `docs/SDK_ARCHITECTURE.md`, `docs/SDK_API.md`,
+`docs/VERSIONING_POLICY.md`) describes an interface this build does not have yet,
+and prints nothing — is deliberately outside it, because adding it would assert a
+coverage the page does not ask for. The cost is real and is the one to weigh when
+one of those pages grows: prose commands named there are not parsed, so the suite
+will not catch a flag that does not exist. Add a transcript to a page and the page
+goes into `PAGES` in the same commit.
+
 The practical rule when you change output: run the suite, read the diff it prints,
 and fix the *page* only if the new output is what you meant. A failure that shows a
 number you did not intend is a product bug, and editing the document to match it is

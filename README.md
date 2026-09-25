@@ -192,6 +192,10 @@ cannot re-read what it rewrote cannot re-prove it either.
 | [docs/SWP-1-SPEC.md](docs/SWP-1-SPEC.md) | the protocol itself: fragments, identities, artifacts, detection, versioning |
 | [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) | building, testing and changing this repository, including writing a language adapter |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | what has been measured, and the command that reproduces each number |
+| [docs/BETA3_ARCHITECTURE_AUDIT.md](docs/BETA3_ARCHITECTURE_AUDIT.md) | the tree read as it is: crate graph, public API surface, where the secret and the filesystem boundaries actually fall |
+| [docs/SDK_ARCHITECTURE.md](docs/SDK_ARCHITECTURE.md) | the proposed Python/Node binding layer, what it may not reach, and why WASM is not it |
+| [docs/SDK_API.md](docs/SDK_API.md) | the operations such a binding would expose, one by one: inputs, side effects, errors, ownership |
+| [docs/VERSIONING_POLICY.md](docs/VERSIONING_POLICY.md) | which version moves when, and why a saved report is never reinterpreted |
 | [examples/](examples) | four protected trees, each with the transcript that proves it |
 
 Around the protocol documentation sits the repository's own set:
