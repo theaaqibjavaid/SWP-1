@@ -20,6 +20,14 @@ every claim of that kind here was run before it was written
 An entry appears here between a change being merged and the tag that carries it,
 and not before.
 
+## [1.0.0-beta.2] - 2026-09-25
+
+The release that changed how a verdict is reached rather than what the tool can
+do. The protocol, the schemas and the commands are the ones `1.0.0-beta.1`
+shipped; what moved is the arithmetic that turns a tally into a finding, and the
+harness that prints the measurements quoted below is added here so that a reader
+can reproduce them rather than take them from this page.
+
 ### Changed
 
 **The verdict is decided by a probability, not by a margin.** A tally used to
@@ -51,6 +59,11 @@ rather than re-read under a rule that grades it differently. A tree protected by
 plan schemas are unchanged and every derivation is pinned. What does not survive
 is a *saved report*, which is a record of one build's arithmetic; re-run `swp scan`
 or `swp verify` to get the current one.
+
+**`base64` moved from 0.22.1 to 0.23.1.** The whole third-party surface of this
+build is a decision rather than a default, so a change inside it is stated here
+even though no product behaviour turned on it: the crate encodes the sealed secret
+and the manifest signature, and is on no path that reads a source tree.
 
 ### Added
 
@@ -182,5 +195,6 @@ These are absences with reasons, not a backlog:
   protected literal leaves nothing to key on, and produces the same report as an
   original. `NO_PROVENANCE_DETECTED` is not a finding of originality.
 
-[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.2...HEAD
+[1.0.0-beta.2]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.1

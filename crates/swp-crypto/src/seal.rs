@@ -285,9 +285,7 @@ fn harden_windows(path: &Path) -> PermissionOutcome {
     );
     let after = match applied {
         Ok(_) => icacls(path),
-        Err(e) => {
-            return PermissionOutcome::Unavailable(format!("icacls failed to run: {e}"));
-        }
+        Err(e) => return PermissionOutcome::Unavailable(e.to_string()),
     };
     match after {
         Ok(text) => {
@@ -311,9 +309,50 @@ fn harden_windows(path: &Path) -> PermissionOutcome {
 }
 
 #[cfg(windows)]
-fn icacls(path: &Path) -> Result<String, std::io::Error> {
+fn icacls(path: &Path) -> Result<String, IcaclsError> {
     let p = path.to_string_lossy().to_string();
     run("icacls", &[p.as_str()])
+}
+
+/// Why an `icacls` invocation came back with nothing usable.
+///
+/// A machine that cannot start the process and a process that started and refused
+/// the change are different failures, and what the operator does next differs
+/// between them. They used to arrive at the call site as one `io::Error`, so the
+/// one sentence printed for both was "icacls failed to run" — and when `icacls`
+/// exited non-zero without writing anything, both streams `run` captures were
+/// empty and the message ended in a colon with nothing after it.
+#[cfg(windows)]
+enum IcaclsError {
+    /// Windows never ran the program. The operating system's own error is kept
+    /// verbatim, code included when it has one: `os error 1450` is a loaded
+    /// machine, `os error 5` is a policy, and neither is a broken ACL.
+    Spawn(std::io::Error),
+    /// The program ran and did not succeed. `text` is whatever it wrote to either
+    /// stream, which may be nothing. `code` is `None` when the child was
+    /// terminated rather than exited, which is a third failure mode again.
+    Refused { code: Option<i32>, text: String },
+}
+
+#[cfg(windows)]
+impl std::fmt::Display for IcaclsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IcaclsError::Spawn(e) => write!(f, "could not start icacls: {e}"),
+            IcaclsError::Refused { code, text } => {
+                let ran = match code {
+                    Some(code) => format!("icacls exited with status {code}"),
+                    None => "icacls was terminated without an exit status".to_string(),
+                };
+                let text = text.trim();
+                if text.is_empty() {
+                    write!(f, "{ran} without reporting a reason")
+                } else {
+                    write!(f, "{ran}: {text}")
+                }
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -328,13 +367,19 @@ fn windows_user_name() -> Option<String> {
 }
 
 #[cfg(windows)]
-fn run(program: &str, args: &[&str]) -> Result<String, std::io::Error> {
+fn run(program: &str, args: &[&str]) -> Result<String, IcaclsError> {
     use std::process::Command;
-    let out = Command::new(program).args(args).output()?;
+    let out = Command::new(program)
+        .args(args)
+        .output()
+        .map_err(IcaclsError::Spawn)?;
     let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
     if !out.status.success() {
         text.push_str(&String::from_utf8_lossy(&out.stderr));
-        return Err(std::io::Error::other(text));
+        return Err(IcaclsError::Refused {
+            code: out.status.code(),
+            text,
+        });
     }
     Ok(text)
 }
@@ -580,5 +625,64 @@ mod tests {
         // Whatever the platform, the call must classify itself and never panic.
         assert!(!outcome.detail().is_empty(), "empty permission report");
         println!("permission outcome: {outcome:?}");
+    }
+
+    // The three modes that used to reach the operator as one sentence, one test
+    // each. The last is the reported failure: a child that exits non-zero without
+    // writing anything left `run` with no text at all, so the caller printed
+    // "icacls failed to run:" with nothing after the colon.
+    #[cfg(windows)]
+    #[test]
+    fn a_program_that_never_started_is_named_as_a_start_failure() {
+        let e = run("icacls-that-does-not-exist", &[]).unwrap_err();
+        assert!(
+            matches!(e, IcaclsError::Spawn(_)),
+            "a missing program was classified as {e}"
+        );
+        let text = e.to_string();
+        assert!(text.starts_with("could not start icacls"), "{text}");
+        // The operating system's own words are carried through untouched, which
+        // is the difference between "check your PATH" and "check the policy".
+        assert!(
+            text.len() > "could not start icacls: ".len(),
+            "the OS error was dropped: {text}"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_refusal_keeps_the_status_and_the_reason_icacls_gave() {
+        let missing = dir("refused").join("no-such-key.file");
+        let e = run("icacls", &[missing.to_string_lossy().as_ref()]).unwrap_err();
+        let IcaclsError::Refused { code, text } = &e else {
+            panic!("icacls answered this and it was classified as a start failure: {e}");
+        };
+        assert!(
+            matches!(code, Some(c) if c != &0),
+            "a refusal with no non-zero status: {e}"
+        );
+        assert!(!text.trim().is_empty(), "the reason was lost: {e}");
+        assert!(e.to_string().contains("exited with status"), "{e}");
+        assert!(
+            !e.to_string().contains("could not start"),
+            "a refusal read as a start failure: {e}"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_child_that_says_nothing_says_that_it_said_nothing() {
+        // `cmd /c exit 3` is the deterministic form of the reported failure: it
+        // runs, it fails, and it writes to neither stream.
+        let e = run("cmd.exe", &["/c", "exit", "3"]).unwrap_err();
+        let IcaclsError::Refused { code, text } = &e else {
+            panic!("a silent exit was classified as a start failure: {e}");
+        };
+        assert_eq!(*code, Some(3));
+        assert!(text.trim().is_empty(), "the child spoke after all: {text}");
+        assert!(
+            e.to_string().contains("without reporting a reason"),
+            "the message was left blank where a diagnosis belongs: {e}"
+        );
     }
 }

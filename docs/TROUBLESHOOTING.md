@@ -106,7 +106,12 @@ Work through these in order:
 4. **A private file could not be hardened.** On a write, the store restricts the
    key file to your own account and reads the restriction back; if that
    confirmation fails you get this code and the message says so — "refused to keep
-   a private artifact whose access could not be confirmed". `icacls
+   a private artifact whose access could not be confirmed". What comes after the
+   em dash is the reason, and on Windows it reads one of three ways. "could not
+   start icacls: …" carries the operating system's own words and means the tool
+   never ran, so it says nothing about your ACL; "icacls exited with status N: …"
+   means it ran and refused; "… without reporting a reason" means it ran, failed,
+   and wrote nothing to either stream. `icacls
    .swp\private\root.key` on Windows, or `ls -l` the same path elsewhere, shows
    what it grants; [SECURITY.md](SECURITY.md) says what the check does and does
    not protect.
