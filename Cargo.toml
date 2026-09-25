@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 edition = "2021"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -22,15 +22,15 @@ publish = ["crates.io"]
 # only a path, `cargo package` refuses to write a manifest whose dependencies
 # name no version. The two are kept in step by `scripts/check-release.sh`, which
 # fails if a `version` here ever disagrees with `[workspace.package]`.
-swp-core = { path = "crates/swp-core", version = "1.0.0-beta.1" }
-swp-crypto = { path = "crates/swp-crypto", version = "1.0.0-beta.1" }
-swp-identity = { path = "crates/swp-identity", version = "1.0.0-beta.1" }
-swp-manifest = { path = "crates/swp-manifest", version = "1.0.0-beta.1" }
-swp-embedding = { path = "crates/swp-embedding", version = "1.0.0-beta.1" }
-swp-detection = { path = "crates/swp-detection", version = "1.0.0-beta.1" }
-swp-evidence = { path = "crates/swp-evidence", version = "1.0.0-beta.1" }
-swp-adapters = { path = "crates/swp-adapters", version = "1.0.0-beta.1" }
-swp-cli = { path = "crates/swp-cli", version = "1.0.0-beta.1" }
+swp-core = { path = "crates/swp-core", version = "1.0.0-beta.2" }
+swp-crypto = { path = "crates/swp-crypto", version = "1.0.0-beta.2" }
+swp-identity = { path = "crates/swp-identity", version = "1.0.0-beta.2" }
+swp-manifest = { path = "crates/swp-manifest", version = "1.0.0-beta.2" }
+swp-embedding = { path = "crates/swp-embedding", version = "1.0.0-beta.2" }
+swp-detection = { path = "crates/swp-detection", version = "1.0.0-beta.2" }
+swp-evidence = { path = "crates/swp-evidence", version = "1.0.0-beta.2" }
+swp-adapters = { path = "crates/swp-adapters", version = "1.0.0-beta.2" }
+swp-cli = { path = "crates/swp-cli", version = "1.0.0-beta.2" }
 # Never published, so it needs no version to be published under.
 swp-test-suite = { path = "crates/swp-test-suite" }
 
