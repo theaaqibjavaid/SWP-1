@@ -111,9 +111,12 @@ Work through these in order:
    start icacls: …" carries the operating system's own words and means the tool
    never ran, so it says nothing about your ACL; "icacls exited with status N: …"
    means it ran and refused; "… without reporting a reason" means it ran, failed,
-   and wrote nothing to either stream. `icacls
-   .swp\private\root.key` on Windows, or `ls -l` the same path elsewhere, shows
-   what it grants; [SECURITY.md](SECURITY.md) says what the check does and does
+   and wrote nothing to either stream. The clause ends with whether the file was
+   taken back — it is, unless the removal itself failed, which the message then
+   says — so looking at `.swp\private\root.key` with `icacls` on Windows, or
+   `ls -l` the same path elsewhere, usually finds nothing there. That is the store
+   behaving as designed, not a second fault: fix the cause in the clause, and run
+   the command again. [SECURITY.md](SECURITY.md) says what the check does and does
    not protect.
 5. **The file is gone.** Restore `.swp/private/root.key` and
    `.swp/private/manifests/` together, from the backup those two lines in every
