@@ -16,133 +16,25 @@
 //! INCONCLUSIVE   some do not, and part of the tree was never read        10
 //! ```
 //!
-//! `5` is [`ErrorCode::ReleaseMismatch`]'s code, and the message that goes with
-//! it in the error table is the advice this command is really giving: the tree
-//! moved on, so record a new release. A `5` is not an accusation about anybody —
-//! a site can go absent because a developer deleted a function, and because a
-//! copier stripped a fragment, and this command cannot tell those apart (§51).
+//! `5` is [`ErrorCode::ReleaseMismatch`](swp_core::error::ErrorCode::ReleaseMismatch)'s code,
+//! and the message that goes with it in the error table is the advice this command
+//! is really giving: the tree moved on, so record a new release. A `5` is not an
+//! accusation about anybody — a site can go absent because a developer deleted a
+//! function, and because a copier stripped a fragment, and this command cannot tell
+//! those apart (§51).
 //!
-//! ## What this document does not print
-//!
-//! No location ids, no `original`/`rendered` literals, no expected tags. A site
-//! is named by the file and line it was recorded at and by its family and width,
-//! which is enough to go look at it, and enough again for a document that exists
-//! in CI logs and build artifacts to be a copy of the watermark — which is the
-//! one thing §29 forbids. `.swp/private/manifests/<release>.json` holds the full
-//! record, and `swp inspect manifest` prints it on a terminal the operator is
-//! standing at.
+//! The `SWP-1-verify-v1` document itself is built by [`swp_evidence`], which owns
+//! what a scan means; this file runs the scan and prints the answer, and the
+//! comment on that module is where the rules about what the document may name live.
 
-use serde::Serialize;
-use swp_core::error::{ErrorCode, SwpError};
-use swp_detection::{build_indexes, input, scan_against, SiteStatus};
-use swp_evidence::Report;
+use swp_core::error::SwpError;
+use swp_detection::{build_indexes, input, scan_against};
+use swp_evidence::{grade, Report, SiteRow, Verdict, Verification, VerifyDocument};
 use swp_identity::Timestamp;
 
 use crate::args::{Flag, Parsed};
 use crate::ctx::Ctx;
 use crate::output::{self, Sink};
-
-/// The `schema` field of the document below, and the string a reader of a saved
-/// report matches on.
-const SCHEMA: &str = "SWP-1-verify-v1";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum Verdict {
-    /// Every site of the release is present with its code.
-    Intact,
-    /// Some site is not, and the tree was read completely enough to say so.
-    Incomplete,
-    /// Some site is not, and part of the tree was never examined.
-    Inconclusive,
-}
-
-impl Verdict {
-    fn as_str(self) -> &'static str {
-        match self {
-            Verdict::Intact => "INTACT",
-            Verdict::Incomplete => "INCOMPLETE",
-            Verdict::Inconclusive => "INCONCLUSIVE",
-        }
-    }
-
-    fn exit_code(self) -> i32 {
-        match self {
-            Verdict::Intact => 0,
-            Verdict::Incomplete => ErrorCode::ReleaseMismatch.exit_code(),
-            Verdict::Inconclusive => ErrorCode::InsufficientEvidence.exit_code(),
-        }
-    }
-}
-
-/// One site of the release, and whether it is still there.
-#[derive(Debug, Serialize)]
-struct SiteRow {
-    /// Index into the release's site list, matching `swp inspect manifest`.
-    site: usize,
-    /// Where this site was when the release was made. A hint for a human, never a
-    /// lookup key — a site that moved is still the same site.
-    file: String,
-    line_hint: u32,
-    language: String,
-    adapter: String,
-    class: &'static str,
-    family: &'static str,
-    width: u8,
-    status: &'static str,
-    /// Which of the four keyed radii the tree reproduced.
-    slots: Vec<&'static str>,
-    /// Where the site was actually found, when that differs from `file`.
-    found_in: Option<String>,
-    found_line: Option<u32>,
-    refactored: bool,
-    moved: bool,
-}
-
-/// `SWP-1-verify-v1`.
-#[derive(Debug, Serialize)]
-struct VerifyDocument {
-    schema: &'static str,
-    protocol: &'static str,
-    project_id: String,
-    display_name: String,
-    tree: String,
-    release_id: String,
-    release_created_at: String,
-    /// `content`, or the label `--revision` stated. Display metadata only.
-    revision: Option<String>,
-    /// Whether the release's manifest authenticated against the identity in
-    /// `.swp/public/identity.json` — the precondition for every claim below.
-    manifest_authenticated: bool,
-    sites_expected: usize,
-    sites_confirmed: usize,
-    sites_exact: usize,
-    sites_stripped: usize,
-    sites_absent: usize,
-    sites_moved: usize,
-    sites_refactored: usize,
-    tag_bits: u8,
-    confirmed_bits: u32,
-    files_scanned: u32,
-    bytes_scanned: u64,
-    /// `"match"`, `"no-match"` or `"not-comparable"`: did the tree hash to the
-    /// §16 fingerprint this release published?
-    fingerprint: String,
-    fingerprint_expected: String,
-    verdict: Verdict,
-    /// True when some of the tree was never read, which is what separates
-    /// `INCOMPLETE` from `INCONCLUSIVE`.
-    partial: bool,
-    sites: Vec<SiteRow>,
-    /// Rows the text rendering left out, counted rather than hidden.
-    omitted_rows: usize,
-    omissions: Vec<String>,
-    notes: Vec<String>,
-    report_saved: Option<String>,
-    limitations: Vec<String>,
-    next: Vec<String>,
-    exit_code: i32,
-}
 
 pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Result<i32, SwpError> {
     let project = Ctx::open(parsed, cwd)?;
@@ -161,84 +53,21 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
         .releases
         .first()
         .ok_or_else(|| SwpError::internal("a scan of one release returned none"))?;
-    let fingerprint = found.fingerprint.as_str().to_string();
-    let expected = indexes[0].fingerprint().to_string();
-
-    let rows: Vec<SiteRow> = found
-        .sites
-        .iter()
-        .map(|s| SiteRow {
-            site: s.site,
-            file: s.manifest_file.clone(),
-            line_hint: s.manifest_line,
-            language: s.language.clone(),
-            adapter: s.adapter.clone(),
-            class: s.class.as_str(),
-            family: s.family.as_str(),
-            width: s.width,
-            status: s.status.as_str(),
-            slots: s.slots.iter().map(|k| k.as_str()).collect(),
-            found_in: s.found_in.clone(),
-            found_line: s.found_line,
-            refactored: s.refactored(),
-            moved: s.moved(),
-        })
-        .collect();
-
-    let confirmed = found.confirmed();
-    let verdict = if confirmed == rows.len() {
-        Verdict::Intact
-    } else if detection.partial {
-        Verdict::Inconclusive
-    } else {
-        Verdict::Incomplete
-    };
     let limit = output::window(parsed.has(Flag::Full), parsed.number(Flag::Limit)?);
-    let omitted_rows = rows.len().saturating_sub(limit);
+    let omitted_rows = found.sites.len().saturating_sub(limit);
     let saved = save(parsed, &project, &detection)?;
-
-    let doc = VerifyDocument {
-        schema: SCHEMA,
-        protocol: swp_core::SWP_PROTOCOL_NAME,
-        project_id: project.identity.project_id.to_string(),
-        display_name: project.identity.display_name.clone(),
-        tree: opened.described.clone(),
-        release_id: release.to_string(),
-        release_created_at: releases[0].record.created_at.to_rfc3339(),
-        revision: releases[0]
-            .record
-            .source_revision
-            .as_str()
-            .map(|s| s.to_string()),
-        manifest_authenticated: true,
-        sites_expected: rows.len(),
-        sites_confirmed: confirmed,
-        sites_exact: found
-            .sites
-            .iter()
-            .filter(|s| s.status == SiteStatus::ExactRendering)
-            .count(),
-        sites_stripped: found.stripped(),
-        sites_absent: found.absent(),
-        sites_moved: found.moved(),
-        sites_refactored: found.refactored(),
-        tag_bits: found.tag_bits,
-        confirmed_bits: found.confirmed_bits(),
-        files_scanned: detection.files_scanned,
-        bytes_scanned: detection.bytes_scanned,
-        fingerprint,
-        fingerprint_expected: expected,
-        verdict,
-        partial: detection.partial,
-        sites: rows,
+    let expected = indexes[0].fingerprint().to_string();
+    let doc = grade(&Verification {
+        detection: &detection,
+        found,
+        project_id: &project.identity.project_id,
+        display_name: &project.identity.display_name,
+        tree: &opened.described,
+        record: &releases[0].record,
+        fingerprint_expected: &expected,
         omitted_rows,
-        omissions: detection.omissions.clone(),
-        notes: detection.notes.clone(),
         report_saved: saved,
-        limitations: limitations(verdict),
-        next: next_steps(verdict, &release),
-        exit_code: verdict.exit_code(),
-    };
+    });
     // The document holds the rows, so both tables the text prints are read back out
     // of it: the `sites` array in the JSON and the rows on the page are then the
     // same values, rather than two copies that could disagree.
@@ -252,8 +81,8 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
         .filter(|(i, _)| !found.sites[*i].confirmed())
         .map(|(_, r)| r)
         .collect();
-    let lines = text_lines(&doc, shown, &missing, verdict);
-    if verdict != Verdict::Intact {
+    let lines = text_lines(&doc, shown, &missing);
+    if doc.verdict != Verdict::Intact {
         sink.warn(&format!(
             "{} of {} site(s) of release {} are not carrying their code",
             doc.sites_expected - doc.sites_confirmed,
@@ -289,48 +118,8 @@ fn save(
     ))
 }
 
-fn limitations(verdict: Verdict) -> Vec<String> {
-    let mut out = vec![
-        "a site that carries its code is a statement about this artifact, not about who wrote \
-         it or what rights attach to it",
-        "an absent site means the watermark is not here, which a deleted function, a formatter \
-         that removed a literal and a deliberate strip all produce identically",
-        "the fingerprint is a hash of the whole tree: it can say no-match while every site is \
-         intact, because ordinary edits change the tree hash without touching a watermark",
-    ];
-    if verdict == Verdict::Inconclusive {
-        out.push(
-            "part of this tree was never examined (see notes), so a site counted absent here \
-             may simply be in a file the scan refused to read",
-        );
-    }
-    out.into_iter().map(|s| s.to_string()).collect()
-}
-
-fn next_steps(verdict: Verdict, release: &swp_core::ReleaseId) -> Vec<String> {
-    let mut out = vec![format!("swp inspect manifest --release {release}")];
-    match verdict {
-        Verdict::Intact => {
-            out.push("swp scan <candidate> --format json".to_string());
-        }
-        Verdict::Incomplete | Verdict::Inconclusive => {
-            out.push("swp protect".to_string());
-            out.push(
-                "if a limit or an unread file caused the gap, raise [limits] in \
-                 .swp/config.toml and re-run this command"
-                    .to_string(),
-            );
-        }
-    }
-    out
-}
-
-fn text_lines(
-    d: &VerifyDocument,
-    shown: &[SiteRow],
-    missing: &[&SiteRow],
-    verdict: Verdict,
-) -> Vec<String> {
+fn text_lines(d: &VerifyDocument, shown: &[SiteRow], missing: &[&SiteRow]) -> Vec<String> {
+    let verdict = d.verdict;
     let mut out = vec![
         format!(
             "verify {} ({}) against release {}",
@@ -473,37 +262,7 @@ fn shorten(path: &str, width: usize) -> String {
 mod tests {
     use super::*;
     use crate::scratch::Scratch;
-    use swp_detection::SLOT_COUNT;
-
-    #[test]
-    fn verdicts_carry_their_exit_codes_and_the_document_is_named() {
-        assert_eq!(SCHEMA, "SWP-1-verify-v1");
-        assert_eq!(Verdict::Intact.exit_code(), 0);
-        assert_eq!(
-            Verdict::Incomplete.exit_code(),
-            ErrorCode::ReleaseMismatch.exit_code()
-        );
-        assert_eq!(
-            Verdict::Inconclusive.exit_code(),
-            ErrorCode::InsufficientEvidence.exit_code()
-        );
-        assert_eq!(Verdict::Inconclusive.as_str(), "INCONCLUSIVE");
-        assert_eq!(
-            serde_json::to_value(Verdict::Incomplete).unwrap(),
-            "INCOMPLETE",
-            "the text and the JSON must be the same three words"
-        );
-    }
-
-    #[test]
-    fn an_inconclusive_verdict_says_why_it_cannot_be_a_negative() {
-        assert!(limitations(Verdict::Incomplete)
-            .iter()
-            .all(|l| !l.contains("never examined")));
-        assert!(limitations(Verdict::Inconclusive)
-            .iter()
-            .any(|l| l.contains("never examined")));
-    }
+    use swp_core::error::ErrorCode;
 
     #[test]
     fn shortening_a_path_keeps_its_tail_and_stays_in_its_column() {
@@ -519,45 +278,6 @@ mod tests {
         let cut = shorten(unicode, 9);
         assert_eq!(cut.chars().count(), 9);
         assert!(cut.ends_with("index.js"), "{cut}");
-    }
-
-    #[test]
-    fn a_site_row_names_a_site_by_hint_and_status_only() {
-        // The row type is the document's only per-site surface. It must carry
-        // hints and statuses and never an address, a literal or a code (§29).
-        let row = SiteRow {
-            site: 3,
-            file: "src/a.js".to_string(),
-            line_hint: 12,
-            language: "javascript".to_string(),
-            adapter: "tree-sitter".to_string(),
-            class: "integer",
-            family: "add",
-            width: 4,
-            status: "tag-confirmed",
-            slots: vec!["statement+identifiers"],
-            found_in: None,
-            found_line: None,
-            refactored: false,
-            moved: false,
-        };
-        let doc = serde_json::to_value(&row).unwrap();
-        assert_eq!(doc["status"], "tag-confirmed");
-        assert_eq!(doc["slots"], serde_json::json!(["statement+identifiers"]));
-        for forbidden in [
-            "locations",
-            "original",
-            "rendered",
-            "primary",
-            "tag",
-            "secret",
-        ] {
-            assert!(doc.get(forbidden).is_none(), "the row printed {forbidden}");
-        }
-        assert_eq!(
-            SLOT_COUNT, 4,
-            "four radii per site; `slots` lists which hit"
-        );
     }
 
     #[test]
@@ -584,7 +304,7 @@ mod tests {
             "a fresh release must verify against itself:\n{}{}",
             r.out, r.err
         );
-        assert_eq!(doc["schema"], SCHEMA);
+        assert_eq!(doc["schema"], swp_evidence::VERIFY_SCHEMA);
         assert_eq!(doc["verdict"], "INTACT");
         assert_eq!(doc["manifest_authenticated"], true);
         assert!(doc["sites_expected"].as_u64().unwrap() >= 4);
