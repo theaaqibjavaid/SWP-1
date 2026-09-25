@@ -87,14 +87,33 @@ pub fn python_project(root: &Path) -> Vec<String> {
 /// matrix over those trees therefore tests two families and passes, which is the
 /// vacuous cover `tests/detection/roundtrip.rs` exists to refuse.
 ///
-/// So this corpus is the opposite of the others: nine strings over twenty
+/// So this corpus is the opposite of the others: fifteen strings over twenty
 /// characters in each of three dialects, one literal per function so the
 /// constellation can use all of them, numbers with a divisor in every residue
 /// class mod 16 (`720720` is the least common multiple of 1..=16, which is what
 /// the factorisation family needs), and numbers whose hexadecimal spelling has
-/// four letters — `beef`, `dead`, `ffff` — which is what the radix family needs.
-/// `Python` is in the set because `str-adjacent` has no JavaScript spelling at
-/// all, so no table of `.js` files could ever have reached it.
+/// four letters — `beef`, `dead`, `ffff`, `cafe`, `babe`, `feed` — which is what
+/// the radix family needs. `Python` is in the set because `str-adjacent` has no
+/// JavaScript spelling at all, so no table of `.js` files could ever have reached
+/// it.
+///
+/// Each of the three shapes that a family needs something unusual for — a
+/// factorisable constant, a hexadecimal spelling with four letters, a string long
+/// enough to sit beside another — is written **several times**. Which of a
+/// literal's reachable families carries its code is drawn from the key, so one
+/// literal per family buys a coin flip rather than coverage: measured over 194
+/// keyed draws of the corpus at one spelling each, a 36-site project was without
+/// `radix` 26 times, without `mul` 15 and without `str-adjacent` 6, and a draw
+/// that misses three of the seven is a round-trip matrix that stops testing three
+/// of them without saying so. Growing the corpus and the constellation is what
+/// §24's ladder asks for here; the assertion the flake failed was correct. The
+/// same sweep over 250 draws of the corpus as it now stands reaches all seven
+/// families in 238 of them, and the three shapes that still draw a family the
+/// corpus cannot always reach are absent 4 times in 250 (`radix`), 2 (`mul`) and
+/// 7 (`str-adjacent`, which only Python can carry); the four families the corpus
+/// offers at almost every literal in it — `add`, `sub`, `str-concat`,
+/// `str-escape` — were absent from 0 of those 250 draws, each of which held 64
+/// sites.
 ///
 /// What it does **not** contain is a file no grammar covers: `swp-embedding`'s
 /// walk admits only extensions a parser handles, because the lexical fallback
@@ -124,11 +143,20 @@ pub fn form_project(root: &Path) -> Vec<String> {
 ///
 /// Nothing here lowers `tag_bits` to make a family reachable: reaching it at the
 /// width a real project ships at is the point, and the difficulty of doing so is
-/// itself one of the measurements the suites that read this table report. Two suites
-/// and the locator's own ground-truth test read this one definition, so a table
-/// about "the form corpus" and a table about "the shapes a writer emits" cannot
-/// quietly become tables about two different constellations.
-pub const FORMS_CONFIG: &str = "[protect]\ntargets = [\"src\"]\ntarget_sites = 48\ntag_bits = 4\n\
+/// itself one of the measurements the suites that read this table report. Two
+/// suites and the locator's own ground-truth test read this one definition, so a
+/// table about "the form corpus" and a table about "the shapes a writer emits"
+/// cannot quietly become tables about two different constellations.
+///
+/// `target_sites` is the constellation the grown corpus fits: the tree offers 88
+/// reachable shapes where this asks for 64, so the number says how wide the
+/// release is, not how many sites exist. It was raised alongside the corpus
+/// rather than held at the count the old three-file tree happened to yield,
+/// because a narrower constellation is its own cause of the same miss: with the
+/// rare shapes already repeated in the tree and `target_sites` still at 48, a
+/// sweep of 113 keyed draws missed `radix` 8 times and `str-adjacent` 11, where
+/// the 64-site sweep of 250 draws missed them 4 and 7 times.
+pub const FORMS_CONFIG: &str = "[protect]\ntargets = [\"src\"]\ntarget_sites = 64\ntag_bits = 4\n\
                                 embed_strings = true\n";
 
 /// An unrelated project that shares the *shapes* a watermark might collide
