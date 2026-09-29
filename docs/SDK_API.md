@@ -618,7 +618,10 @@ the design, each with the reason the audit supports.
 
 This section is the freeze list: what `swp-sdk` exposes today, so that a binding
 plan can be written against names rather than against the prose above. Everything
-here is read from `crates/swp-sdk/src/`; nothing in it is a plan.
+here is read from `crates/swp-sdk/src/`; nothing in it is a plan. The same
+classification is written as data in [BINDING_SURFACE.json](BINDING_SURFACE.json),
+which is what a binding reads, and the `binding_surface` suite fails this workspace
+when the file and the crate disagree in either direction.
 
 **Modules.** `capabilities`, `init`, `protect`, `report`, `scan`, `session`,
 `verify` — all `pub mod`, and each one's items are also re-exported at the crate
@@ -739,6 +742,18 @@ type that can be turned back into bytes — `SecretBytes::as_slice` is `pub(crat
 inside `swp-crypto` (`secret.rs:39`), which is what makes that hold even of the handle
 above. What the crate does offer, deliberately and in Rust only, is the store itself.
 
+Two things qualify that sentence, and both are on the list rather than under it.
+The rule is about *names in signatures*, so a value reachable by walking public fields
+is a different question: `Session::protect()`'s result reaches
+`PlannedSite.locations: [LocationId; 4]` (`swp-embedding/src/plan.rs:57`) — a keyed
+site identity, not a key, and not a tag, and the first thing a binding would print if
+it were free to walk the struct. Hence `protect`/`ProtectOutcome` as `pending` and
+`LocationId`/`Plan`/`PlannedSite`/`Protection` as `forbidden` in the boundary file,
+with the field read by a `const` closure in the suite so the classification changes
+only when the field does. And `open_store` in the table above is the only row marked
+`pub`; the row exists because being public is a fact about the Rust API, not a
+licence for a binding to wrap it.
+
 ## 12. Binding-readiness notes
 
 Six questions a binding author asks first, answered with what the source actually
@@ -784,15 +799,23 @@ this boundary exists to prevent.
   `Report.limitations`, `VerifyDocument.next`, `SwpError::next_step`. Those are
   wording rather than values, stable only in the sense that a schema version governs
   them; a binding may display them and must not parse them.
-* **Which structures are binding-facing, and the two that are not.**
-  Every *type* in §11's list is binding-facing: it is the surface the Rust caller
-  reads, and `swp-cli` reads the same fields to print. Two items are the exception,
-  and both are in §10. `Session::open_store()` is Rust-only — it hands back the store
+* **Which structures are binding-facing, and the categories that are not.**
+  The answer is data, not prose: [BINDING_SURFACE.json](BINDING_SURFACE.json) names
+  every item under five categories — `binding_facing` (what a future Python or Node
+  binding may wrap), `rust_only` (public in Rust on purpose and staying there),
+  `forbidden` (would hand a caller keyed or private material), `pending` (meant to
+  cross, blocked by a named item), `sealed` (must not become public at all) — and the
+  `binding_surface` suite is what keeps the file describing this crate.
+  Every *type* in §11's list is `binding_facing`: it is the surface the Rust caller
+  reads, and `swp-cli` reads the same fields to print. Two items are `rust_only`, and
+  both are in §10: `Session::open_store()` — it hands back the store
   handle, which is a capability rather than a value, and a binding that wrapped it
-  would offer `swp inspect manifest` as a method. And `swp-sdk`'s own `Store`,
-  `ProjectIdentity` and `ReleaseRecord` re-exports exist so that the façade's
-  signatures can be spoken about in Rust; they are not a licence to expose private
-  reads across FFI. The two enum *types* that appear as `Report` field values —
+  would offer `swp inspect manifest` as a method — and `Store` itself. That leaves the
+  façade's other re-exports, `ProjectIdentity` and `ReleaseRecord`: they are
+  `binding_facing` because they are what `identity()` and `release()` return, and they
+  carry public identity and published release fields; the private reads a binding must
+  not offer are the methods on `Store`, not these values. The two enum *types* that
+  appear as `Report` field values —
   `swp_evidence::Outcome` and
   `swp_evidence::EvidenceLevel` — are **not re-exported by `swp-sdk`**, so a Rust
   caller either names them through `swp-evidence` (which it may already depend on)

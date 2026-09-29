@@ -97,7 +97,7 @@ cargo clippy --workspace --all-targets
 cargo fmt --all --check
 ```
 
-`cargo test --workspace` runs the unit tests inside each crate plus the eleven
+`cargo test --workspace` runs the unit tests inside each crate plus the thirteen
 named suites in `swp-test-suite`. They are deliberately separate targets, because
 each one measures a different property of the product, and a measurement you
 cannot run by name is a measurement nobody re-runs:
@@ -115,6 +115,8 @@ cannot run by name is a measurement nobody re-runs:
 | `adversarial_removal` | `tests/adversarial/attacks.rs` | shape search and fold, revert, restructure, compound, two-project planting |
 | `acceptance_scenario` | `tests/acceptance/final_scenario.rs` | the end-to-end two-project scenario |
 | `docs_examples` | `tests/docs/examples.rs` | every documented transcript |
+| `sdk_parity` | `tests/sdk/parity.rs` | the CLI and the SDK library call agreeing on one tree |
+| `binding_surface` | `tests/binding/surface.rs` | [BINDING_SURFACE.json](BINDING_SURFACE.json) still describing `swp-sdk`, and nothing keyed on the binding-facing side of it |
 | *(library)* | `crates/*/src` | unit tests beside the code they test, including the pinned derivation vectors |
 
 Most of these suites print the table they measured, because a number nobody can

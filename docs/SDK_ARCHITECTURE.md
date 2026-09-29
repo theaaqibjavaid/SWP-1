@@ -327,9 +327,36 @@ and the access list on `root.key` — and the protection a bound caller gets is 
 binding's own surface, which therefore must not wrap `open_store`. [SDK_API.md](SDK_API.md)
 §10 and §11 name the item and the rule.
 
+That sentence is now checked rather than asserted. [BINDING_SURFACE.json](BINDING_SURFACE.json)
+classifies every `pub` item of `swp-sdk` into five groups — `binding_facing`,
+`rust_only`, `forbidden`, `pending`, `sealed` — and the `binding_surface` suite
+(`crates/swp-test-suite/tests/binding/surface.rs`) reads the crate's sources against
+that file: every public item must be classified, a binding-facing type's fields and a
+binding-facing function's signature may name only binding-facing types, the privileged
+names are listed in Rust as well as in JSON so that editing the file cannot admit one,
+and the sealed accessors must still have the visibility the file records. A binding
+reads the same file; nothing in it has to be re-derived from prose.
+
+The review found one exposure that is *not* a signature-name leak, and it is recorded
+rather than repaired: `Session::protect()` is public Rust API, and its result reaches
+the keyed site identities of a private plan document by field —
+`ProtectOutcome.protection` (`swp-sdk/src/protect.rs:73-84`),
+`Protection.plan` (`swp-embedding/src/protect.rs:170`), `Plan.sites`, and
+`PlannedSite.locations: [LocationId; 4]` (`swp-embedding/src/plan.rs:57`), which is
+128 bits of HMAC output per radius under the project's root secret. `LocationId` is a
+keyed *identifier*, not a key and not a tag: it cannot be turned into either without the
+secret, and it is already written into the private plan file whose disclosure this
+surface refuses. It is still the first thing a binding would print if it walked the
+struct, so `protect` and `ProtectOutcome` are classified `pending` — meant to cross,
+blocked by that field — and `LocationId`, `Plan`, `PlannedSite` and `Protection` are
+`forbidden`. The API was not narrowed to make the list tidy: the pin in the suite is a
+`const` closure that reads the field, so the record is deleted by the change that
+removes the field, not by an edit to this page.
+
 | risk | where it comes from | what the design does |
 | --- | --- | --- |
-| key bytes as a value | `RootSecret::from_bytes` (`secret.rs:56`), `SecretBytes::from_vec` (`:21`) | no façade argument or field is `Vec<u8>`/`bytes`/`Buffer`; the only accessor that returns key material — `Session::secret` — is `pub(crate)` (`session.rs:264-266`) and every caller of it drops the secret before returning (`session.rs:403`). Importing a key from outside the store is not offered, in any language |
+| key bytes as a value | `RootSecret::from_bytes` (`secret.rs:56`), `SecretBytes::from_vec` (`:21`) | no façade argument or field is `Vec<u8>`/`bytes`/`Buffer`; the only accessor that returns key material — `Session::secret` — is `pub(crate)` (`session.rs:264-266`) and every caller of it drops the secret before returning (`session.rs:403`). Importing a key from outside the store is not offered, in any language. The field-shape half of that sentence is checked: `binding_surface` refuses a binding-facing type with a `[u8; N]`, `&[u8]` or `Vec<u8>` member, with one exception it names — `Digest`, the public SHA-256 of already-published material |
+| a keyed site id as a value | `PlannedSite.locations: [LocationId; 4]` (`swp-embedding/src/plan.rs:57`) | reachable from public Rust `protect`, and therefore `forbidden` in the boundary file while `protect`/`ProtectOutcome` sit in `pending`. See the paragraph above: recorded, pinned by a `const` closure, and not repaired by narrowing the API in a freeze |
 | key bytes as a *print* | `RootSecret`/`DerivedKey`/`SealedSecret` already redact (`secret.rs:44,106,135`, `seal.rs:70`) | the façade's own types must not be able to hold one: `Session` stores a `Store` (a `PathBuf`), and the result DTOs are plain data, so a `Debug`/`inspect`/`console.log` of any binding value prints paths and counts |
 | a tag oracle | `ManifestKeys::fragment_tag` (`keys.rs:149`), `ReleaseIndex::expected_tag` (`index.rs:257`) | neither is reachable from the façade surface. A caller with them could test a candidate without a report and without the maths that says whether the answer means anything — which is how a weak signal starts being quoted as a finding |
 | private-manifest disclosure | `Store::read_private_manifest` (`store.rs:358`); `PrivateManifest`/`SiteEntry` derive `Serialize` | not re-exported, and the façade's own read is module-private (`session.rs:444`); the reason `inspect` is out (§3). The paragraph above states what that does not cover |
@@ -344,8 +371,10 @@ binding's own surface, which therefore must not wrap `open_store`. [SDK_API.md](
 What this review does **not** claim: that the façade makes misuse impossible. The
 service crates stay publishable with their full `pub` surface
 ([audit §8](BETA3_ARCHITECTURE_AUDIT.md)). The claim is narrower and checkable:
-every value that can cross this boundary has been named, and none of the five
-forbidden kinds is on the list.
+every value that can cross this boundary has been named, none of the five forbidden
+kinds is on the list, and the one keyed value the public Rust surface does reach — a
+`LocationId` through `protect`'s plan field — is classed as what may not cross rather
+than argued into the boundary.
 
 ## 7. PHASE 8: tests, written before the code
 
