@@ -6,13 +6,13 @@
 //! [`swp_sdk::session`] states them. What is left here is the command line's own
 //! share of the same work:
 //!
-//! * **Flags are not settings.** [`overrides`] turns `--target`, `--sites` and
-//!   `--bits` into an [`Overrides`], and [`selection`] turns `--release` and
+//! * **Flags are not settings.** `overrides` turns `--target`, `--sites` and
+//!   `--bits` into an [`Overrides`], and `selection` turns `--release` and
 //!   `--latest` into a [`ReleaseSelection`]. The SDK takes structured choices and
 //!   never sees a flag, which is what lets a bound caller make the same choice
 //!   without a terminal.
 //! * **A named directory is resolved, not searched.** `--project` and `swp scan
-//!   <candidate>` both take a path as typed, and [`resolve`] makes it absolute
+//!   <candidate>` both take a path as typed, and `resolve` makes it absolute
 //!   without canonicalizing it — the report has to say what the operator wrote.
 //! * **The private half of the store stays the CLI's.** `swp inspect` prints
 //!   private manifests on purpose, and [`Session`] withholds them; the read is

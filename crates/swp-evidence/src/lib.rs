@@ -12,8 +12,8 @@
 //!
 //! The crate owns a second document: [`verify`]'s `SWP-1-verify-v1`, the per-site
 //! answer to "did every site of this release survive?". It is here rather than in
-//! the command that prints it because it grades a [`Detection`] the same way — and
-//! because a caller that is not a terminal needs to read it too.
+//! the command that prints it because it grades a [`swp_detection::Detection`] the
+//! same way — and because a caller that is not a terminal needs to read it too.
 //!
 //! ## The two channels, kept apart all the way to the page
 //!
@@ -50,12 +50,12 @@
 //!
 //! ## Secrets
 //!
-//! Nothing in this crate can hold key material: it consumes [`Detection`], whose
-//! `SiteMatch` values carry paths, line numbers, widths, families and truncated text
-//! hints and no tags or keys, and it emits strings built from those. The leak sweep in
-//! `swp-test-suite` asserts the resulting JSON and text contain no root secret, no
-//! derived key, and no expected tag for the artifacts a real protection run produced
-//! (§29).
+//! Nothing in this crate can hold key material: it consumes a
+//! [`swp_detection::Detection`], whose `SiteMatch` values carry paths, line
+//! numbers, widths, families and truncated text hints and no tags or keys, and it
+//! emits strings built from those. The leak sweep in `swp-test-suite` asserts the
+//! resulting JSON and text contain no root secret, no derived key, and no expected
+//! tag for the artifacts a real protection run produced (§29).
 
 pub mod item;
 pub mod level;

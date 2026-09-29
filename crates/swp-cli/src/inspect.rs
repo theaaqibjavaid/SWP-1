@@ -9,8 +9,8 @@
 //!
 //! * **No secret, ever.** Authentication uses the project's *public* verify key,
 //!   so even the manifest views need nothing private beyond the file itself, and
-//!   [`Ctx::secret`] is never called here. `swp inspect` can therefore read a
-//!   project's whole history on a machine that has the store but not the root key.
+//!   the only root-secret accessor is `pub(crate)` in `swp-sdk`, unreachable here.
+//!   `swp inspect` can therefore read a whole history with no root key on disk.
 //! * **The private views say so, and say what they give away.** `manifest`, `plan`
 //!   and `fragments` print the constellation, and each warning names the part of
 //!   it that view actually holds: the signed manifest and the plan serialize the
