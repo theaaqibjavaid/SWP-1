@@ -11,7 +11,8 @@
     "A binding reads exactly one category, `binding_facing`. The other three exist so that an omission is written down as a decision rather than as an oversight.",
     "`pending` is the one category that is an open question, not a boundary: it names API intended to cross that cannot cross today, and `blocked_by` states the field that blocks it.",
     "Nothing here is a promise about FFI mechanics: no ownership model, no error mapping, no async or cancellation semantics. It says only which names are safe to wrap.",
-    "Why the protection boundary is drawn where it is, and what the keyed field is actually worth to a caller, is a decision record: `docs/adr/0001-protect-generate-binding-boundary.md`. Every number it cites comes from `cargo run --locked -p swp-test-suite --example protect-binding-boundary`."
+    "Why the protection boundary is drawn where it is, and what the keyed field is actually worth to a caller, is a decision record: `docs/adr/0001-protect-generate-binding-boundary.md`. Every number it cites comes from `cargo run --locked -p swp-test-suite --example protect-binding-boundary`.",
+    "Protection crosses this file as `swp_sdk::Session::protect_summary` and `swp_sdk::ProtectSummary`: one call, the run's non-keyed account of itself, built by reading fields a keyed value cannot be reached through. A `pending` pair staying `pending` after that is the record of a decision not to narrow public Rust API here, not an omission — the gate checks the built value, not the prose about it."
   ],
   "inline_types": [
     "bool",
@@ -219,6 +220,40 @@
           "kind": "fn",
           "declared_in": "crates/swp-sdk/src/protect.rs",
           "reason": "Constructor for the mode-only default."
+        },
+        {
+          "path": "swp_sdk::Session::protect_summary",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reason": "Embedding as a binding may hold it: this runs `Session::protect` and returns the run's account, so there is one protection pipeline and not a Rust spelling and a binding spelling. Its signature reaches only names in this category, and the projection in `protect.rs` copies out of named fields rather than filtering the plan — a keyed value would have to be read to cross. Decided in docs/adr/0001-protect-generate-binding-boundary.md; swept at runtime by `sdk_parity` against a real run's own location ids and against the refusal sentences in which a rendered tag appears."
+        },
+        {
+          "path": "swp_sdk::ProtectSummary",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reexported": true,
+          "reason": "The non-keyed account of one run: mode, project and release id, revision, fingerprint and its level, tag width, the six counts, the files rewritten, one row per embedded site and one per refusal, the artifacts written in write order and the run's notes. It holds no plan, so it holds no location id. The notes cross because every producer of one was read and none interpolates keyed text (swp-embedding/src/candidates.rs:358-361, :385-388; plan.rs:155-157 over walk.rs:239-424; plan.rs:158-164 with select.rs:312-320; protect.rs:274-286, :377-381)."
+        },
+        {
+          "path": "swp_sdk::ProtectedFile",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reexported": true,
+          "reason": "One rewritten file, its site count and its size before and after: a project-relative path and three integers. It restates `swp_embedding::FileChange` as a type this boundary owns, because a binding-facing field may name only a binding-facing type."
+        },
+        {
+          "path": "swp_sdk::ProtectedSite",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reexported": true,
+          "reason": "A site the release carries, as far as a caller outside Rust may see it: file, line hint, language, adapter, class, family, tag width and the radius code. This is a planned site with its four location ids absent, and the absence is the boundary — those ids decide which renderings a copy must carry, so a list of them is the private constellation in a printable form."
+        },
+        {
+          "path": "swp_sdk::RefusedSite",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reexported": true,
+          "reason": "One candidate the run did not use: file, line hint and the stable reason token. The refusal's sentence is deliberately not here, because one of its forms interpolates the site's rendered fragment tag (swp-embedding/src/apply.rs:235, :256-266, copied at plan.rs:132-139) and a tag is keyed material."
         },
         {
           "path": "swp_sdk::VerifyOptions",
@@ -719,7 +754,7 @@
           "kind": "fn",
           "declared_in": "crates/swp-sdk/src/protect.rs",
           "blocked_by": "swp_sdk::ProtectOutcome",
-          "reason": "Embedding is the operation a binding exists to offer, and this one is a call the CLI already makes. It cannot cross today because its result type does not: `ProtectOutcome::protection.plan.sites[].locations` is `[LocationId; 4]`. What it should cross as is decided in docs/adr/0001-protect-generate-binding-boundary.md — a sanitized result carrying the run's non-keyed account and nothing else, because nothing downstream of a protection run reads a plan id and the CLI's whole printed document is rebuildable without one; whether that content is a Rust struct or a schema-versioned document is left open there. Narrowing the result is a public-Rust-API decision, not a protocol one: no stored artifact and no document schema moves. This freeze records the decision and does not make the change."
+          "reason": "The operation crosses: `swp_sdk::Session::protect_summary` calls this one and returns the run's non-keyed account, which is what docs/adr/0001-protect-generate-binding-boundary.md decided and what shipped with it. This spelling is still blocked by its own result type — `ProtectOutcome::protection.plan.sites[].locations` is `[LocationId; 4]` — and narrowing it further is the ADR's Option C, a `MAJOR` against re-exported Rust API recorded there as the fallback to take only if the two result types demonstrably drift."
         },
         {
           "path": "swp_sdk::ProtectOutcome",
@@ -727,7 +762,7 @@
           "declared_in": "crates/swp-sdk/src/protect.rs",
           "reexported": true,
           "blocked_by": "swp_embedding::Protection",
-          "reason": "`protection: Protection` reaches the plan, and the plan reaches the keyed location ids — and because `Protection` derives `Serialize`, serializing this envelope emits every one of them, which is the only path from a public `swp-sdk` operation to a keyed value that the measurements in docs/adr/0001-protect-generate-binding-boundary.md found. `revision` is the only field a binding could be given today. The target is the result that record describes, not a widened `Protection`."
+          "reason": "`protection: Protection` reaches the plan, and the plan reaches the keyed location ids — and because `Protection` derives `Serialize`, serializing this envelope emits every one of them, which is the only path from a public `swp-sdk` operation to a keyed value that the measurements in docs/adr/0001-protect-generate-binding-boundary.md found. `revision` is the only field a binding could be given today. The binding-facing account of the same run is `swp_sdk::ProtectSummary`; this envelope stays the Rust spelling, and the target for moving it is the narrowed result that record describes, not a widened `Protection`."
         }
       ]
     },

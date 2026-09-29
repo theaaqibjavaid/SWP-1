@@ -63,6 +63,7 @@
 //! | [`Session::open`] | resolve a project, apply overrides | `swp-identity`'s store |
 //! | [`Session::init`] | draw and seal a secret, measure, write config | `swp-crypto` + `swp-identity` |
 //! | [`Session::protect`] | plan or apply a constellation | `swp-embedding` |
+//! | [`Session::protect_summary`] | the same run, without its private plan | `swp-embedding` |
 //! | [`Session::verify`] | grade this tree against one release | `swp-detection` + `swp-evidence` |
 //! | [`Session::scan`] | look for provenance in a candidate | `swp-detection` + `swp-evidence` |
 //! | [`Session::reports`] | name and read saved documents | `swp-identity` + `swp-evidence` |
@@ -85,7 +86,9 @@ pub use crate::capabilities::{
     capabilities, Capabilities, DefaultPolicy, LanguageInfo, SiteRange, TagRange,
 };
 pub use crate::init::{InitOptions, InitOutcome, InitResult, Measurement, Settings};
-pub use crate::protect::{ProtectOptions, ProtectOutcome};
+pub use crate::protect::{
+    ProtectOptions, ProtectOutcome, ProtectSummary, ProtectedFile, ProtectedSite, RefusedSite,
+};
 pub use crate::report::{report_stem, StoredReport};
 pub use crate::scan::{SavedReport, ScanOutcome, ScannedSite};
 pub use crate::session::{Overrides, ReleaseSelection, Session};

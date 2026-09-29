@@ -233,6 +233,345 @@ fn a_tree_protected_by_the_sdk_publishes_what_the_cli_would() {
 }
 
 // --------------------------------------------------------------------------------------
+// the binding-facing account of a protection run
+// --------------------------------------------------------------------------------------
+
+/// The new result and the old document state the same run.
+///
+/// `swp protect --dry-run --format json` reads 22 of its 29 keys out of a
+/// [`Protection`]; `ProtectSummary` carries those 22 and nothing else, so every one
+/// of them has to say the same thing about the same tree. The seven it does not
+/// carry — `schema`, `protocol`, `command`, `commit`, `never_commit`, `back_up`,
+/// `next` — are constants and advice of a printed document, not claims about the
+/// run. The check runs in both directions: the summary invents nothing the document
+/// does not have, except its two per-site lists, which the document aggregates.
+#[test]
+fn the_binding_facing_account_matches_the_cli_document_key_for_key() {
+    let project = unguarded("parity-summary-cli");
+    let run = cli(
+        &[
+            "protect",
+            "--dry-run",
+            "--release",
+            PINNED,
+            "--revision",
+            "r-7",
+            "--format",
+            "json",
+        ],
+        project.root(),
+    )
+    .ok();
+    // The SDK door is handed an untrimmed revision deliberately: what both doors
+    // report is the label as it was *stored*, and both trim before storing.
+    let summary = sdk(project.root())
+        .protect_summary(&ProtectOptions {
+            mode: Mode::DryRun,
+            release_id: Some(ReleaseId::new(PINNED).unwrap()),
+            revision: Some("  r-7  ".to_string()),
+        })
+        .expect("the same line the CLI just ran");
+
+    let doc = run.json();
+    let s = through_json(&summary);
+    assert_eq!(text(&doc, "project_id"), text(&s, "project_id"));
+    assert_eq!(text(&doc, "release_id"), PINNED);
+    assert_eq!(text(&doc, "release_id"), text(&s, "release_id"));
+    assert_eq!(text(&doc, "revision"), text(&s, "revision"));
+    assert_eq!(text(&doc, "fingerprint"), text(&s, "fingerprint"));
+    assert_eq!(
+        text(&doc, "fingerprint_level"),
+        text(&s, "fingerprint_level")
+    );
+    // One spelling difference, stated rather than smoothed over: the document prints
+    // the mode as the CLI's flag reads, and the summary serializes the enum. A
+    // binding reads `Mode`, not prose.
+    assert_eq!(text(&doc, "mode"), summary.mode.as_str());
+    assert_eq!(text(&s, "mode"), "dry_run");
+    for key in [
+        "tag_bits",
+        "requested_sites",
+        "target_sites",
+        "sites_embedded",
+        "sites_skipped",
+        "files_walked",
+        "files_in_scope",
+        "candidates",
+    ] {
+        assert_eq!(
+            number(&doc, key),
+            number(&s, key),
+            "{key} is one count and both doors print it"
+        );
+    }
+    // A run's two timestamps are two moments, so `created_at` is the one documented
+    // key not compared; both are RFC 3339 and both name this run.
+    assert!(!text(&doc, "created_at").is_empty());
+    assert!(!text(&s, "created_at").is_empty());
+    // Same file, same site count, same before and after sizes — the rewrite is the
+    // same rewrite whichever door asked for it.
+    assert_eq!(
+        doc["files_changed"], s["files_changed"],
+        "the CLI's `files_changed` rows and the summary's are one list"
+    );
+    let modified: Vec<String> = s["files_changed"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| text(c, "file"))
+        .collect();
+    assert_eq!(doc["modified"], serde_json::to_value(&modified).unwrap());
+    assert_eq!(doc["artifacts"], s["artifacts"]);
+    assert_eq!(
+        doc["generated"], s["artifacts"],
+        "what the command says it generated is what the run wrote"
+    );
+    assert_eq!(doc["notes"], s["notes"]);
+    // The document's two censuses, recounted from the summary's per-site lists.
+    let census = |rows: &str, field: &str| -> serde_json::Value {
+        let mut out: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
+        for row in s[rows].as_array().unwrap() {
+            *out.entry(text(row, field)).or_insert(0) += 1;
+        }
+        serde_json::to_value(&out).unwrap()
+    };
+    assert_eq!(doc["skip_reasons"], census("refusals", "reason"));
+    assert_eq!(doc["families"], census("sites", "family"));
+    assert_eq!(
+        summary.sites.len(),
+        summary.sites_embedded as usize,
+        "the summary lists exactly the sites it says it embedded"
+    );
+    assert_eq!(
+        summary.refusals.len(),
+        summary.sites_skipped as usize,
+        "and exactly the refusals it says it made"
+    );
+    let cli_keys: std::collections::BTreeSet<&String> = doc.as_object().unwrap().keys().collect();
+    for key in s.as_object().unwrap().keys() {
+        assert!(
+            cli_keys.contains(&key) || key == "sites" || key == "refusals",
+            "the summary reports {key:?}, which no CLI document has ever printed: a new field \
+             here is a new claim about a run and belongs in the ADR before the code"
+        );
+    }
+    // A dry run writes nothing, which is what let both doors run one project.
+    assert!(s["artifacts"].as_array().unwrap().is_empty());
+    assert_eq!(project.releases(), Vec::<String>::new());
+}
+
+/// The summary is the result it replaces with its keyed half left behind.
+///
+/// A `ProtectOutcome` and a `ProtectSummary` for one run must agree on everything
+/// non-keyed, and the disagreement must be exactly the two things the boundary is
+/// about: a planned site's four keyed identities and a refusal's sentence, which
+/// interpolates a rendered tag. So the same plan is drawn twice over one tree —
+/// `Mode::Plan` touches no source, and the constellation is keyed by release id, so
+/// both calls decide the identical 12 sites — and the outcome is checked against
+/// both the summary and its own serialized bytes.
+#[test]
+fn the_summary_is_the_same_run_with_every_keyed_site_identity_left_behind() {
+    let project = unguarded("parity-summary-projection");
+    let options = ProtectOptions {
+        mode: Mode::Plan,
+        release_id: Some(ReleaseId::new(PINNED).unwrap()),
+        revision: Some("r-2".to_string()),
+    };
+    let summary = sdk(project.root())
+        .protect_summary(&options)
+        .expect("a planned constellation");
+    let outcome = sdk(project.root())
+        .protect(&options)
+        .expect("the same constellation, drawn again");
+    let p = &outcome.protection;
+
+    assert_eq!(summary.mode, p.mode);
+    assert_eq!(summary.project_id, p.project_id);
+    assert_eq!(summary.release_id, p.release_id);
+    assert_eq!(summary.revision, outcome.revision);
+    assert_eq!(summary.fingerprint, p.fingerprint);
+    assert_eq!(summary.fingerprint_level, p.fingerprint_level);
+    assert_eq!(summary.tag_bits, p.tag_bits);
+    assert_eq!(summary.requested_sites, p.requested_sites);
+    assert_eq!(summary.target_sites, p.target_sites);
+    assert_eq!(summary.sites_embedded, p.sites_embedded);
+    assert_eq!(summary.sites_skipped, p.sites_skipped);
+    assert_eq!(summary.files_walked, p.files_walked);
+    assert_eq!(summary.files_in_scope, p.files_in_scope);
+    assert_eq!(summary.candidates, p.candidates);
+    assert_eq!(summary.artifacts, p.artifacts);
+    assert_eq!(summary.notes, p.notes);
+    assert_eq!(summary.files_changed.len(), p.files_changed.len());
+    for (row, change) in summary.files_changed.iter().zip(&p.files_changed) {
+        assert_eq!(row.file, change.file);
+        assert_eq!(row.sites, change.sites);
+        assert_eq!(row.bytes_before, change.bytes_before);
+        assert_eq!(row.bytes_after, change.bytes_after);
+    }
+
+    assert_eq!(summary.sites.len(), p.plan.sites.len());
+    for (row, site) in summary.sites.iter().zip(&p.plan.sites) {
+        assert_eq!(row.file, site.file);
+        assert_eq!(row.line_hint, site.line_hint);
+        assert_eq!(row.language, site.language);
+        assert_eq!(row.adapter, site.adapter);
+        assert_eq!(row.class, site.class);
+        assert_eq!(row.family, site.family);
+        assert_eq!(row.width, site.width);
+        assert_eq!(row.primary, site.primary);
+    }
+    assert_eq!(summary.refusals.len(), p.plan.skipped.len());
+    for (row, skipped) in summary.refusals.iter().zip(&p.plan.skipped) {
+        assert_eq!(row.file, skipped.file);
+        assert_eq!(row.line_hint, skipped.line_hint);
+        assert_eq!(row.reason, skipped.reason);
+    }
+
+    // The keyed half, swept out of every rendering the summary can take. These are
+    // this run's own location ids, read off its own plan: a build that leaked the
+    // constellation into the binding-facing result would leak *these* bytes.
+    let json = serde_json::to_string(&summary).unwrap();
+    let debug = format!("{summary:?}");
+    let mut needles = Vec::new();
+    let mut ids = 0usize;
+    for site in &p.plan.sites {
+        for id in &site.locations {
+            needles.push(NeedleSet::new(format!("location-id-{ids}"), id.as_bytes()));
+            ids += 1;
+        }
+    }
+    assert!(
+        ids >= 8,
+        "the fixture handed back {ids} keyed location ids; a sweep of so little is a vacuous pass"
+    );
+    let sentences: Vec<String> = p
+        .plan
+        .skipped
+        .iter()
+        .map(|s| s.detail.clone())
+        .filter(|detail| detail.len() >= 24)
+        .collect();
+    assert!(
+        !sentences.is_empty(),
+        "no refusal sentence was long enough to sweep, so this test would not notice one crossing"
+    );
+    let mut report = SweepReport::default();
+    for (label, artifact) in [("summary-json", &json), ("summary-debug", &debug)] {
+        sweep_bytes(label, artifact.as_bytes(), &needles, &mut report);
+    }
+    report.assert_clean();
+    for sentence in &sentences {
+        assert!(
+            !json.contains(sentence) && !debug.contains(sentence),
+            "the summary carries a refusal's sentence, which is where a rendered tag appears: \
+             {sentence}"
+        );
+    }
+    // The other half of the same claim: the summary still says what the run did.
+    assert!(json.contains(PINNED), "the release id is in the account");
+    assert!(json.contains("\"family\""));
+    assert!(json.contains("\"reason\""));
+    assert!(
+        !json.contains("\"locations\""),
+        "the keyed address list crossed into the binding-facing account"
+    );
+    assert_eq!(
+        project.releases(),
+        Vec::<String>::new(),
+        "a plan records a constellation and publishes no release"
+    );
+}
+
+/// The same run, the same magnitude, whichever door a caller uses.
+#[test]
+fn a_release_through_the_binding_door_reports_the_same_run_as_the_cli_document() {
+    let via_cli = unguarded("parity-summary-release-a");
+    let via_sdk = unguarded("parity-summary-release-b");
+    for rel in via_cli.sources() {
+        via_sdk.write(&rel, &via_cli.read(&rel));
+    }
+    let run = cli(
+        &[
+            "protect",
+            "--release",
+            PINNED,
+            "--revision",
+            "r-9",
+            "--format",
+            "json",
+        ],
+        via_cli.root(),
+    )
+    .ok();
+    let summary = sdk(via_sdk.root())
+        .protect_summary(&ProtectOptions {
+            mode: Mode::Release,
+            release_id: Some(ReleaseId::new(PINNED).unwrap()),
+            revision: Some("r-9".to_string()),
+        })
+        .expect("the same tree the other project just protected");
+
+    let doc = run.json();
+    let s = through_json(&summary);
+    // Two projects hold two keys, so they embed two different constellations and
+    // hash to two different trees. What has to agree is every claim about the tree
+    // as it was before the run and about how much protection it took.
+    for key in [
+        "tag_bits",
+        "requested_sites",
+        "target_sites",
+        "sites_embedded",
+        "sites_skipped",
+        "files_walked",
+        "files_in_scope",
+        "candidates",
+    ] {
+        assert_eq!(
+            number(&doc, key),
+            number(&s, key),
+            "{key} is a property of one tree, not of one key"
+        );
+    }
+    assert_eq!(text(&doc, "release_id"), text(&s, "release_id"));
+    assert_eq!(text(&doc, "revision"), text(&s, "revision"));
+    assert_eq!(text(&doc, "mode"), summary.mode.as_str());
+    assert_eq!(
+        text(&doc, "fingerprint_level"),
+        text(&s, "fingerprint_level")
+    );
+    assert_ne!(text(&doc, "project_id"), text(&s, "project_id"));
+    assert_ne!(
+        text(&doc, "fingerprint"),
+        text(&s, "fingerprint"),
+        "the two trees differ once each carries its own mark, and a shared fingerprint here \
+         would say the mark was not keyed"
+    );
+    assert_eq!(
+        doc["artifacts"], s["artifacts"],
+        "one release id lands the same records at the same store paths by either door"
+    );
+    assert_eq!(summary.sites.len(), summary.sites_embedded as usize);
+    assert_eq!(summary.refusals.len(), summary.sites_skipped as usize);
+    assert!(
+        !summary.files_changed.is_empty(),
+        "a release rewrites source"
+    );
+    // What the boundary keeps out, checked on the document a binding would hold.
+    let rows = s["sites"].as_array().unwrap();
+    for row in rows {
+        for key in row.as_object().unwrap().keys() {
+            assert_ne!(key.as_str(), "locations", "a keyed address crossed");
+        }
+    }
+    for row in s["refusals"].as_array().unwrap() {
+        for key in row.as_object().unwrap().keys() {
+            assert_ne!(key.as_str(), "detail", "a refusal sentence crossed");
+        }
+    }
+    assert_eq!(via_sdk.releases(), vec![PINNED.to_string()]);
+}
+
+// --------------------------------------------------------------------------------------
 // verification and scanning
 // --------------------------------------------------------------------------------------
 
@@ -567,6 +906,12 @@ fn no_value_the_sdk_hands_back_prints_the_key_it_just_used() {
     ];
 
     let session = sdk(tmp.path());
+    // The binding-facing account, taken as a dry run first so the tree below is
+    // still the one the release is made over: this is the value that reaches a
+    // caller outside Rust, which is exactly the caller that prints things.
+    let summary = session
+        .protect_summary(&ProtectOptions::new(Mode::DryRun))
+        .expect("a tree this suite just configured");
     let protect = session
         .protect(&ProtectOptions::new(Mode::Release))
         .expect("a tree this suite just configured");
@@ -587,6 +932,11 @@ fn no_value_the_sdk_hands_back_prints_the_key_it_just_used() {
         (
             "protect-json",
             serde_json::to_string(&protect.protection).unwrap(),
+        ),
+        ("protect-summary", format!("{summary:?}")),
+        (
+            "protect-summary-json",
+            serde_json::to_string(&summary).unwrap(),
         ),
         ("scan", format!("{scan:?}")),
         ("scan-json", serde_json::to_string(&scan.report).unwrap()),

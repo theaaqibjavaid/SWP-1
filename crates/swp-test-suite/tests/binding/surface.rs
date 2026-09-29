@@ -47,7 +47,7 @@ const _: fn(
     &swp_identity::Store,
 ) -> Result<swp_crypto::secret::RootSecret, swp_core::error::SwpError> = |store| store.load_root();
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -448,6 +448,41 @@ fn public_members(file: &str, kind: &str, name: &str) -> Vec<String> {
         other => panic!("no member model for a {other}"),
     }
     members
+}
+
+/// The public field names a struct declares, and the variant names an enum does.
+///
+/// `public_members` returns the *types* and drops the names, which is right for
+/// containment and useless for the name ban, so this reads the same declaration
+/// lines again.
+fn public_field_names(file: &str, kind: &str, name: &str) -> Vec<String> {
+    let lines = declaration_lines(file, kind, name);
+    let mut names = Vec::new();
+    for line in &lines[1..] {
+        if kind == "enum" {
+            let variant = line
+                .split(['(', '{'])
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_end_matches(',')
+                .to_string();
+            if !variant.is_empty() {
+                names.push(variant);
+            }
+            continue;
+        }
+        if let Some(field) = line
+            .strip_prefix("pub ")
+            .and_then(|rest| rest.split(':').next())
+        {
+            let field = field.trim().to_string();
+            if !field.is_empty() {
+                names.push(field);
+            }
+        }
+    }
+    names
 }
 
 /// The text between the first `open` and its matching `close`.
@@ -1010,6 +1045,64 @@ fn the_keyed_half_of_a_protect_result_stays_out_of_the_boundary() {
     );
 }
 
+/// What the boundary now offers instead: a result built by *reading* non-keyed
+/// fields, so the sanitizer itself is the thing under test.
+///
+/// `a_binding_facing_field_is_never_keyed_material` checks the field types of
+/// `ProtectSummary` and its rows, which is the shape. This checks the construction:
+/// a keyed field can only cross if something reads it, and the one function that
+/// moves a plan into a binding-facing value is `summarize`.
+#[test]
+fn the_protect_summary_is_built_without_reading_the_keyed_fields() {
+    let manifest = load();
+    let mut categories = entries(&manifest)
+        .iter()
+        .map(|(category, entry)| (name_of(&entry.path).to_string(), *category))
+        .collect::<BTreeMap<_, _>>();
+    for name in [
+        "ProtectSummary",
+        "ProtectedFile",
+        "ProtectedSite",
+        "RefusedSite",
+    ] {
+        let found = categories.remove(name);
+        assert_eq!(
+            found,
+            Some("binding_facing"),
+            "{name} is the sanitized result a binding is meant to hold, and the manifest \
+             classifies it as {found:?}"
+        );
+    }
+
+    let source = read_repo("crates/swp-sdk/src/protect.rs");
+    let head = "fn summarize(";
+    let start = source
+        .find(head)
+        .unwrap_or_else(|| panic!("swp-sdk no longer has a `{head}` to check"));
+    let body = &source[start..];
+    let body = body
+        .split("\n}\n")
+        .next()
+        .unwrap_or_else(|| panic!("{head}: no closing brace"));
+    // `.locations` is the keyed identity of a site and `.detail` is the refusal's
+    // sentence, which interpolates a rendered tag. Neither may be read here; the
+    // plan's remaining fields are the ones the projection names.
+    for keyed in [".locations", ".detail"] {
+        assert!(
+            !body.contains(keyed),
+            "summarize reads {keyed}, which is keyed or tag-bearing private plan content: \
+             the sanitized result would carry it"
+        );
+    }
+    for walked in [".plan\n", ".skipped\n"] {
+        assert!(
+            body.contains(walked),
+            "summarize no longer walks the plan's site and refusal rows to build the summary, \
+             so this check is reading a function that has moved"
+        );
+    }
+}
+
 #[test]
 fn the_operations_a_binding_may_be_built_on_are_all_named() {
     let manifest = load();
@@ -1041,6 +1134,7 @@ fn the_operations_a_binding_may_be_built_on_are_all_named() {
         "report_stem",
         "suggest_sites",
         "new",
+        "protect_summary",
     ] {
         assert!(
             calls.contains(expected),
@@ -1074,6 +1168,24 @@ const KEYED_FIELD_TYPES: [&str; 8] = [
 const BYTE_SHAPES: [&str; 4] = ["[u8;", "&[u8]", "Vec<u8>", "[u8]"];
 const BYTE_CARRIERS: [&str; 1] = ["Digest"];
 
+/// Field names that mean "the keyed thing itself", whatever type they carry.
+///
+/// These are exact matches, not a substring rule: `project_id`, `tag_bits` and
+/// `secret_scheme` are all honest binding-facing fields and `locations` is not. The
+/// ban exists because the gates above check *types*, and `pub locations: Vec<String>`
+/// — the private constellation, hex-rendered — would satisfy every one of them. The
+/// same reasoning forbids `detail`, whose sentence can interpolate a rendered tag.
+const KEYED_FIELD_NAMES: [&str; 8] = [
+    "locations",
+    "location_ids",
+    "detail",
+    "fragment_tag",
+    "expected_tag",
+    "tag",
+    "root_secret",
+    "secret_bytes",
+];
+
 #[test]
 fn a_binding_facing_field_is_never_keyed_material() {
     let manifest = load();
@@ -1084,6 +1196,16 @@ fn a_binding_facing_field_is_never_keyed_material() {
             continue;
         }
         let name = name_of(&entry.path);
+        for field in public_field_names(&entry.declared_in, &entry.kind, name) {
+            if KEYED_FIELD_NAMES.contains(&field.as_str()) {
+                leaks.push(format!(
+                    "{} exposes a field named {field}, which is the name of keyed material \
+                     whatever type it carries — the private constellation hex-rendered into a \
+                     Vec<String> passes every type gate below",
+                    entry.path
+                ));
+            }
+        }
         for member in public_members(&entry.declared_in, &entry.kind, name) {
             read += 1;
             for token in type_names(&member) {
