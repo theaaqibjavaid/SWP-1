@@ -99,3 +99,10 @@ path = "tests/docs/examples.rs"
 [[test]]
 name = "sdk_parity"
 path = "tests/sdk/parity.rs"
+
+# Beta 3: docs/BINDING_SURFACE.json is the boundary a future Python or Node binding
+# is built against. This is the half of it that can only be checked in Rust: that the
+# file still describes the crate, and that nothing keyed is on the allowed side.
+[[test]]
+name = "binding_surface"
+path = "tests/binding/surface.rs"
