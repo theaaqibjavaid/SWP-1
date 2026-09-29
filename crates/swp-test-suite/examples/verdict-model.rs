@@ -13,8 +13,7 @@
 
 use std::path::Path;
 
-use swp_detection::{build_indexes, input, scan_against, SiteStatus};
-use swp_evidence::level::tally;
+use swp_detection::SiteStatus;
 
 /// One scan, flattened to the numbers the rules read.
 struct Obs {
@@ -149,37 +148,40 @@ fn genuine(iter: usize, bits: u8) {
     drop(release);
 }
 
-/// Reproduce `swp scan` down to the detection, so per-site data is visible.
+/// Reproduce `swp scan` through the call `swp scan` makes, so per-site data is
+/// visible alongside the grade.
+///
+/// This is the SDK's [`scan`](swp_sdk::Session::scan), not a hand-assembled
+/// detection: the tally read here is the one the shipped report carries, so the
+/// scored statistics cannot drift from what the command would have printed.
 fn observe(scanner: &Path, candidate: &Path, label: &str, kind: &'static str) -> Obs {
-    let argv = vec![
-        "scan".to_string(),
-        candidate.display().to_string(),
-        "--format".to_string(),
-        "json".to_string(),
-    ];
-    let parsed = swp_cli::args::parse(&argv).expect("the scan line parses");
-    let ctx = swp_cli::ctx::Ctx::open(&parsed, scanner).expect("the scanner is a project");
-    let limits = ctx.limits();
-    let releases = ctx.candidate_releases(&parsed).expect("releases load");
-    let verify_key = ctx.identity.verify_key().expect("identity has a key");
-    let indexes = build_indexes(&releases, &verify_key, &limits).expect("indexes build");
-    let opened = input::open(candidate, &limits).expect("candidate opens");
-    let detection = scan_against(&opened, &indexes, &limits).expect("the scan completes");
-    let t = tally(&detection, 0);
-    let release = &detection.releases[0];
-    let site_probes: Vec<u32> = release.sites.iter().map(|s| s.probes).collect();
+    let session = swp_sdk::Session::open(scanner, &swp_sdk::Overrides::default())
+        .expect("the scanner is a project");
+    let outcome = session
+        .scan(candidate, &swp_sdk::ReleaseSelection::All, false)
+        .expect("the scan completes");
+    let report = &outcome.report;
+    let t = report
+        .releases
+        .first()
+        .expect("a scan of a protected project tallies its release");
+    let site_probes: Vec<u32> = outcome.sites.iter().map(|s| s.probes).collect();
     let mut sites = Vec::new();
-    for s in &release.sites {
-        sites.push((s.probes, s.distinct_codes, status(s.status)));
+    for s in &outcome.sites {
+        sites.push((s.probes, s.distinct_codes, s.status));
     }
     let mut per_span: std::collections::BTreeMap<(String, u32, String), usize> = Default::default();
-    for s in release.sites.iter().filter(|s| s.confirmed()) {
+    for s in outcome
+        .sites
+        .iter()
+        .filter(|s| SiteStatus::parse(s.status).is_some_and(|st| st.is_watermark()))
+    {
         if let Some(f) = &s.found_in {
             *per_span
                 .entry((
                     f.clone(),
                     s.found_line.unwrap_or(0),
-                    s.found_text.clone().unwrap_or_default(),
+                    s.found_excerpt.clone().unwrap_or_default(),
                 ))
                 .or_default() += 1;
         }
@@ -201,15 +203,6 @@ fn observe(scanner: &Path, candidate: &Path, label: &str, kind: &'static str) ->
         tail_loose: tail_binomial(t.probes as usize, t.tag_bits, t.fragments),
         sites,
         shared_span_sites: per_span.values().filter(|n| **n > 1).count(),
-    }
-}
-
-fn status(s: SiteStatus) -> &'static str {
-    match s {
-        SiteStatus::Absent => "absent",
-        SiteStatus::LocationOnly => "loc-only",
-        SiteStatus::TagConfirmed => "tag",
-        SiteStatus::ExactRendering => "exact",
     }
 }
 

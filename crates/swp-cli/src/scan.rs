@@ -5,10 +5,11 @@
 //!
 //! * **The keys come from the owner's project, never from the candidate.** The
 //!   project is found by [`Ctx::open`] walking up from the *working directory*, and
-//!   the candidate is only ever opened by [`input::open`]. A repository under
-//!   examination may ship its own `.swp/` — possibly a different project's,
-//!   possibly a forged one — and if any part of the verdict depended on it, the
-//!   examined party would be supplying the evidence used to judge them.
+//!   the candidate is only ever opened by [`Session::scan`](swp_sdk::Session::scan).
+//!   A repository under examination may ship its own `.swp/` — possibly a
+//!   different project's, possibly a forged one — and if any part of the verdict
+//!   depended on it, the examined party would be supplying the evidence used to
+//!   judge them.
 //! * **The candidate is read, not run.** No process is spawned, no manifest is
 //!   interpreted, no dependency is resolved (§21). Archives are unpacked into a
 //!   temporary directory that is removed afterwards, and the only thing done to
@@ -28,9 +29,8 @@
 use std::path::Path;
 
 use swp_core::error::{ErrorCode, SwpError};
-use swp_detection::{build_indexes, input, scan_against};
 use swp_evidence::{Outcome, Report};
-use swp_identity::Timestamp;
+use swp_sdk::SavedReport;
 
 use crate::args::{Flag, Parsed};
 use crate::ctx::{self, Ctx};
@@ -39,59 +39,32 @@ use crate::output::{self, Sink};
 pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpError> {
     let candidate = candidate_path(parsed, cwd)?;
     let project = Ctx::open(parsed, cwd)?;
-    for warning in &project.warnings {
+    for warning in project.warnings() {
         sink.warn(warning);
     }
-    let limits = project.limits();
-    let releases = project.candidate_releases(parsed)?;
-    let verify_key = project.identity.verify_key()?;
-    let indexes = build_indexes(&releases, &verify_key, &limits)?;
+    let selection = ctx::selection(parsed)?;
     if parsed.verbose() {
         sink.note(&format!(
             "scanning {} against {} release(s) of project {}",
             candidate.display(),
-            indexes.len(),
-            project.identity.project_id
+            project.session.releases(&selection)?.len(),
+            project.identity().project_id
         ));
     }
-    let opened = input::open(&candidate, &limits)?;
+    let outcome = project
+        .session
+        .scan(&candidate, &selection, parsed.has(Flag::Save))?;
     if parsed.verbose() {
         sink.note(&format!(
             "{} ({}) read; matching keyed addresses",
-            opened.described,
-            opened.kind.as_str()
+            outcome.report.candidate.described, outcome.report.candidate.kind
         ));
     }
-    let detection = scan_against(&opened, &indexes, &limits)?;
-
-    let now = Timestamp::now_utc();
-    let report = Report::build(
-        &detection,
-        "scan",
-        &now.to_rfc3339(),
-        &crate::help::banner(),
-    );
-    let saved = if parsed.has(Flag::Save) {
-        let stem = format!("scan-{}", now.filename_stem());
-        let path = project
-            .store
-            .save_report(&stem, report.to_json().as_bytes())?;
-        sink.note(&format!("report saved to {path}"));
-        // The store numbers a collision rather than overwriting, so the name to
-        // print — and the name `swp report` will accept — is the one it returned.
-        let written = path
-            .rsplit('/')
-            .next()
-            .and_then(|f| f.strip_suffix(".json"))
-            .unwrap_or(stem.as_str())
-            .to_string();
-        Some(Saved {
-            stem: written,
-            path,
-        })
-    } else {
-        None
-    };
+    let report = &outcome.report;
+    let saved = outcome.saved.as_ref();
+    if let Some(at) = saved {
+        sink.note(&format!("report saved to {}", at.path));
+    }
 
     match report.result {
         Outcome::ProvenanceDetected => {}
@@ -103,8 +76,8 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
             report.omissions.len()
         )),
     }
-    let lines = render(&report, parsed, saved.as_ref())?;
-    output::deliver(sink, &report, &lines, parsed.value(Flag::Output))?;
+    let lines = render(report, parsed, saved)?;
+    output::deliver(sink, report, &lines, parsed.value(Flag::Output))?;
     Ok(report.exit_code())
 }
 
@@ -139,7 +112,7 @@ fn candidate_path(parsed: &Parsed, cwd: &Path) -> Result<std::path::PathBuf, Swp
 fn render(
     report: &Report,
     parsed: &Parsed,
-    saved: Option<&Saved>,
+    saved: Option<&SavedReport>,
 ) -> Result<Vec<String>, SwpError> {
     let limit = crate::output::window(parsed.has(Flag::Full), parsed.number(Flag::Limit)?);
     let text = report.to_text_items(limit);
@@ -157,13 +130,7 @@ fn render(
     Ok(lines)
 }
 
-/// What `--save` produced: the name to re-render it by, and the path that holds it.
-struct Saved {
-    stem: String,
-    path: String,
-}
-
-fn next_steps(report: &Report, json: bool, saved: Option<&Saved>) -> Vec<String> {
+fn next_steps(report: &Report, json: bool, saved: Option<&SavedReport>) -> Vec<String> {
     let mut out = Vec::new();
     match report.result {
         Outcome::ProvenanceDetected => {
@@ -186,7 +153,7 @@ fn next_steps(report: &Report, json: bool, saved: Option<&Saved>) -> Vec<String>
             } else {
                 out.push(format!(
                     "swp report {} --format json   (re-render the saved copy)",
-                    saved.map(|s| s.stem.as_str()).unwrap_or_default()
+                    saved.map(|s| s.name.as_str()).unwrap_or_default()
                 ));
             }
         }

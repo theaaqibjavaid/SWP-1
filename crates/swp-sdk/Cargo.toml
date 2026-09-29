@@ -1,6 +1,6 @@
 [package]
-name = "swp-cli"
-description = "SWP-1 command line: init, generate, protect, verify, scan, inspect and report, with machine-readable output and stable exit codes."
+name = "swp-sdk"
+description = "SWP-1 orchestration API: the project session, initialization, protection, verification, scanning and saved-report access that `swp` runs, as one Rust surface with structured results and no terminal formatting."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,20 +11,13 @@ keywords.workspace = true
 categories.workspace = true
 publish.workspace = true
 
-[lib]
-name = "swp_cli"
-path = "src/lib.rs"
-
-[[bin]]
-name = "swp"
-path = "src/main.rs"
-
 [dependencies]
 swp-core.workspace = true
-swp-sdk.workspace = true
+swp-crypto.workspace = true
 swp-identity.workspace = true
 swp-manifest.workspace = true
 swp-embedding.workspace = true
+swp-detection.workspace = true
 swp-evidence.workspace = true
+swp-adapters.workspace = true
 serde.workspace = true
-serde_json.workspace = true

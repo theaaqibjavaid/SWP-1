@@ -1,0 +1,810 @@
+{
+  "schema": "swp-binding-surface-v1",
+  "protocol": "SWP-1",
+  "crate": "swp-sdk",
+  "generated": false,
+  "purpose": "The item-level boundary between the public Rust SDK and the surface a future Python or Node binding may wrap. `binding_facing` is the allowlist: a generated binding's export table must be a subset of it. Every other category names Rust-public API that is deliberately not part of that boundary.",
+  "enforced_by": "cargo test --locked -p swp-test-suite --test binding_surface",
+  "enforcement_source": "crates/swp-test-suite/tests/binding/surface.rs",
+  "notes": [
+    "Items are classified by the declaration site the Rust compiler sees, not by a rendered doc page: `declared_in` plus the last segment of `path`.",
+    "A binding reads exactly one category, `binding_facing`. The other three exist so that an omission is written down as a decision rather than as an oversight.",
+    "`pending` is the one category that is an open question, not a boundary: it names API intended to cross that cannot cross today, and `blocked_by` states the field that blocks it.",
+    "Nothing here is a promise about FFI mechanics: no ownership model, no error mapping, no async or cancellation semantics. It says only which names are safe to wrap."
+  ],
+  "inline_types": [
+    "bool",
+    "str",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "usize",
+    "i32",
+    "f64",
+    "String",
+    "Self",
+    "Path",
+    "PathBuf",
+    "Vec",
+    "Option",
+    "Result",
+    "Box",
+    "Arc",
+    "BTreeMap",
+    "BTreeSet",
+    "HashMap"
+  ],
+  "modules": ["capabilities", "init", "protect", "report", "scan", "session", "verify"],
+  "surface": [
+    {
+      "category": "binding_facing",
+      "meaning": "Permitted to cross a foreign-binding boundary. Carries no key material, no keyed identity, no handle on the private half of the store.",
+      "items": [
+        {
+          "path": "swp_sdk::Session",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reexported": true,
+          "reason": "A path plus two parsed documents. Its four fields are private, and none of them is a file handle, a lock or a key."
+        },
+        {
+          "path": "swp_sdk::Overrides",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reexported": true,
+          "reason": "Five settings fields, all strings, integers and a bool."
+        },
+        {
+          "path": "swp_sdk::ReleaseSelection",
+          "kind": "enum",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reexported": true,
+          "reason": "All, Latest or a list of release ids. An id is a label, not a key."
+        },
+        {
+          "path": "swp_sdk::Session::open",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "Resolves a project the caller names."
+        },
+        {
+          "path": "swp_sdk::Session::discover",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "Resolves the nearest enclosing project."
+        },
+        {
+          "path": "swp_sdk::Session::init",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/init.rs",
+          "reason": "Draws and seals a secret inside the call and never returns it: InitResult reports the secret's state, scheme and store-relative handle, all of which are strings that name a file rather than open it."
+        },
+        {
+          "path": "swp_sdk::Session::verify",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/verify.rs",
+          "reason": "Grades this tree against one release; the answer is a document of counts, statuses and words."
+        },
+        {
+          "path": "swp_sdk::Session::scan",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/scan.rs",
+          "reason": "Grades somebody else's artifact. Loads the keyed constellation inside the call, drops the secret before returning, and hands back only the graded report and per-site counts."
+        },
+        {
+          "path": "swp_sdk::Session::reports",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/report.rs",
+          "reason": "Names the saved reports this store holds, newest first."
+        },
+        {
+          "path": "swp_sdk::Session::read_report",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/report.rs",
+          "reason": "Reads one saved report back as the same document `scan` produced. The report is a graded finding, not keyed material; the path it returns is store-relative and forward-slashed."
+        },
+        {
+          "path": "swp_sdk::Session::project_root",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "The directory the caller opened."
+        },
+        {
+          "path": "swp_sdk::Session::identity",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "The public half of the project identity, which `.swp/public/identity.json` is designed to carry."
+        },
+        {
+          "path": "swp_sdk::Session::config",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "The settings in force after overrides, as data."
+        },
+        {
+          "path": "swp_sdk::Session::stored_config",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "The same settings as written on disk, without the overrides applied."
+        },
+        {
+          "path": "swp_sdk::Session::warnings",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "Strings produced while opening the project."
+        },
+        {
+          "path": "swp_sdk::Session::limits",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "Resource ceilings: integers only."
+        },
+        {
+          "path": "swp_sdk::Session::releases",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "Release ids, which are random labels."
+        },
+        {
+          "path": "swp_sdk::Session::one_release",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "Exactly one release id, or the error that says the selection is not one."
+        },
+        {
+          "path": "swp_sdk::Session::release_history",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "The signed public records, in the order the store holds them."
+        },
+        {
+          "path": "swp_sdk::Session::release",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "One signed public record."
+        },
+        {
+          "path": "swp_sdk::InitOptions",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/init.rs",
+          "reexported": true,
+          "reason": "A display name and a force flag."
+        },
+        {
+          "path": "swp_sdk::InitOutcome",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/init.rs",
+          "reexported": true,
+          "reason": "A fresh Session plus its InitResult."
+        },
+        {
+          "path": "swp_sdk::InitResult",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/init.rs",
+          "reexported": true,
+          "reason": "Project id, display name, the secret's state/scheme/store-relative handle, the permission check's own words, what was created, and the measurement. Every field is a string, a bool, an integer or one of the records below; none of them opens the file it names."
+        },
+        {
+          "path": "swp_sdk::Measurement",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/init.rs",
+          "reexported": true,
+          "reason": "Counts of files, bytes, languages and candidate sites."
+        },
+        {
+          "path": "swp_sdk::Settings",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/init.rs",
+          "reexported": true,
+          "reason": "The targets, site count, tag width and string flag a project starts with."
+        },
+        {
+          "path": "swp_sdk::init::suggest_sites",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/init.rs",
+          "reexported": false,
+          "reason": "A pure function of the file count."
+        },
+        {
+          "path": "swp_sdk::ProtectOptions",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reexported": true,
+          "reason": "Mode, an optional release id and an optional revision label. All three go into a request; nothing comes out of a key."
+        },
+        {
+          "path": "swp_sdk::ProtectOptions::new",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reason": "Constructor for the mode-only default."
+        },
+        {
+          "path": "swp_sdk::VerifyOptions",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/verify.rs",
+          "reexported": true,
+          "reason": "A release choice, a save flag and a row window."
+        },
+        {
+          "path": "swp_sdk::VerifyOutcome",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/verify.rs",
+          "reexported": true,
+          "reason": "The verify document plus, when `save` was set, the store-relative name it went under."
+        },
+        {
+          "path": "swp_sdk::ScanOutcome",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/scan.rs",
+          "reexported": true,
+          "reason": "The graded report, where a saved copy went, and the per-site rows. The rows are a companion to the document, not a second grading of it."
+        },
+        {
+          "path": "swp_sdk::ScannedSite",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/scan.rs",
+          "reexported": true,
+          "reason": "One site's status word, probe and distinct-code counts, token count, and where it was found with a truncated excerpt. The location ids and expected codes the match was decided against stay in `swp-detection`; this is the same claim the report's evidence items make."
+        },
+        {
+          "path": "swp_sdk::SavedReport",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/scan.rs",
+          "reexported": true,
+          "reason": "The name and store-relative path of one report a run saved."
+        },
+        {
+          "path": "swp_sdk::StoredReport",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/report.rs",
+          "reexported": true,
+          "reason": "One saved report document with its name and store-relative path."
+        },
+        {
+          "path": "swp_sdk::report_stem",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/report.rs",
+          "reexported": true,
+          "reason": "Turns a name into the stem a save would use."
+        },
+        {
+          "path": "swp_sdk::Capabilities",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/capabilities.rs",
+          "reexported": true,
+          "reason": "Protocol name, tool version, report schema, canonicalizer version, languages, the two numeric ranges and the built-in excludes."
+        },
+        {
+          "path": "swp_sdk::LanguageInfo",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/capabilities.rs",
+          "reexported": true,
+          "reason": "A language name and its file extensions."
+        },
+        {
+          "path": "swp_sdk::TagRange",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/capabilities.rs",
+          "reexported": true,
+          "reason": "Min, max, default bits."
+        },
+        {
+          "path": "swp_sdk::SiteRange",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/capabilities.rs",
+          "reexported": true,
+          "reason": "Min, default, max sites."
+        },
+        {
+          "path": "swp_sdk::DefaultPolicy",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/capabilities.rs",
+          "reexported": true,
+          "reason": "The excludes a project cannot turn off."
+        },
+        {
+          "path": "swp_sdk::capabilities",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/capabilities.rs",
+          "reexported": true,
+          "reason": "Reads nothing: no filesystem, no project, no secret."
+        },
+        {
+          "path": "swp_sdk::VERSION",
+          "kind": "const",
+          "declared_in": "crates/swp-sdk/src/lib.rs",
+          "reexported": false,
+          "reason": "The version this build reports. A binding that states a version states this one."
+        },
+        {
+          "path": "swp_sdk::banner",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/lib.rs",
+          "reexported": false,
+          "reason": "The one sentence a report's `generator` field carries."
+        },
+        {
+          "path": "swp_sdk::SwpError",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/error.rs",
+          "reexported": true,
+          "reason": "A code, a message, an optional path and an optional next step. `path` is a filesystem location the caller already named; the type has no key field, and `render()` is the text the CLI prints."
+        },
+        {
+          "path": "swp_core::SwpFailure",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/error.rs",
+          "reexported": false,
+          "reason": "`SwpError`'s public inner record: code, message, optional path. Reachable through `SwpError::failure`, so it is classified here, but a binding that only needs `code()`/`message()` never has to name it."
+        },
+        {
+          "path": "swp_sdk::ErrorCode",
+          "kind": "enum",
+          "declared_in": "crates/swp-core/src/error.rs",
+          "reexported": true,
+          "reason": "The stable discriminant a binding branches on instead of an exit code."
+        },
+        {
+          "path": "swp_sdk::ProjectId",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/id.rs",
+          "reexported": true,
+          "reason": "Base32 of the first ten bytes of the *verify key*: public by design, and printed in every report."
+        },
+        {
+          "path": "swp_sdk::ReleaseId",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/id.rs",
+          "reexported": true,
+          "reason": "A random label. Carries no meaning and is derived from nothing keyed."
+        },
+        {
+          "path": "swp_core::Digest",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/id.rs",
+          "reexported": false,
+          "reason": "SHA-256 output. Reached only as a `ReleaseRecord` field: the tree fingerprint and the private-manifest digest, both already published in `.swp/public/releases/`. A digest of keyed content is not keyed content — inverting it is not the question; guessing the whole manifest to test one hash is, and that is what the record's own comment says."
+        },
+        {
+          "path": "swp_sdk::Limits",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/limits.rs",
+          "reexported": true,
+          "reason": "Resource ceilings against hostile input: every field is a byte, file, depth or count limit the scanner refuses to exceed."
+        },
+        {
+          "path": "swp_core::GeneratorInfo",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/version.rs",
+          "reexported": false,
+          "reason": "The two strings that say which build produced an artifact: a version and a name. It is reached as a field of the public identity and release records, never on its own."
+        },
+        {
+          "path": "swp_identity::Timestamp",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/timestamp.rs",
+          "reexported": false,
+          "reason": "An opaque instant: its one tuple field is private, so a caller reads it through `to_rfc3339()` and the serializers."
+        },
+        {
+          "path": "swp_sdk::ProjectIdentity",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/project.rs",
+          "reexported": true,
+          "reason": "`.swp/public/identity.json` as data. Safe to commit and to ship, which the type's own comment states."
+        },
+        {
+          "path": "swp_crypto::PublicKeys",
+          "kind": "struct",
+          "declared_in": "crates/swp-crypto/src/secret.rs",
+          "reexported": false,
+          "reason": "The base64 Ed25519 *verify* key and its scheme name. The signing half is never in this type, and it is reached only as `ProjectIdentity::verification`."
+        },
+        {
+          "path": "swp_sdk::SwpConfig",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/config.rs",
+          "reexported": true,
+          "reason": "`.swp/config.toml` as data: protocol name, protect block, limits."
+        },
+        {
+          "path": "swp_identity::ProtectConfig",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/config.rs",
+          "reexported": false,
+          "reason": "Targets, excludes, site count, tag width, string flag. Reached through `SwpConfig`."
+        },
+        {
+          "path": "swp_sdk::ReleaseRecord",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/release.rs",
+          "reexported": true,
+          "reason": "The signed public record of one release, exactly as `.swp/public/releases/` stores it. Its `signature` is a base64 Ed25519 signature, which is public by construction."
+        },
+        {
+          "path": "swp_identity::SourceRevision",
+          "kind": "enum",
+          "declared_in": "crates/swp-identity/src/release.rs",
+          "reexported": false,
+          "reason": "A git hash, a manual label or content-only. Display metadata the detector never trusts."
+        },
+        {
+          "path": "swp_identity::WatermarkParams",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/release.rs",
+          "reexported": false,
+          "reason": "Counts, widths, the canonicalizer version, a digest of the permitted family names and per-language adapter use. Recorded publicly so a later scan can explain an old release without revealing a single location."
+        },
+        {
+          "path": "swp_identity::AdapterUse",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/release.rs",
+          "reexported": false,
+          "reason": "A language, a mode word and a file count."
+        },
+        {
+          "path": "swp_sdk::Mode",
+          "kind": "enum",
+          "declared_in": "crates/swp-embedding/src/protect.rs",
+          "reexported": true,
+          "reason": "Plan, Release or DryRun: whether a run may touch source."
+        },
+        {
+          "path": "swp_sdk::Report",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/report.rs",
+          "reexported": true,
+          "reason": "The `SWP-1-report-v2` document. It is the artifact a scan exists to produce, and the §29 leak sweep already holds every string in it free of keyed material."
+        },
+        {
+          "path": "swp_evidence::Run",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/report.rs",
+          "reexported": false,
+          "reason": "Command, timestamp, generator."
+        },
+        {
+          "path": "swp_evidence::Candidate",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/report.rs",
+          "reexported": false,
+          "reason": "How the input was described, its kind, and how much of it was read."
+        },
+        {
+          "path": "swp_evidence::ReleaseTally",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/level.rs",
+          "reexported": false,
+          "reason": "One release's counts, the coincidence bound and the probability the verdict came from. The bound is the number §23 requires a finding to travel with, so it has to be readable as data, not only as a printed sentence."
+        },
+        {
+          "path": "swp_evidence::EvidenceLevel",
+          "kind": "enum",
+          "declared_in": "crates/swp-evidence/src/level.rs",
+          "reexported": false,
+          "reason": "The §12 ladder rung. A caller that shows a finding has to show this beside it."
+        },
+        {
+          "path": "swp_evidence::Outcome",
+          "kind": "enum",
+          "declared_in": "crates/swp-evidence/src/level.rs",
+          "reexported": false,
+          "reason": "Detected, not detected, or inconclusive."
+        },
+        {
+          "path": "swp_evidence::EvidenceItem",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/item.rs",
+          "reexported": false,
+          "reason": "One citable observation, with its own strength and its basis in words."
+        },
+        {
+          "path": "swp_evidence::Region",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/item.rs",
+          "reexported": false,
+          "reason": "A path, a line, an optional truncated excerpt, an optional token count, and the names of the radii that reproduced the span. A radius *name* is a protocol constant; the keyed values behind it are not in this type."
+        },
+        {
+          "path": "swp_evidence::EvidenceKind",
+          "kind": "enum",
+          "declared_in": "crates/swp-evidence/src/item.rs",
+          "reexported": false,
+          "reason": "The seven observation categories."
+        },
+        {
+          "path": "swp_sdk::SiteRow",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/verify.rs",
+          "reexported": true,
+          "reason": "One site of a release by hint and status only. `slots` lists radius names; the document's own header states that it prints no location ids, no literals and no expected tags."
+        },
+        {
+          "path": "swp_sdk::Verdict",
+          "kind": "enum",
+          "declared_in": "crates/swp-evidence/src/verify.rs",
+          "reexported": true,
+          "reason": "Intact, incomplete or inconclusive."
+        },
+        {
+          "path": "swp_sdk::VerifyDocument",
+          "kind": "struct",
+          "declared_in": "crates/swp-evidence/src/verify.rs",
+          "reexported": true,
+          "reason": "The `SWP-1-verify-v1` document, whose field set and ordering are a published schema."
+        }
+      ]
+    },
+    {
+      "category": "rust_only",
+      "meaning": "Public in Rust on purpose, and not part of the binding boundary. No binding may wrap these names, and the reason is stated rather than implied.",
+      "items": [
+        {
+          "path": "swp_identity::Store",
+          "kind": "struct",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reexported": true,
+          "reason": "`swp-cli`'s `inspect` needs a store handle to print the private manifest at all, so the façade keeps one door open and says so. It is a Rust-only door: the type resolves paths under `.swp/private/`, unseals the root key and reads the keyed constellation."
+        },
+        {
+          "path": "swp_sdk::Session::open_store",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "reason": "The second handle to the same store `Session` already holds. It exists for `swp-cli`, which is a Rust crate, and it is the one public accessor whose return value opens the private half of the store."
+        }
+      ]
+    },
+    {
+      "category": "forbidden",
+      "meaning": "Keyed material, secret material, or a privileged path into the private half of the store. Crossing this boundary would hand a foreign caller either the watermark itself or the means to test a guess against it.",
+      "items": [
+        {
+          "path": "swp_core::LocationId",
+          "kind": "struct",
+          "declared_in": "crates/swp-core/src/id.rs",
+          "reexported": false,
+          "reason": "128 bits of HMAC output under the root secret: the keyed site identity. `as_bytes()` and `hex()` are public, so a binding that could name one could collect a project's whole address set and test candidate spans against it without the evidence maths that decides whether a hit means anything."
+        },
+        {
+          "path": "swp_embedding::Protection",
+          "kind": "struct",
+          "declared_in": "crates/swp-embedding/src/protect.rs",
+          "reexported": true,
+          "reason": "Re-exported so a Rust caller can read the full account of a run. Its `plan` field is that account, and the plan is keyed — see `PlannedSite`."
+        },
+        {
+          "path": "swp_embedding::Plan",
+          "kind": "struct",
+          "declared_in": "crates/swp-embedding/src/plan.rs",
+          "reexported": false,
+          "reason": "The constellation as a document — the same bytes `Store::write_plan` puts under `.swp/private/plans/` with tightened ACLs. Its `sites` are `PlannedSite`s."
+        },
+        {
+          "path": "swp_embedding::PlannedSite",
+          "kind": "struct",
+          "declared_in": "crates/swp-embedding/src/plan.rs",
+          "reexported": false,
+          "reason": "`locations: [LocationId; 4]` — the site's four keyed identities in manifest slot order. The only keyed field on any path reachable from a public `swp-sdk` operation, and the reason `protect`'s result does not cross the boundary."
+        },
+        {
+          "path": "swp_embedding::SkippedSite",
+          "kind": "struct",
+          "declared_in": "crates/swp-embedding/src/plan.rs",
+          "reexported": false,
+          "reason": "Keyed by content rather than by type: it names the site a run refused and the radius it refused to use. It crosses with the plan document or not at all, and the plan document does not cross."
+        },
+        {
+          "path": "swp_crypto::RootSecret",
+          "kind": "struct",
+          "declared_in": "crates/swp-crypto/src/secret.rs",
+          "reexported": false,
+          "reason": "The project secret. `swp-sdk` re-exports no type from `swp-crypto`, so a caller of the façade has no name for one."
+        },
+        {
+          "path": "swp_crypto::SecretBytes",
+          "kind": "struct",
+          "declared_in": "crates/swp-crypto/src/secret.rs",
+          "reexported": false,
+          "reason": "Zeroizing held key bytes. Across FFI those bytes would sit in memory this project cannot zeroize, which is the reason `as_slice` is `pub(crate)` and stays so."
+        },
+        {
+          "path": "swp_manifest::ManifestKeys",
+          "kind": "struct",
+          "declared_in": "crates/swp-manifest/src/keys.rs",
+          "reexported": false,
+          "reason": "Three derived keys for one release. `fragment_tag` on it is the tag oracle the façade refuses to reach."
+        },
+        {
+          "path": "swp_detection::ReleaseIndex",
+          "kind": "struct",
+          "declared_in": "crates/swp-detection/src/index.rs",
+          "reexported": false,
+          "reason": "The keyed per-site index a scan matches against, plus `expected_tag`."
+        },
+        {
+          "path": "swp_detection::CandidateRelease",
+          "kind": "struct",
+          "declared_in": "crates/swp-detection/src/index.rs",
+          "reexported": false,
+          "reason": "A private manifest authenticated against this project's identity, with its keyed index. What `Session::load_releases` returns, and why that accessor is `pub(crate)`."
+        },
+        {
+          "path": "swp_manifest::ManifestKeys::fragment_tag",
+          "kind": "fn",
+          "declared_in": "crates/swp-manifest/src/keys.rs",
+          "reason": "Computes the code a site is expected to carry. Reachable from a binding, it is a tag oracle: a caller could test a guess with none of the evidence maths that decides whether a match means anything, and quote the answer as a finding."
+        },
+        {
+          "path": "swp_detection::ReleaseIndex::expected_tag",
+          "kind": "fn",
+          "declared_in": "crates/swp-detection/src/index.rs",
+          "reason": "The same oracle on the keyed index side, which is why the façade returns a graded document rather than a code."
+        },
+        {
+          "path": "swp_identity::Store::load_root",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "Unseals the root key."
+        },
+        {
+          "path": "swp_identity::Store::root_key_exists",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "Probes for the secret file."
+        },
+        {
+          "path": "swp_identity::Store::root_key_path",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "A filesystem path into the sealed half of the store."
+        },
+        {
+          "path": "swp_identity::Store::private_dir",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "The directory that holds everything private."
+        },
+        {
+          "path": "swp_identity::Store::read_private_manifest",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "The keyed constellation itself."
+        },
+        {
+          "path": "swp_identity::Store::private_manifest_ids",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "The location ids of a release, straight off the private artifact."
+        },
+        {
+          "path": "swp_identity::Store::write_private_manifest",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "Writes the private manifest, and tightens its ACL while doing it."
+        },
+        {
+          "path": "swp_identity::Store::plans_dir",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "Where the plan documents live, under `.swp/private/`."
+        },
+        {
+          "path": "swp_identity::Store::plan_path",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "One plan document's path."
+        },
+        {
+          "path": "swp_identity::Store::read_plan",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "One plan document's bytes, keyed sites and all."
+        },
+        {
+          "path": "swp_identity::Store::write_plan",
+          "kind": "fn",
+          "declared_in": "crates/swp-identity/src/store.rs",
+          "reason": "Writes a plan document privately."
+        }
+      ]
+    },
+    {
+      "category": "pending",
+      "meaning": "Intended for a binding and blocked today. Not a boundary decision: an open item that a future change has to settle by narrowing what crosses, not by loosening this list.",
+      "items": [
+        {
+          "path": "swp_sdk::Session::protect",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "blocked_by": "swp_sdk::ProtectOutcome",
+          "reason": "Embedding is the operation a binding exists to offer, and this one is a call the CLI already makes. It cannot cross today because its result type does not: `ProtectOutcome::protection.plan.sites[].locations` is `[LocationId; 4]`. Narrowing the result is a protocol-visible decision, so this freeze records it and does not make it."
+        },
+        {
+          "path": "swp_sdk::ProtectOutcome",
+          "kind": "struct",
+          "declared_in": "crates/swp-sdk/src/protect.rs",
+          "reexported": true,
+          "blocked_by": "swp_embedding::Protection",
+          "reason": "`protection: Protection` reaches the plan, and the plan reaches the keyed location ids. `revision` is the only field a binding could be given today."
+        }
+      ]
+    },
+    {
+      "category": "sealed",
+      "meaning": "Not public today, and the reason they are not public is the boundary itself. The gate fails if one of these becomes `pub`, because a keyed handle that became nameable would become wrappable.",
+      "items": [
+        {
+          "path": "swp_sdk::Session::secret",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "The only root-secret accessor in the façade."
+        },
+        {
+          "path": "swp_sdk::Session::load_releases",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "Returns the authenticated private manifests, keyed."
+        },
+        {
+          "path": "swp_sdk::Session::indexes",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "Returns the keyed per-site indexes a scan matches against."
+        },
+        {
+          "path": "swp_sdk::Session::loaded",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "The step between a selection and the keyed manifests."
+        },
+        {
+          "path": "swp_sdk::Session::store",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "The façade's own handle to the store. The public door to a second one is `open_store`, and it is `rust_only`."
+        },
+        {
+          "path": "swp_sdk::Session::relabel",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "Turns a path into a store-relative name; an internal detail of the output the façade is allowed to print."
+        },
+        {
+          "path": "swp_sdk::Session::build",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "Its parameter is a `Store`, so making it public would be a second way in."
+        },
+        {
+          "path": "swp_sdk::Session::private_manifest",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "private",
+          "reason": "Reads a private manifest for one release."
+        },
+        {
+          "path": "swp_sdk::session::without_current_dir_components",
+          "kind": "fn",
+          "declared_in": "crates/swp-sdk/src/session.rs",
+          "must_be": "pub(crate)",
+          "reason": "Path plumbing shared with `swp-cli`'s tests."
+        },
+        {
+          "path": "swp_crypto::SecretBytes::as_slice",
+          "kind": "fn",
+          "declared_in": "crates/swp-crypto/src/secret.rs",
+          "must_be": "pub(crate)",
+          "reason": "The only accessor that turns held key material into a byte slice."
+        }
+      ]
+    }
+  ]
+}

@@ -417,9 +417,9 @@ impl Parsed {
 
 /// Parse `argv` without the program name.
 ///
-/// Errors carry [`ErrorCode::Usage`], whose exit code is 2, so a script can tell
-/// "you asked for something SWP-1 does not do" from "SWP-1 ran and found
-/// nothing".
+/// Errors carry [`swp_core::error::ErrorCode::Usage`], whose exit code is 2, so
+/// a script can tell "you asked for something SWP-1 does not do" from "SWP-1 ran
+/// and found nothing".
 pub fn parse(argv: &[String]) -> Result<Parsed, SwpError> {
     let Some(word) = argv.first() else {
         return Ok(Parsed {

@@ -3,7 +3,8 @@
 //! Both commands are the same pipeline with one flag different, which is the
 //! point of splitting them: `generate` is what `protect` would have chosen, run
 //! against the tree as it is now, so an operator can read the plan before the
-//! diff exists. [`swp_embedding::protect`] does the work and returns a
+//! diff exists. [`swp_sdk::Session::protect`] runs that pipeline — drawing the
+//! release id, loading the secret, deriving the keys, dropping it — and returns a
 //! [`Protection`]; this file turns that into §35's answer — what was generated,
 //! what was modified, where the private data is, what to back up, what may be
 //! committed, and what may never be.
@@ -23,8 +24,7 @@ use std::path::Path;
 use serde::Serialize;
 use swp_core::error::SwpError;
 use swp_core::id::Digest;
-use swp_embedding::{Mode, Protection, Request};
-use swp_identity::{new_release_id, SourceRevision};
+use swp_embedding::{Mode, Protection};
 use swp_manifest::{BACKUP_ARTIFACTS, PRIVATE_ARTIFACTS, PUBLIC_ARTIFACTS};
 
 use crate::args::{Flag, Parsed};
@@ -83,46 +83,24 @@ struct ProtectionDocument {
 
 pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>, mode: Mode) -> Result<i32, SwpError> {
     let project = Ctx::open(parsed, cwd)?;
-    for warning in &project.warnings {
+    for warning in project.warnings() {
         sink.warn(warning);
     }
     // `--release` on a protection run is how a generated plan gets applied: the
     // constellation is keyed by release id, so the same id over the same tree is
     // the same plan, byte for byte.
-    let release_id = match parsed.value(Flag::Release) {
-        Some(raw) => swp_core::ReleaseId::new(raw)?,
-        None => new_release_id()?,
-    };
-    let revision = match parsed.value(Flag::Revision) {
-        Some(text) => SourceRevision::Manual {
-            value: text.trim().to_string(),
-        },
-        // `Content`, always, unless the operator named a revision. There is no
-        // shell-out to `git` anywhere in this build: §21 forbids running things
-        // in a tree that may not be the operator's, and a protection run is
-        // allowed to be pointed at a directory that is not a repository at all.
-        None => SourceRevision::Content,
-    };
-    let secret = project.secret()?;
-    let request = Request {
-        root: project.root(),
-        store: &project.store,
-        secret: &secret,
-        identity: &project.identity,
-        config: &project.config,
-        release_id: release_id.clone(),
-        revision,
-        created_at: swp_identity::Timestamp::now_utc(),
+    let run = swp_sdk::ProtectOptions {
         mode,
+        release_id: match parsed.value(Flag::Release) {
+            Some(raw) => Some(swp_core::ReleaseId::new(raw)?),
+            None => None,
+        },
+        revision: parsed.value(Flag::Revision).map(|s| s.trim().to_string()),
     };
-    let protection = swp_embedding::protect(&request)?;
-    drop(secret);
-    let stated = parsed
-        .value(Flag::Revision)
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
+    let outcome = project.session.protect(&run)?;
+    let protection = &outcome.protection;
 
-    let doc = document(&protection, mode, stated);
+    let doc = document(protection, mode, outcome.revision.clone());
     let lines = text_lines(&doc, mode);
     for note in &protection.notes {
         sink.note(note);

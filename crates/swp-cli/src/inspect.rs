@@ -9,8 +9,8 @@
 //!
 //! * **No secret, ever.** Authentication uses the project's *public* verify key,
 //!   so even the manifest views need nothing private beyond the file itself, and
-//!   [`Ctx::secret`] is never called here. `swp inspect` can therefore read a
-//!   project's whole history on a machine that has the store but not the root key.
+//!   the only root-secret accessor is `pub(crate)` in `swp-sdk`, unreachable here.
+//!   `swp inspect` can therefore read a whole history with no root key on disk.
 //! * **The private views say so, and say what they give away.** `manifest`, `plan`
 //!   and `fragments` print the constellation, and each warning names the part of
 //!   it that view actually holds: the signed manifest and the plan serialize the
@@ -169,7 +169,7 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
         }
     };
     let project = Ctx::open(parsed, cwd)?;
-    for warning in &project.warnings {
+    for warning in project.warnings() {
         sink.warn(warning);
     }
     if let Some(contents) = view.private_contents() {
@@ -192,8 +192,8 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
     let doc = json!({
         "schema": SCHEMA,
         "view": view.as_str(),
-        "project_id": project.identity.project_id.to_string(),
-        "display_name": project.identity.display_name,
+        "project_id": project.identity().project_id.to_string(),
+        "display_name": project.identity().display_name,
         // null for the views that are not about one release.
         "release_id": release_id.as_ref().map(|r| r.to_string()),
         // Which repeating lists the text windowed. The JSON document is never shortened.
@@ -215,9 +215,9 @@ fn store_view(project: &Ctx) -> Result<Rendering, SwpError> {
     let data = json!({
         "root": swp_core::text::display_path(&s.project_root().display().to_string()),
         "store": s.relabel(&s.swp_dir()),
-        "protocol": project.identity.protocol,
-        "canonicalizer_version": project.identity.canonicalizer_version,
-        "created_at": project.identity.created_at.to_rfc3339(),
+        "protocol": project.identity().protocol,
+        "canonicalizer_version": project.identity().canonicalizer_version,
+        "created_at": project.identity().created_at.to_rfc3339(),
         "root_key": {
             "present": s.root_key_exists(),
             "path": s.relabel(&s.root_key_path()),
@@ -240,7 +240,7 @@ fn store_view(project: &Ctx) -> Result<Rendering, SwpError> {
         format!(
             "store {} — project {}",
             s.relabel(&s.swp_dir()),
-            project.identity.project_id
+            project.identity().project_id
         ),
         format!(
             "  root        {}",
@@ -258,10 +258,14 @@ fn store_view(project: &Ctx) -> Result<Rendering, SwpError> {
                 )
             }
         ),
-        format!("  created     {}", project.identity.created_at.to_rfc3339()),
+        format!(
+            "  created     {}",
+            project.identity().created_at.to_rfc3339()
+        ),
         format!(
             "  protocol    {} · canonicalizer {}",
-            project.identity.protocol, project.identity.canonicalizer_version
+            project.identity().protocol,
+            project.identity().canonicalizer_version
         ),
         format!(
             "  counts      {} release(s), {} manifest(s), {} plan(s), {} report(s)",
@@ -299,7 +303,7 @@ fn store_view(project: &Ctx) -> Result<Rendering, SwpError> {
 // --------------------------------------------------------------------------------------
 
 fn identity_view(project: &Ctx) -> Result<Rendering, SwpError> {
-    let i = &project.identity;
+    let i = project.identity();
     let data = serde_json::to_value(i).map_err(|e| SwpError::internal(format!("identity: {e}")))?;
     // The stored base64 is what gets printed, so decode it first: a file whose
     // key does not parse must not be described as one that verifies anything.
@@ -366,10 +370,10 @@ fn config_view(project: &Ctx) -> Result<Rendering, SwpError> {
         "  change what one protection run uses and never write here, which is why".to_string(),
     );
     out.push("  `swp protect` prints the settings a run actually used.".to_string());
-    if !project.warnings.is_empty() {
+    if !project.warnings().is_empty() {
         out.push(String::new());
         out.push("  Applied on top of this file for the current command:".to_string());
-        for w in &project.warnings {
+        for w in project.warnings() {
             out.push(format!("  · {w}"));
         }
     }
@@ -396,7 +400,7 @@ fn releases_view(project: &Ctx, limit: usize) -> Result<Rendering, SwpError> {
     let mut out = vec![format!(
         "releases — {} of project {}",
         history.len(),
-        project.identity.project_id
+        project.identity().project_id
     )];
     out.push(String::new());
     out.push(format!(

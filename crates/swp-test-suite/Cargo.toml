@@ -27,9 +27,11 @@ walkdir.workspace = true
 base64.workspace = true
 
 [dev-dependencies]
-# The `verdict-model` example reads a scan below the report, where the per-site
-# probe and distinct-code counts live, and scores it under the gate the product
-# uses and the rule it replaced.
+# The `verdict-model` example scans through the same SDK call `swp scan` makes and
+# scores the result under the gate the product uses and the rule it replaced;
+# `swp-detection` is here only to turn a report's status word back into the rung it
+# names, so the per-site rows can be filtered the way the detector filters them.
+swp-sdk.workspace = true
 swp-detection.workspace = true
 swp-evidence.workspace = true
 # §45's archive-bomb case has to *build* a hostile container, and the only zip
@@ -91,3 +93,16 @@ path = "tests/acceptance/final_scenario.rs"
 [[test]]
 name = "docs_examples"
 path = "tests/docs/examples.rs"
+
+# Beta 3: the CLI and the SDK driven over one state, and their answers compared
+# as data — the extraction is only an extraction if this passes.
+[[test]]
+name = "sdk_parity"
+path = "tests/sdk/parity.rs"
+
+# Beta 3: docs/BINDING_SURFACE.json is the boundary a future Python or Node binding
+# is built against. This is the half of it that can only be checked in Rust: that the
+# file still describes the crate, and that nothing keyed is on the allowed side.
+[[test]]
+name = "binding_surface"
+path = "tests/binding/surface.rs"

@@ -41,7 +41,7 @@
 use std::path::Path;
 
 use serde::Serialize;
-use swp_core::error::{ErrorCode, SwpError};
+use swp_core::error::SwpError;
 use swp_core::id::ReleaseId;
 use swp_core::SWP_PROTOCOL_NAME;
 use swp_evidence::Report;
@@ -117,7 +117,7 @@ struct Index {
 
 pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpError> {
     let project = Ctx::open(parsed, cwd)?;
-    for warning in &project.warnings {
+    for warning in project.warnings() {
         sink.warn(warning);
     }
     let filter = match parsed.value(Flag::Release) {
@@ -132,17 +132,19 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
             (Document::Index(index), lines)
         }
         [one] => {
-            let (report, at, stem) = read_one(&project.store, one)?;
+            let stored = project.session.read_report(one)?;
+            let report = &stored.report;
             if let Some(id) = &filter {
                 if !report.releases.iter().any(|t| t.release_id == id.as_str()) {
                     sink.warn(&format!(
-                        "{stem} does not mention release {id}; it is printed anyway. \
-                         `swp report --release {id}` lists the ones that do."
+                        "{} does not mention release {id}; it is printed anyway. \
+                         `swp report --release {id}` lists the ones that do.",
+                        stored.name
                     ));
                 }
             }
-            let lines = stored_text(&report, &at, &stem, limit);
-            (Document::Stored(report), lines)
+            let lines = stored_text(report, &stored.path, &stored.name, limit);
+            (Document::Stored(stored.report), lines)
         }
         many => {
             return Err(SwpError::usage(format!(
@@ -171,6 +173,12 @@ fn index(project: &Ctx, filter: Option<&ReleaseId>) -> Result<Index, SwpError> {
     for name in &names {
         let path = project.store.report_path(name)?;
         let rel = project.store.relabel(&path);
+        // This is the one place the listing reads a report's bytes itself, and it
+        // is here rather than through [`Session::read_report`](swp_sdk::Session::read_report)
+        // because the two failures are not the same command's business: a file the
+        // store cannot *read* is an error the operator has to hear about, while a
+        // file that is not a report is one row of a listing that still owes them
+        // the rest of the directory.
         let report = match Report::from_json(&read_text(&project.store, name)?) {
             Ok(r) => r,
             // A file that is not a report is a fact about the store, and the
@@ -215,8 +223,8 @@ fn index(project: &Ctx, filter: Option<&ReleaseId>) -> Result<Index, SwpError> {
     Ok(Index {
         schema: INDEX_SCHEMA,
         protocol: SWP_PROTOCOL_NAME,
-        project_id: project.identity.project_id.to_string(),
-        display_name: project.identity.display_name.clone(),
+        project_id: project.identity().project_id.to_string(),
+        display_name: project.identity().display_name.clone(),
         release_filter: filter.map(|id| id.to_string()),
         saved: names.len(),
         listed: rows.len(),
@@ -369,34 +377,13 @@ fn index_text(index: &Index, limit: usize) -> Vec<String> {
     out
 }
 
-// --------------------------------------------------------------------------------------
-// one report
-// --------------------------------------------------------------------------------------
-
-/// Read one saved report by whatever name the operator gave it, and return it
-/// with the store-relative path it came from.
-fn read_one(store: &Store, what: &str) -> Result<(Report, String, String), SwpError> {
-    let stem = stem_of(what);
-    let path = store.report_path(&stem)?;
-    if !path.is_file() {
-        let saved = store.report_names()?.len();
-        return Err(SwpError::new(
-            ErrorCode::Usage,
-            format!(
-                "there is no saved report {stem:?} in this project ({saved} report(s) are \
-                 stored). `swp report` lists them; a report is written by \
-                 `swp scan <candidate> --save` or `swp verify --save`."
-            ),
-        )
-        .with_path(store.relabel(&path)));
-    }
-    let text = read_text(store, &stem)?;
-    let report = Report::from_json(&text)?;
-    let at = store.relabel(&path);
-    Ok((report, at, stem))
-}
-
 /// Bytes of one saved report, decoded.
+///
+/// Only the listing uses this. Reading one report by name is
+/// [`Session::read_report`](swp_sdk::Session::read_report)'s operation — it owns
+/// the three-spellings-of-one-entry rule and the missing-entry message — but the
+/// listing has to tell a file it cannot read apart from a file that is not a
+/// report, and only the first of those is worth failing the command over.
 fn read_text(store: &Store, stem: &str) -> Result<String, SwpError> {
     let bytes = store.read_report(stem)?;
     String::from_utf8(bytes).map_err(|_| {
@@ -404,25 +391,6 @@ fn read_text(store: &Store, stem: &str) -> Result<String, SwpError> {
             "the saved report {stem:?} is not UTF-8, so it is not a report this tool wrote"
         ))
     })
-}
-
-/// The name a report is stored under, from however the operator spelled it.
-///
-/// `swp scan --save` prints a stem, `swp report` prints a store-relative path,
-/// and a shell completion offers the file name. All three mean the same entry, so
-/// all three are accepted, and the store's own check on the result is what stops
-/// a path from leaving the reports directory.
-fn stem_of(what: &str) -> String {
-    let trimmed = what.trim();
-    let last = trimmed
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or(trimmed)
-        .to_string();
-    match last.strip_suffix(".json") {
-        Some(stripped) if !stripped.is_empty() => stripped.to_string(),
-        _ => last,
-    }
 }
 
 fn stored_text(report: &Report, at: &str, stem: &str, limit: usize) -> Vec<String> {
@@ -462,6 +430,7 @@ mod tests {
     use super::*;
     use crate::scratch::Scratch;
     use serde_json::Value;
+    use swp_core::error::ErrorCode;
     use swp_evidence::{EvidenceItem, EvidenceKind, EvidenceLevel, Outcome, REPORT_SCHEMA};
 
     /// A report of one's own, so a test can put a document in the store without
@@ -740,12 +709,6 @@ mod tests {
         assert_eq!(by_path.code, 0, "{}", by_path.err);
         assert_eq!(by_stem.out, by_file.out, "the file name means the entry");
         assert_eq!(by_stem.out, by_path.out, "so does the path it lives at");
-        assert_eq!(stem_of(&at), stem);
-        assert_eq!(stem_of("scan-x.json"), "scan-x");
-        assert_eq!(stem_of("scan-x"), "scan-x");
-        // A stem that is only `.json` is not a name, and a `..` never reaches the
-        // filesystem.
-        assert_eq!(stem_of(".json"), ".json");
         // `..` in the name is stripped, not resolved: the last segment is the
         // entry's name and the check below is what keeps it inside the reports
         // directory. So this asks for a report that does not exist rather than

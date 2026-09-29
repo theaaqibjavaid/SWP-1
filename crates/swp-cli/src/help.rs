@@ -13,16 +13,6 @@ use swp_core::version::SWP_PROTOCOL_NAME;
 use crate::args::{Command, Flag, Parsed};
 use crate::output::{Format, Sink};
 
-/// The version banner: what a report's `generator` field says, and what
-/// `swp --version` prints.
-pub fn banner() -> String {
-    format!(
-        "{SWP_PROTOCOL_NAME} · swp {} · report schema {}",
-        crate::VERSION,
-        swp_evidence::REPORT_SCHEMA
-    )
-}
-
 /// Print `swp --version` / `swp help --version`.
 pub fn version(sink: &mut Sink<'_>) -> Result<(), SwpError> {
     let protocol = serde_json::json!({
@@ -34,7 +24,7 @@ pub fn version(sink: &mut Sink<'_>) -> Result<(), SwpError> {
     if sink.json() {
         return sink.result(&protocol, &[]);
     }
-    sink.result(&protocol, &[format!("swp {}", banner())])
+    sink.result(&protocol, &[format!("swp {}", swp_sdk::banner())])
 }
 
 /// `swp help` with no argument: the overview.
@@ -67,7 +57,7 @@ pub fn overview(sink: &mut Sink<'_>) -> Result<(), SwpError> {
         return sink.result(&doc, &[]);
     }
     let mut lines = Vec::new();
-    lines.push(format!("swp {}", banner()));
+    lines.push(format!("swp {}", swp_sdk::banner()));
     lines.push(String::new());
     lines.push("Usage: swp <command> [options]".to_string());
     lines.push(String::new());

@@ -27,7 +27,7 @@ note() { printf '        %s\n' "$1"; }
 # The crates that go to the registry, in dependency order. `swp-test-suite` is
 # deliberately absent: it is this project's own measurement harness, and it
 # says so in its manifest.
-PUBLISHABLE="swp-core swp-crypto swp-identity swp-manifest swp-adapters swp-embedding swp-detection swp-evidence swp-cli"
+PUBLISHABLE="swp-core swp-crypto swp-identity swp-manifest swp-adapters swp-embedding swp-detection swp-evidence swp-sdk swp-cli"
 TOTAL=0
 for c in $PUBLISHABLE; do TOTAL=$((TOTAL + 1)); done
 

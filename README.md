@@ -192,6 +192,11 @@ cannot re-read what it rewrote cannot re-prove it either.
 | [docs/SWP-1-SPEC.md](docs/SWP-1-SPEC.md) | the protocol itself: fragments, identities, artifacts, detection, versioning |
 | [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) | building, testing and changing this repository, including writing a language adapter |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | what has been measured, and the command that reproduces each number |
+| [docs/BETA3_ARCHITECTURE_AUDIT.md](docs/BETA3_ARCHITECTURE_AUDIT.md) | the tree read as it is: crate graph, public API surface, where the secret and the filesystem boundaries actually fall |
+| [docs/SDK_ARCHITECTURE.md](docs/SDK_ARCHITECTURE.md) | the proposed Python/Node binding layer, what it may not reach, and why WASM is not it |
+| [docs/SDK_API.md](docs/SDK_API.md) | the operations such a binding would expose, one by one: inputs, side effects, errors, ownership |
+| [docs/BINDING_SURFACE.json](docs/BINDING_SURFACE.json) | that boundary as data: which `swp-sdk` items a Python or Node binding may wrap, which stay Rust-only, and which are keyed |
+| [docs/VERSIONING_POLICY.md](docs/VERSIONING_POLICY.md) | which version moves when, and why a saved report is never reinterpreted |
 | [examples/](examples) | four protected trees, each with the transcript that proves it |
 
 Around the protocol documentation sits the repository's own set:
@@ -307,7 +312,7 @@ source.
 ## Status
 
 Protocol v1.0.0, implemented end to end: embed, verify, scan, report. The public
-build carries `1.0.0-beta.2`: the protocol is settled and a tree protected by
+build carries `1.0.0-beta.3`: the protocol is settled and a tree protected by
 this build verifies against the release after it, so what the beta withholds is the
 endorsement rather than the functionality. Three
 languages with real parser adapters, one refusal that is a design decision, and a

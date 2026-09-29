@@ -20,6 +20,55 @@ every claim of that kind here was run before it was written
 An entry appears here between a change being merged and the tag that carries it,
 and not before.
 
+## [1.0.0-beta.3] - 2026-09-29
+
+The release that moved the implementation rather than the product. What a user runs is
+still the same seven commands with the same options, the same exit codes and the same
+report; what changed is that the orchestration those commands perform now lives in a
+library crate the command line calls, and that the boundary a future Python or Node
+binding would be written against is fixed and checked. The protocol, every stored
+artifact's schema, the key derivation and the verdict arithmetic are `1.0.0-beta.2`'s,
+and no binding ships in this release.
+
+### Added
+
+**`swp-sdk`, the Rust façade.** `Session` — `open`, `discover`, `init`, `protect`,
+`verify`, `scan`, saved-report access, and the identity, configuration, limits and
+release reads — plus `capabilities()`, the machine-readable answer to what this build
+can do. `swp-cli` keeps argument parsing, rendering and the exit code. This is one
+implementation with two doors, not a second one: `sdk_parity` drives the CLI and the
+library over a single project state and compares their answers as data.
+
+**The verify document in `swp-evidence`.** `SWP-1-verify-v1` moved out of the
+command-line crate so a library caller can hold it, with the field set, ordering and
+serialized names it had before the move — which is what the schema guard and the
+documented transcripts re-check.
+
+**The foreign-binding boundary, as data and as a gate.**
+[`docs/BINDING_SURFACE.json`](docs/BINDING_SURFACE.json) classifies every public item
+of `swp-sdk`: what a binding may wrap, what is public in Rust on purpose and stays
+there, what would hand a caller keyed or private material, what is meant to cross and
+cannot yet, and what must not become public at all. `binding_surface` reads the crate
+against that file and fails when the two disagree in either direction, so growing the
+façade is a decision a caller has to make twice.
+
+### Changed
+
+**Ten publishable crates, not nine.** `swp-sdk` is in `check-release.sh`'s
+`PUBLISHABLE` order, between `swp-evidence` and `swp-cli`.
+
+### Known limitation, recorded rather than repaired
+
+`Session::protect()` is public Rust API, and its result reaches the keyed site
+identities of a private plan document — `PlannedSite.locations`, four 128-bit HMAC
+outputs per site. A keyed identifier is not a key and not an expected tag, and it is
+already inside the plan file the store's access list protects, but it is not something a
+foreign binding should be free to print: `protect` and `ProtectOutcome` are classified
+`pending`, `Session::open_store()` and `Store` are `rust_only` for `swp inspect`, and no
+binding may wrap either until that is answered. Both are written up in
+[docs/SDK_ARCHITECTURE.md](docs/SDK_ARCHITECTURE.md) §6 and
+[docs/SDK_API.md](docs/SDK_API.md) §11.
+
 ## [1.0.0-beta.2] - 2026-09-25
 
 The release that changed how a verdict is reached rather than what the tool can
@@ -195,6 +244,7 @@ These are absences with reasons, not a backlog:
   protected literal leaves nothing to key on, and produces the same report as an
   original. `NO_PROVENANCE_DETECTED` is not a finding of originality.
 
-[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.2...HEAD
+[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.3...HEAD
+[1.0.0-beta.3]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.1

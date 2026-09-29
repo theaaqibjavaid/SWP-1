@@ -26,9 +26,9 @@
 //!
 //! | decision | file |
 //! |---|---|
-//! | which project's keys are used, and that a candidate cannot supply them | [`ctx::Ctx::open`] |
-//! | when the root secret is read, and that it is never printed | [`ctx::Ctx::secret`] |
-//! | what `init` creates, and that a second run cannot rotate the secret | [`init`] |
+//! | which project's keys are used, and that a candidate cannot supply them | [`ctx::Ctx::open`], over `swp-sdk`'s release-authenticating path |
+//! | when the root secret is read, and that it is never printed | `swp-sdk`'s `session` module; no accessor here returns a key |
+//! | what `init` creates, and that a second run cannot rotate the secret | [`init`], over [`Session::init`](swp_sdk::Session::init) |
 //! | what may be committed, backed up, and never shared | the four lists in [`init`], from `swp-manifest`'s table |
 //! | which tree a command may write to | [`protect`], which delegates the writes to `swp-embedding` |
 //! | what a report claims and what it refuses to | `swp-evidence`, rendered verbatim here |

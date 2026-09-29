@@ -10,8 +10,8 @@ tool rather than using it — for the latter see
 
 ## The workspace
 
-Eight library crates, one crate that is both a library and the `swp` binary, and
-one test crate: ten in all. `crates/*` is the whole
+Nine library crates, one crate that is both a library and the `swp` binary, and
+one test crate: eleven in all. `crates/*` is the whole
 member list of the root `Cargo.toml`, which pins `[workspace.package] version`,
 `edition = "2021"`, `rust-version = "1.85"` and `license = "Apache-2.0"` for all
 of them at once, and which sets `publish = ["crates.io"]` for every crate but
@@ -28,7 +28,8 @@ is this project's measurement harness rather than something to depend on.
 | `swp-embedding` | the walk, candidate location, selection, plan, and the rewrite itself | everything above |
 | `swp-detection` | input sniffing, container extraction, the two-pass site search | everything above |
 | `swp-evidence` | evidence items, the level ladder, the coincidence bound, the report document | core, identity, manifest, detection |
-| `swp-cli` | argument parsing, the seven commands, rendering, exit codes | all of them |
+| `swp-sdk` | the project session and the operations it runs: `init`, `protect`, `scan`, `verify`, saved reports, capabilities | all of the library crates above |
+| `swp-cli` | argument parsing, the seven commands, rendering, exit codes | core, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
 | `swp-test-suite` | fixtures, transforms, the measurement suites, the documentation test | used as a dev-dependency only |
 
 `swp-adapters` is the only crate that links tree-sitter, which is what keeps the
@@ -96,7 +97,7 @@ cargo clippy --workspace --all-targets
 cargo fmt --all --check
 ```
 
-`cargo test --workspace` runs the unit tests inside each crate plus the eleven
+`cargo test --workspace` runs the unit tests inside each crate plus the thirteen
 named suites in `swp-test-suite`. They are deliberately separate targets, because
 each one measures a different property of the product, and a measurement you
 cannot run by name is a measurement nobody re-runs:
@@ -114,6 +115,8 @@ cannot run by name is a measurement nobody re-runs:
 | `adversarial_removal` | `tests/adversarial/attacks.rs` | shape search and fold, revert, restructure, compound, two-project planting |
 | `acceptance_scenario` | `tests/acceptance/final_scenario.rs` | the end-to-end two-project scenario |
 | `docs_examples` | `tests/docs/examples.rs` | every documented transcript |
+| `sdk_parity` | `tests/sdk/parity.rs` | the CLI and the SDK library call agreeing on one tree |
+| `binding_surface` | `tests/binding/surface.rs` | [BINDING_SURFACE.json](BINDING_SURFACE.json) still describing `swp-sdk`, and nothing keyed on the binding-facing side of it |
 | *(library)* | `crates/*/src` | unit tests beside the code they test, including the pinned derivation vectors |
 
 Most of these suites print the table they measured, because a number nobody can
@@ -168,6 +171,16 @@ against the four projects under `examples/`. Two floor assertions keep the check
 from thinning out when a page is edited: at least forty blocks and at least forty
 distinct commands must be covered.
 
+`PAGES` is the index the suite reads, and it is a page's claim to be checked, not
+a directory listing. A page that quotes no output — the Beta 3 design set
+(`docs/BETA3_ARCHITECTURE_AUDIT.md`, `docs/SDK_ARCHITECTURE.md`, `docs/SDK_API.md`,
+`docs/VERSIONING_POLICY.md`) describes an interface this build does not have yet,
+and prints nothing — is deliberately outside it, because adding it would assert a
+coverage the page does not ask for. The cost is real and is the one to weigh when
+one of those pages grows: prose commands named there are not parsed, so the suite
+will not catch a flag that does not exist. Add a transcript to a page and the page
+goes into `PAGES` in the same commit.
+
 The practical rule when you change output: run the suite, read the diff it prints,
 and fix the *page* only if the new output is what you meant. A failure that shows a
 number you did not intend is a product bug, and editing the document to match it is
@@ -187,10 +200,14 @@ text and `--formt json` has to answer with `Did you mean --format?`.
    the four that need the root secret; `init` mints one; `inspect` and `report`
    must keep working with no secret at all, which is the property that lets a
    colleague audit a store they were never given.
-3. Implement in a module of `swp-cli`, reached from `run_in(argv, cwd, out, err)`,
-   which is what every test drives. Return a `SwpError` with a code from
-   `swp-core/src/error.rs` and a `next:` advice line; the code chooses the exit
-   status, so add a mapping there rather than inventing a number locally.
+3. Implement the work in `swp-sdk` — the session and the operations live there —
+   and keep the `swp-cli` module to argument parsing, rendering and the exit code,
+   reached from `run_in(argv, cwd, out, err)`, which is what every test drives.
+   A command and a binding call must not be two implementations of one
+   orchestration: `sdk_parity` is the suite that fails if they diverge. Return a
+   `SwpError` with a code from `swp-core/src/error.rs` and a `next:` advice line;
+   the code chooses the exit status, so add a mapping there rather than inventing
+   a number locally.
 4. Write the help text in `crates/swp-cli/src/help.rs` — that file is the only
    source for `swp help`, `swp help <command>` and the exit-code table, and all
    three are quoted by documentation the test checks.
