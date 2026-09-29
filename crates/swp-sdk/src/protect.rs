@@ -214,7 +214,7 @@ pub struct ProtectSummary {
     /// What the walk and the ceilings reported but did not act on.
     ///
     /// This crosses because every string that can appear here has been read, not
-    /// because it is a `String`. The producers, all in `swp-embedding`:
+    /// because it is a `String`. Seven push sites in five files, all in `swp-embedding`:
     /// `candidates.rs:358-361` and `:385-388` (a project-relative path with a
     /// count of literals left out; the limits in force), `plan.rs:155-157` — one
     /// line per walk omission, whose reason is fixed prose, a path, a byte count
@@ -226,7 +226,7 @@ pub struct ProtectSummary {
     /// id or a tag; a limit is a number from the config and a path is already in
     /// `files_changed`. `sdk_parity` sweeps the serialized summary of a real run
     /// against that run's own location ids, which is what keeps this a measured
-    /// claim rather than a reading of six files.
+    /// claim rather than a reading of five files.
     pub notes: Vec<String>,
 }
 

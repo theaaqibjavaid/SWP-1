@@ -326,7 +326,7 @@ nothing downstream of a protection run reads a plan id, and M5 of the ADR measur
 that a release applies from its release id without the plan being an FFI object.
 
 `notes` crosses because every string that can appear there was read, not because it
-is a `String`. The producers, all in `swp-embedding`: `candidates.rs:358-361,
+is a `String`. Seven push sites in five files, all in `swp-embedding`: `candidates.rs:358-361,
 :385-388` (a path with a count of literals left out; the limits in force),
 `plan.rs:155-157` — one line per walk omission, whose reason is fixed prose, a path,
 a byte count or a limit number (`walk.rs:239-424`) — `plan.rs:158-164` with

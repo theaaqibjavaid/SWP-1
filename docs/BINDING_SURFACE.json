@@ -232,7 +232,7 @@
           "kind": "struct",
           "declared_in": "crates/swp-sdk/src/protect.rs",
           "reexported": true,
-          "reason": "The non-keyed account of one run: mode, project and release id, revision, fingerprint and its level, tag width, the six counts, the files rewritten, one row per embedded site and one per refusal, the artifacts written in write order and the run's notes. It holds no plan, so it holds no location id. The notes cross because every producer of one was read and none interpolates keyed text (swp-embedding/src/candidates.rs:358-361, :385-388; plan.rs:155-157 over walk.rs:239-424; plan.rs:158-164 with select.rs:312-320; protect.rs:274-286, :377-381)."
+          "reason": "The non-keyed account of one run: mode, project and release id, revision, fingerprint and its level, tag width, the seven counts, the files rewritten, one row per embedded site and one per refusal, the artifacts written in write order and the run's notes. It holds no plan, so it holds no location id. The notes cross because every producer of one was read and none interpolates keyed text (swp-embedding/src/candidates.rs:358-361, :385-388; plan.rs:155-157 over walk.rs:239-424; plan.rs:158-164 with select.rs:312-320; protect.rs:274-286, :377-381)."
         },
         {
           "path": "swp_sdk::ProtectedFile",

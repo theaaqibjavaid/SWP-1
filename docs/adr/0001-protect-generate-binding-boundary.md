@@ -672,7 +672,7 @@ what to build; 3 and 5 are still open, and nothing built here closes them.
    A boundary rule that checks types cannot check prose, so its crossing needs the same
    argument `SkippedSite.detail` got: read the producers, name the strings that can carry
    keyed text, and refuse the type until they cannot.
-   **Resolved: it crosses, and the census is in the boundary file.** Six push sites, all
+   **Resolved: it crosses, and the census is in the boundary file.** Seven push sites, all
    read, all in `swp-embedding`: `candidates.rs:358-361` and `:385-388` (a
    project-relative path with a count of literals left out, and the limits in force),
    `plan.rs:155-157` (one line per walk omission, each reason fixed prose, a path, a byte
