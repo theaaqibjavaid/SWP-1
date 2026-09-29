@@ -1,10 +1,25 @@
 # ADR-0001 — `protect`/`generate` at the foreign-binding boundary
 
-**Status: accepted, not implemented.** This record settles *which* contract a future
-binding phase should build to and *why*; it changes no protocol semantics, no stored
-artifact, no Rust signature, and no category in
-[BINDING_SURFACE.json](../BINDING_SURFACE.json). `Session::protect` and
-`ProtectOutcome` stay `pending` until the type described in §7 exists.
+**Status: accepted, and now implemented.** This record settled *which* contract a
+binding phase should build to and *why*; the type it asked for exists.
+
+At acceptance it changed no protocol semantics, no stored artifact, no Rust
+signature, and no category in [BINDING_SURFACE.json](../BINDING_SURFACE.json), and
+`Session::protect` and `ProtectOutcome` stayed `pending` until the type described in
+§7 existed. That is what the rest of this document records, and the evidence in §§2–6
+and Appendix A is the acceptance-time measurement: it has not been revised by the
+implementation, because a decision record that moves its own evidence to match the code
+is not a record. Its two pointers into `crates/swp-sdk/src/protect.rs` are the file as it
+stood then — `Request<'a>` still borrows the secret at `swp-embedding/src/protect.rs:118`,
+and that is unchanged — while the implementation grew the SDK module, so what it cites as
+the drop at `:137` is `:367` now and `ProtectOptions` at `:35-57` is `:45-67`.
+
+Implemented as §7 decided: `swp_sdk::Session::protect_summary(&ProtectOptions) ->
+swp_sdk::ProtectSummary` (`crates/swp-sdk/src/protect.rs`), a `binding_facing`
+projection of the same call. `Session::protect` and `ProtectOutcome` remain `pending`
+— narrowing them further is Option C, a `MAJOR` change to public Rust API that no
+binding needs — and the five items §7 required to stay outside the boundary all do.
+§9 records what the implementation answered and what it did not.
 
 Decided here: whether the operation a binding most wants — embedding a constellation —
 can cross the boundary, and if so in what shape.
@@ -609,6 +624,9 @@ Rejected with reasons, stated so the next reader does not re-litigate:
 
 ## 9. Unresolved questions
 
+Recorded as open at acceptance. The implementation answered 1, 2 and 4 by deciding
+what to build; 3 and 5 are still open, and nothing built here closes them.
+
 1. **Document or struct.** B and E differ on the container, and the evidence does not
    settle it: M6 shows a struct is sufficient, §6 E shows a document is drift-proof. The
    deciding question is whether the protection document becomes a *published schema*. The
@@ -618,25 +636,64 @@ Rejected with reasons, stated so the next reader does not re-litigate:
    it cannot interpret, which is what `Report` already does for a saved report
    (`swp-evidence/src/report.rs:147-162`). That is a versioning decision for
    `VERSIONING_POLICY.md §1`, not a binding one.
+   **Resolved: an owned Rust struct.** The evidence did not change during
+   implementation, so the choice was made on what is in the tree today: publishing a
+   schema means a constant, a reader and an unknown-schema refusal rule, and none of
+   those exist because no consumer of a protection run parses its output — the CLI's
+   document is written and never read back. `ProtectSummary` therefore carries no
+   `schema` and no `protocol` field: a struct with a schema number in it is half a
+   schema and none of the discipline. E's container stays available; adopting it later
+   is additive over this type's fields, which are the same 22 the CLI reads.
 2. **Does `Mode::DryRun` cross?** Its result is the same shape with no writes
    (`swp-embedding/src/protect.rs:103-108`), so it is the natural first candidate for a
    binding and the natural first test of the sanitized type. Nothing in this record
    requires it, and nothing forbids it either.
+   **Resolved: all three modes cross, because there is nothing mode-specific to
+   decide.** `protect_summary` calls `protect` and projects its result, so a mode is
+   a field of the answer rather than a gate in front of it. `sdk_parity` runs the
+   projection under each of the three (`the_binding_facing_account_matches_the_cli_document_key_for_key`
+   is a dry run against the CLI's own `--dry-run` document,
+   `the_summary_is_the_same_run_with_every_keyed_site_identity_left_behind` a plan,
+   `a_release_through_the_binding_door_reports_the_same_run_as_the_cli_document` a
+   release).
 3. **`inspect`-equivalent reads.** A binding that can protect but cannot read a plan
    cannot explain a refusal beyond a reason token. `swp inspect plan`'s text view prints
    file, line and reason with no id (M4: identical under total id destruction), so a
    plan-view operation is likely crossable — but the plan it reads is a store file, and
    `Store::read_plan` is `forbidden`, so that is a *new* façade read to design, not a
    reclassification.
+   **Still open, and narrower than it was.** The summary answers most of the question
+   without touching the store: a binding holds every refusal's file, line and reason
+   token from the run that made it. What remains genuinely open is reading a *stored*
+   plan for a release the caller did not just produce — a new façade read, not a
+   reclassification, and still out of scope here.
 4. **How much of `notes` is safe.** It is `Vec<String>` assembled from walk omissions and
    resource-limit lines (`plan.rs:154-164`), i.e. free-form text from inside the pipeline.
    A boundary rule that checks types cannot check prose, so its crossing needs the same
    argument `SkippedSite.detail` got: read the producers, name the strings that can carry
    keyed text, and refuse the type until they cannot.
+   **Resolved: it crosses, and the census is in the boundary file.** Six push sites, all
+   read, all in `swp-embedding`: `candidates.rs:358-361` and `:385-388` (a
+   project-relative path with a count of literals left out, and the limits in force),
+   `plan.rs:155-157` (one line per walk omission, each reason fixed prose, a path, a byte
+   count or a limit number, per `walk.rs:239-424`), `plan.rs:158-164` with
+   `select.rs:312-320` (the shortfall line: two counts of sites), `protect.rs:274-278`
+   and `:281-286` (the `plan`/`dry_run` explanations, written at the call site), and
+   `protect.rs:377-381` (how many source files were modified). None interpolates a key, a
+   keyed id or a rendered tag. The argument is not the only thing
+   holding it: `sdk_parity` sweeps the serialized summary of a real run against that
+   run's own location ids, and a note that carried one would fail there rather than in
+   review. `SkippedSite.detail`, by contrast, still does not cross — its sentence
+   renders a tag (`apply.rs:235, :256-266`), and `RefusedSite` carries the token.
 5. **Whether `Protection: Serialize` should stay.** M1's finding row is a property of a
    derive on a Rust type, so a Rust program can already write a private-plan equivalent to
    a log. Removing the derive is a breaking Rust-API change (C's cost) that no binding
    needs; it is left as a standing finding rather than folded into this decision.
+   **Still open, and untouched.** The derive is why `ProtectOutcome` is `pending` rather
+   than `binding_facing`, and this change did not move it: a binding is pointed at the
+   projection instead. A Rust caller can still serialize a `Protection` and write the
+   keyed constellation into its own log; that is the standing finding, and it is the
+   CLI's own stdout that M1 measured as carrying zero ids.
 
 ## Appendix A — field-by-field classification
 
