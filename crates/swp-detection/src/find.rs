@@ -109,6 +109,22 @@ impl SiteStatus {
         }
     }
 
+    /// The inverse of [`SiteStatus::as_str`], for a reader that has the word and
+    /// not the value — a row of a saved report, say.
+    ///
+    /// `None` for anything this enum does not spell: an unrecognised status is a
+    /// status from a newer build, and guessing that it counts as watermark
+    /// evidence would be the silent strengthening §19 forbids.
+    pub fn parse(word: &str) -> Option<SiteStatus> {
+        match word {
+            "absent" => Some(SiteStatus::Absent),
+            "location-only" => Some(SiteStatus::LocationOnly),
+            "tag-confirmed" => Some(SiteStatus::TagConfirmed),
+            "exact-rendering" => Some(SiteStatus::ExactRendering),
+            _ => None,
+        }
+    }
+
     /// Whether this status is watermark evidence at all.
     ///
     /// The line is drawn here, once, so that no report, test or level rule
@@ -984,6 +1000,23 @@ mod tests {
         assert!(!SiteStatus::LocationOnly.is_watermark());
         assert!(SiteStatus::TagConfirmed.is_watermark());
         assert!(SiteStatus::ExactRendering.is_watermark());
+    }
+
+    #[test]
+    fn a_word_only_recognises_the_statuses_this_build_spells() {
+        for status in [
+            SiteStatus::Absent,
+            SiteStatus::LocationOnly,
+            SiteStatus::TagConfirmed,
+            SiteStatus::ExactRendering,
+        ] {
+            assert_eq!(SiteStatus::parse(status.as_str()), Some(status));
+        }
+        // A word from a newer build is not guessed at: reading `exact` for a status
+        // that means something else would count a rung this build never graded.
+        assert_eq!(SiteStatus::parse("exact"), None);
+        assert_eq!(SiteStatus::parse(""), None);
+        assert_eq!(SiteStatus::parse("ABSENT"), None);
     }
 
     #[test]

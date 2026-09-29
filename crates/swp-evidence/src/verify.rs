@@ -104,6 +104,16 @@ pub struct SiteRow {
 }
 
 impl SiteRow {
+    /// Whether this row is watermark evidence, read off its own status.
+    ///
+    /// A caller that has the document but not the [`SiteMatch`]es the rows were
+    /// built from still needs to answer "which sites are not carrying their code",
+    /// so the question goes through [`SiteStatus::is_watermark`] — the one place
+    /// the line is drawn — and an unknown word is not evidence.
+    pub fn confirmed(&self) -> bool {
+        SiteStatus::parse(self.status).is_some_and(|s| s.is_watermark())
+    }
+
     fn of(site: usize, s: &SiteMatch) -> SiteRow {
         SiteRow {
             site,

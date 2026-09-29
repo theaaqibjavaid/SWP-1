@@ -24,13 +24,13 @@
 //! those apart (§51).
 //!
 //! The `SWP-1-verify-v1` document itself is built by [`swp_evidence`], which owns
-//! what a scan means; this file runs the scan and prints the answer, and the
-//! comment on that module is where the rules about what the document may name live.
+//! what a scan means, and [`swp_sdk::Session::verify`] runs the scan that fills it
+//! in; this file prints the answer, and the comment on that evidence module is
+//! where the rules about what the document may name live.
 
 use swp_core::error::SwpError;
-use swp_detection::{build_indexes, input, scan_against};
-use swp_evidence::{grade, Report, SiteRow, Verdict, Verification, VerifyDocument};
-use swp_identity::Timestamp;
+use swp_evidence::{SiteRow, Verdict, VerifyDocument};
+use swp_sdk::VerifyOptions;
 
 use crate::args::{Flag, Parsed};
 use crate::ctx::Ctx;
@@ -38,50 +38,26 @@ use crate::output::{self, Sink};
 
 pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Result<i32, SwpError> {
     let project = Ctx::open(parsed, cwd)?;
-    for warning in &project.warnings {
+    for warning in project.warnings() {
         sink.warn(warning);
     }
-    let release = project.one_release(parsed)?;
-    let limits = project.limits();
-    let releases = project.load_releases(std::slice::from_ref(&release))?;
-    let verify_key = project.identity.verify_key()?;
-    let indexes = build_indexes(&releases, &verify_key, &limits)?;
-    let root = project.root().to_path_buf();
-    let opened = input::open(&root, &limits)?;
-    let detection = scan_against(&opened, &indexes, &limits)?;
-    let found = detection
-        .releases
-        .first()
-        .ok_or_else(|| SwpError::internal("a scan of one release returned none"))?;
     let limit = output::window(parsed.has(Flag::Full), parsed.number(Flag::Limit)?);
-    let omitted_rows = found.sites.len().saturating_sub(limit);
-    let saved = save(parsed, &project, &detection)?;
-    let expected = indexes[0].fingerprint().to_string();
-    let doc = grade(&Verification {
-        detection: &detection,
-        found,
-        project_id: &project.identity.project_id,
-        display_name: &project.identity.display_name,
-        tree: &opened.described,
-        record: &releases[0].record,
-        fingerprint_expected: &expected,
-        omitted_rows,
-        report_saved: saved,
-    });
+    let outcome = project.session.verify(&VerifyOptions {
+        release: Some(project.one_release(parsed)?),
+        save: parsed.has(Flag::Save),
+        // The document carries every row whatever the window; saying how many the
+        // page leaves out is the renderer's business, and the run reports it.
+        rows: Some(limit),
+    })?;
+    let doc = &outcome.document;
     // The document holds the rows, so both tables the text prints are read back out
     // of it: the `sites` array in the JSON and the rows on the page are then the
     // same values, rather than two copies that could disagree.
     let (shown, _) = output::head(&doc.sites, limit);
-    // Rows were built from `found.sites` in order, so the site's own verdict — the
+    // Rows were built from the scan's sites in order, so a row's own status — the
     // one place the watermark/not-watermark line is drawn — selects them here.
-    let missing: Vec<&SiteRow> = doc
-        .sites
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| !found.sites[*i].confirmed())
-        .map(|(_, r)| r)
-        .collect();
-    let lines = text_lines(&doc, shown, &missing);
+    let missing: Vec<&SiteRow> = doc.sites.iter().filter(|r| !r.confirmed()).collect();
+    let lines = text_lines(doc, shown, &missing);
     if doc.verdict != Verdict::Intact {
         sink.warn(&format!(
             "{} of {} site(s) of release {} are not carrying their code",
@@ -90,32 +66,8 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
             doc.release_id
         ));
     }
-    output::deliver(sink, &doc, &lines, parsed.value(Flag::Output))?;
+    output::deliver(sink, doc, &lines, parsed.value(Flag::Output))?;
     Ok(doc.exit_code)
-}
-
-/// `--save` keeps a verification report beside the release it describes.
-fn save(
-    parsed: &Parsed,
-    project: &Ctx,
-    detection: &swp_detection::Detection,
-) -> Result<Option<String>, SwpError> {
-    if !parsed.has(Flag::Save) {
-        return Ok(None);
-    }
-    let now = Timestamp::now_utc();
-    let report = Report::build(
-        detection,
-        "verify",
-        &now.to_rfc3339(),
-        &crate::help::banner(),
-    );
-    let stem = format!("verify-{}", now.filename_stem());
-    Ok(Some(
-        project
-            .store
-            .save_report(&stem, report.to_json().as_bytes())?,
-    ))
 }
 
 fn text_lines(d: &VerifyDocument, shown: &[SiteRow], missing: &[&SiteRow]) -> Vec<String> {
@@ -263,6 +215,7 @@ mod tests {
     use super::*;
     use crate::scratch::Scratch;
     use swp_core::error::ErrorCode;
+    use swp_evidence::Report;
 
     #[test]
     fn shortening_a_path_keeps_its_tail_and_stays_in_its_column() {

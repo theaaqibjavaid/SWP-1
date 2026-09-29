@@ -609,14 +609,12 @@ version = "1.0.0-beta.2"
 dependencies = [
  "serde",
  "serde_json",
- "swp-adapters",
  "swp-core",
- "swp-crypto",
- "swp-detection",
  "swp-embedding",
  "swp-evidence",
  "swp-identity",
  "swp-manifest",
+ "swp-sdk",
 ]
 
 [[package]]
@@ -714,6 +712,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "swp-sdk"
+version = "1.0.0-beta.2"
+dependencies = [
+ "serde",
+ "swp-adapters",
+ "swp-core",
+ "swp-crypto",
+ "swp-detection",
+ "swp-embedding",
+ "swp-evidence",
+ "swp-identity",
+ "swp-manifest",
+]
+
+[[package]]
 name = "swp-test-suite"
 version = "1.0.0-beta.2"
 dependencies = [
@@ -727,6 +740,7 @@ dependencies = [
  "swp-detection",
  "swp-evidence",
  "swp-identity",
+ "swp-sdk",
  "walkdir",
  "zip",
 ]

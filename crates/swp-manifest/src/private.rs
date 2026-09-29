@@ -368,6 +368,43 @@ impl PrivateManifest {
         Ok(m)
     }
 
+    /// Read one release's manifest out of a store and authenticate it against the
+    /// project's own **public** verify key.
+    ///
+    /// This is [`PrivateManifest::load`] plus the two reads a store-shaped caller
+    /// needs around it, and it is one function rather than one per caller because
+    /// the missing manifest has to stay distinguishable from the edited one: a
+    /// release with a public record and no private manifest means an interrupted
+    /// protection run or a half-restored `.swp/`, and a plain "invalid manifest"
+    /// would send the reader to the wrong fix.
+    ///
+    /// It needs no secret, which is why a command that only lists artifacts can
+    /// afford to authenticate everything it names (§29).
+    pub fn from_store(
+        store: &swp_identity::Store,
+        identity: &swp_identity::ProjectIdentity,
+        id: &ReleaseId,
+    ) -> Result<Self, SwpError> {
+        let verify_key = identity.verify_key()?;
+        let bytes = match store.read_private_manifest(id) {
+            Ok(bytes) => bytes,
+            Err(e) if !store.manifest_path(id).is_file() => {
+                return Err(SwpError::new(
+                    ErrorCode::InvalidManifest,
+                    format!(
+                        "release {id} has a public record but no private manifest at {}; the \
+                         protection run was interrupted, or .swp/private/ was not restored with \
+                         .swp/public/",
+                        store.relabel(&store.manifest_path(id))
+                    ),
+                )
+                .caused_by(&e))
+            }
+            Err(e) => return Err(e),
+        };
+        PrivateManifest::load(&bytes, &verify_key)
+    }
+
     /// What the release record binds: SHA-256 of the exact bytes written to
     /// `.swp/private/manifests/<release>.json`, so a restored backup can be
     /// confirmed to be the manifest this release shipped with.
