@@ -86,7 +86,7 @@ Two invariants that keep the façade from becoming a second product:
 What the façade adds that the crates do not have: a `Session` that owns no
 secret between calls (the `Ctx` this came from loaded and dropped one per
 operation, `ctx.rs:270`/`:298` in the pre-extraction file, and `Session` keeps
-that at `session.rs:403` and `swp-sdk/src/protect.rs:137`), owned plain-data
+that at `session.rs:403` and `swp-sdk/src/protect.rs:367`), owned plain-data
 argument types instead of eight-borrow `Request<'a>`
 (`swp-embedding/src/protect.rs:114-130`), and one place for the errors to be
 shaped. The `catch_unwind` and the error *conversion* in this list belong to the
@@ -109,7 +109,7 @@ pre-extraction ones except where a row below says otherwise.
 | --- | --- | --- | --- |
 | `capabilities()` | `swp_core::version`, `Registry::parsed_languages` + `extensions`, `Limits`, `TagWidth`, `REPORT_SCHEMA` | yes | read-only, pure, no filesystem, no secret; and the audit's §7 shows no single API answers "which languages and which extensions" |
 | `init` | `SealedSecret::generate` → `Store::init` → `measure` → `suggest_sites` → `write_settings` (`init.rs:105-151`) | yes | without it nothing else can run; the store cannot be hand-built |
-| `protect` (modes `plan` / `release` / `dry_run`) | `swp_embedding::protect(&Request)` with `Mode` (`protect.rs:78-108`) | yes, as **one** operation | `generate` and `protect` already are one function; splitting them into two binding methods invites divergence |
+| `protect` (modes `plan` / `release` / `dry_run`) | `swp_embedding::protect(&Request)` with `Mode` (`protect.rs:78-108`) | yes, as **one** operation, with two results: `protect` → `ProtectOutcome` for Rust and `protect_summary` → `ProtectSummary` for a binding | `generate` and `protect` already are one function; splitting them into two binding methods invites divergence — and so does a second protection pipeline, which is why the binding-facing result is a projection of the same call rather than a re-run of it (§6) |
 | `scan` | `ctx` release load + `build_indexes` + `input::open` + `scan_against` + `Report::build` (`scan.rs:41-73`) | yes | the embedding question an integrator actually asks: "is my provenance in this artifact?" |
 | `verify` | the same, against the project root, plus the per-site verdict — now `Session::verify` (`swp-sdk/src/verify.rs:71`) | yes | this row was the exception when the page was written: the answer was `VerifyDocument`, a module-private DTO inside `swp-cli`, and exposing it meant moving it down into `swp-evidence` first (`swp-evidence/src/verify.rs:139`, schema `SWP-1-verify-v1` at `:46`). The move happened, on the original field set, before the façade took it. Until it had, `scan` of your own tree was all the binding could offer — which is *not* the same claim, and pretending otherwise is the overclaim this project's rules forbid |
 | `report` | `Store::read_report`/`report_names` + `Report::from_json`/`to_json`/`to_text`/`exit_code` (`report.rs:118`, `swp-evidence/src/report.rs:126-182`) | yes, as a data type | already a versioned, fully serializable document with a schema guard; the cleanest existing model for what a binding result should look like |
@@ -338,9 +338,9 @@ and the sealed accessors must still have the visibility the file records. A bind
 reads the same file; nothing in it has to be re-derived from prose.
 
 The review found one exposure that is *not* a signature-name leak, and it is recorded
-rather than repaired: `Session::protect()` is public Rust API, and its result reaches
-the keyed site identities of a private plan document by field —
-`ProtectOutcome.protection` (`swp-sdk/src/protect.rs:73-84`),
+rather than repaired by narrowing the API: `Session::protect()` is public Rust API, and
+its result reaches the keyed site identities of a private plan document by field —
+`ProtectOutcome.protection` (`swp-sdk/src/protect.rs:83-94`),
 `Protection.plan` (`swp-embedding/src/protect.rs:170`), `Plan.sites`, and
 `PlannedSite.locations: [LocationId; 4]` (`swp-embedding/src/plan.rs:57`), which is
 128 bits of HMAC output per radius under the project's root secret. `LocationId` is a
@@ -353,10 +353,25 @@ blocked by that field — and `LocationId`, `Plan`, `PlannedSite` and `Protectio
 `const` closure that reads the field, so the record is deleted by the change that
 removes the field, not by an edit to this page.
 
+What crosses instead is `Session::protect_summary(&ProtectOptions) -> ProtectSummary`
+(`swp-sdk/src/protect.rs:247`), the accepted answer in
+[ADR-0001](adr/0001-protect-generate-binding-boundary.md) and one operation rather than
+two: it calls `protect` and projects the result onto the fields the CLI itself reads
+(`summarize`, `:258`), so the pipeline stays authoritative and the two results cannot
+drift on what a run did. The projection is written as a copy out of named fields, not
+as a filter over the struct — a keyed value crosses only if something reads it, and
+this reads no `locations` and no refusal `detail`. The suite checks that claim three
+ways: by field type and field *name* on the binding-facing structs, by reading the
+body of `summarize` for those two reads, and at runtime, by sweeping the serialized
+summary of a real run against that run's own location ids, taken from its own plan
+(`sdk_parity`). `Mode::Plan`, `Mode::Release` and `Mode::DryRun` all work through it,
+because it delegates; and because applying a generated constellation needs only its
+release id, the plan is not an object a binding has to hold.
+
 | risk | where it comes from | what the design does |
 | --- | --- | --- |
 | key bytes as a value | `RootSecret::from_bytes` (`secret.rs:56`), `SecretBytes::from_vec` (`:21`) | no façade argument or field is `Vec<u8>`/`bytes`/`Buffer`; the only accessor that returns key material — `Session::secret` — is `pub(crate)` (`session.rs:264-266`) and every caller of it drops the secret before returning (`session.rs:403`). Importing a key from outside the store is not offered, in any language. The field-shape half of that sentence is checked: `binding_surface` refuses a binding-facing type with a `[u8; N]`, `&[u8]` or `Vec<u8>` member, with one exception it names — `Digest`, the public SHA-256 of already-published material |
-| a keyed site id as a value | `PlannedSite.locations: [LocationId; 4]` (`swp-embedding/src/plan.rs:57`) | reachable from public Rust `protect`, and therefore `forbidden` in the boundary file while `protect`/`ProtectOutcome` sit in `pending`. See the paragraph above: recorded, pinned by a `const` closure, and not repaired by narrowing the API in a freeze |
+| a keyed site id as a value | `PlannedSite.locations: [LocationId; 4]` (`swp-embedding/src/plan.rs:57`) | reachable from public Rust `protect`, and therefore `forbidden` in the boundary file while `protect`/`ProtectOutcome` sit in `pending`. See the two paragraphs above: recorded, pinned by a `const` closure, and not repaired by narrowing the API — a binding is pointed at `protect_summary`, which is built without reading that field, and the suite sweeps the built value against the run's own ids |
 | key bytes as a *print* | `RootSecret`/`DerivedKey`/`SealedSecret` already redact (`secret.rs:44,106,135`, `seal.rs:70`) | the façade's own types must not be able to hold one: `Session` stores a `Store` (a `PathBuf`), and the result DTOs are plain data, so a `Debug`/`inspect`/`console.log` of any binding value prints paths and counts |
 | a tag oracle | `ManifestKeys::fragment_tag` (`keys.rs:149`), `ReleaseIndex::expected_tag` (`index.rs:257`) | neither is reachable from the façade surface. A caller with them could test a candidate without a report and without the maths that says whether the answer means anything — which is how a weak signal starts being quoted as a finding |
 | private-manifest disclosure | `Store::read_private_manifest` (`store.rs:358`); `PrivateManifest`/`SiteEntry` derive `Serialize` | not re-exported, and the façade's own read is module-private (`session.rs:444`); the reason `inspect` is out (§3). The paragraph above states what that does not cover |
@@ -374,7 +389,8 @@ service crates stay publishable with their full `pub` surface
 every value that can cross this boundary has been named, none of the five forbidden
 kinds is on the list, and the one keyed value the public Rust surface does reach — a
 `LocationId` through `protect`'s plan field — is classed as what may not cross rather
-than argued into the boundary.
+than argued into the boundary, with `protect_summary` as the door that offers the same
+run without it.
 
 ## 7. PHASE 8: tests, written before the code
 
