@@ -35,7 +35,7 @@ pub struct StoredReport {
 }
 
 impl Session {
-    /// Every saved report this store holds, oldest first.
+    /// Every saved report this store holds, newest first (the stems are timestamped).
     ///
     /// The names are what [`Session::read_report`] takes. A file in the directory
     /// that is not a readable report is still listed here, because this is a
