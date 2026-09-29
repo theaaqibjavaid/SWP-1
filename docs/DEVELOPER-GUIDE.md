@@ -10,8 +10,8 @@ tool rather than using it — for the latter see
 
 ## The workspace
 
-Eight library crates, one crate that is both a library and the `swp` binary, and
-one test crate: ten in all. `crates/*` is the whole
+Nine library crates, one crate that is both a library and the `swp` binary, and
+one test crate: eleven in all. `crates/*` is the whole
 member list of the root `Cargo.toml`, which pins `[workspace.package] version`,
 `edition = "2021"`, `rust-version = "1.85"` and `license = "Apache-2.0"` for all
 of them at once, and which sets `publish = ["crates.io"]` for every crate but
@@ -28,7 +28,8 @@ is this project's measurement harness rather than something to depend on.
 | `swp-embedding` | the walk, candidate location, selection, plan, and the rewrite itself | everything above |
 | `swp-detection` | input sniffing, container extraction, the two-pass site search | everything above |
 | `swp-evidence` | evidence items, the level ladder, the coincidence bound, the report document | core, identity, manifest, detection |
-| `swp-cli` | argument parsing, the seven commands, rendering, exit codes | all of them |
+| `swp-sdk` | the project session and the operations it runs: `init`, `protect`, `scan`, `verify`, saved reports, capabilities | all of the library crates above |
+| `swp-cli` | argument parsing, the seven commands, rendering, exit codes | core, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
 | `swp-test-suite` | fixtures, transforms, the measurement suites, the documentation test | used as a dev-dependency only |
 
 `swp-adapters` is the only crate that links tree-sitter, which is what keeps the
@@ -197,10 +198,14 @@ text and `--formt json` has to answer with `Did you mean --format?`.
    the four that need the root secret; `init` mints one; `inspect` and `report`
    must keep working with no secret at all, which is the property that lets a
    colleague audit a store they were never given.
-3. Implement in a module of `swp-cli`, reached from `run_in(argv, cwd, out, err)`,
-   which is what every test drives. Return a `SwpError` with a code from
-   `swp-core/src/error.rs` and a `next:` advice line; the code chooses the exit
-   status, so add a mapping there rather than inventing a number locally.
+3. Implement the work in `swp-sdk` — the session and the operations live there —
+   and keep the `swp-cli` module to argument parsing, rendering and the exit code,
+   reached from `run_in(argv, cwd, out, err)`, which is what every test drives.
+   A command and a binding call must not be two implementations of one
+   orchestration: `sdk_parity` is the suite that fails if they diverge. Return a
+   `SwpError` with a code from `swp-core/src/error.rs` and a `next:` advice line;
+   the code chooses the exit status, so add a mapping there rather than inventing
+   a number locally.
 4. Write the help text in `crates/swp-cli/src/help.rs` — that file is the only
    source for `swp help`, `swp help <command>` and the exit-code table, and all
    three are quoted by documentation the test checks.

@@ -13,6 +13,11 @@ three must agree on. The rationale for the boundary is in
 [VERSIONING_POLICY.md](VERSIONING_POLICY.md) governs which of these values may
 change without a protocol change.
 
+As of Beta 3.1 the Rust side of this contract exists: `crates/swp-sdk` implements
+it, §11 lists the shipped surface, and the citations below point at that crate. Two
+things this page once held back — `verify` (§6) and the per-site scan rows (§5) —
+are now exposed as described there.
+
 Conventions used below:
 
 * **Effects** — what the operation touches: `none`, `reads`, `writes store`,
@@ -20,10 +25,12 @@ Conventions used below:
   write predicates are the implementation's own
   (`swp-embedding/src/protect.rs:99, :106`).
 * **Secret** — whether the operation loads the project's root secret, and if so
-  where it is dropped. A `Session` never holds one between calls; today's code
-  loads inside the operation and drops it before the tree walk
-  (`crates/swp-cli/src/ctx.rs:270, :298`; `swp-cli/src/protect.rs:106, :119`),
-  and the boundary keeps that.
+  where it is dropped. A `Session` never holds one between calls; the
+  implementation loads inside the operation and drops it before the tree walk
+  (`crates/swp-sdk/src/session.rs:403` in the release loader,
+  `crates/swp-sdk/src/protect.rs:137` after `swp-embedding` has derived what it
+  needs, `crates/swp-sdk/src/init.rs:175, :190, :195` for the secret a run drew and
+  did not use), and the boundary keeps that.
 * **Blocks** — whether the call is expected to take long enough that a binding
   should release its host's interpreter lock. All of them are synchronous;
   there is no async Rust here and none will be added for bindings.
@@ -81,7 +88,7 @@ of the tree.
 
 Errors: none. It is a constant.
 
-## 2. `Session::init(project_root, options) -> Session`
+## 2. `Session::init(project_root, options) -> InitOutcome`
 
 Create or re-open a project's store. Two outcomes, and the difference is a fact
 about the tree rather than a flag: a directory that already has a store keeps its
@@ -90,28 +97,56 @@ identity and its secret, because SWP never replaces a project secret
 
 | | |
 | --- | --- |
-| Inputs | `project_root: Path`, `name: Option<String>` (the display label, validated at `swp-cli/src/init.rs:111-135`) |
+| Inputs | `project_root: Path`, absolute, must already exist; `options: InitOptions { name: Option<String>, force: bool }` (the display label, validated at `crates/swp-sdk/src/init.rs:143-149`; `force` is `--force`, and without it a rename of an existing label is `USAGE` at `:151-161`) |
 | Effects | **writes store**: creates `.swp/`, `root.key`, `identity.json`, `config.toml`, and the `.gitignore` entry (`store.rs:185-244`) |
-| Secret | generates one (`SealedSecret::generate`, `swp-crypto/src/seal.rs:81`), hands it to `Store::init`, drops it (`init.rs:155, :167`). Never accepts one. |
-| Blocks | briefly (one tree measure, `init.rs:335`) |
+| Secret | generates one (`SealedSecret::generate`, `swp-crypto/src/seal.rs:81`), hands it to `Store::init`, drops it (`init.rs:175, :190, :195`). Never accepts one. |
+| Blocks | briefly (one tree measure: `init.rs:169` calls `measure`, `:248`) |
 | Concurrent | one init per project at a time. There is no lock in this tree, in any layer. |
 
 ```rust
+pub struct InitOutcome {
+    pub session: Session,      // the project, open and ready to protect
+    pub result: InitResult,
+}
+
 pub struct InitResult {
     pub project_id: ProjectId,
     pub display_name: String,
     pub pre_existing: bool,             // store.rs:49-59 StoreInit
     pub secret_state: &'static str,     // "created" | "kept"
     pub secret_scheme: &'static str,    // "dpapi" | "plain" — seal.rs:32-38
-    pub secret_handle: String,          // RootSecret::fingerprint(), secret.rs:95 — 8 chars, non-secret
+    pub secret_handle: String,          // RootSecret::fingerprint(), secret.rs:95 — non-secret
     pub permissions_verified: bool,     // PermissionOutcome::is_verified(), seal.rs:231
     pub permissions_detail: String,     // what the OS reported back
     pub gitignore: &'static str,        // "created" | "updated" | "already ignored" | "not written"
     pub created: Vec<String>,           // store-relative, forward-slashed
-    pub measurement: Measurement,       // files, bytes, per-language counts, top-level dirs
-    pub settings: Settings,             // the targets and site count this run wrote
+    pub renamed: bool,                  // whether this run changed the label
+    pub measurement: Measurement,       // see below
+    pub settings: Settings,             // see below
+}
+
+pub struct Measurement {                // swp-sdk/src/init.rs:39-48
+    pub files: u32,                     // files with a parser-covered extension
+    pub bytes: u64,
+    pub languages: BTreeMap<String, u32>,
+    pub tops: BTreeMap<String, u32>,    // source files per top-level directory
+    pub skipped: u32,
+}
+
+pub struct Settings {                   // swp-sdk/src/init.rs:52-61
+    pub targets: Vec<String>,
+    pub target_sites: u32,
+    pub tag_bits: u8,
+    pub embed_strings: bool,
+    pub written: bool,                  // did this run write the config, or leave it
+    pub suggestion: u32,                // what the measurement suggested, applied or not
 }
 ```
+
+`InitOutcome` carries a `Session` because the store this call just created is the
+one the caller wants to protect with: `init` returns the opened project as well as
+the account of what it wrote, so a binding does not have to open a directory it
+named a moment earlier and hope the two agree.
 
 Three fields are here because a caller cannot otherwise know something it needs.
 `secret_scheme`: on Windows, `SWP_SECRET_PLAIN=1` skips DPAPI
@@ -124,23 +159,24 @@ the same three-way answer the CLI prints. `created` is what `swp init` shows a
 user, and the store's own test pins its completeness and order
 (`swp-identity/src/store.rs`, `init_creates_the_expected_layout_and_reopens`).
 
-`measurement` and `settings` are `swp-cli`'s private shapes today
-(`init.rs:40-48`, `:64`); the façade exposes equivalent types whose fields are
-the same values, so that `suggest_sites` (`init.rs:387`) stays the single source
-of the default constellation.
+`Measurement` and `Settings` are the shapes `swp-cli` used to keep private
+(`init.rs:40-48`, `:64` before the extraction). They are the SDK's now, and the
+CLI renders them, which is what keeps `suggest_sites`
+(`swp-sdk/src/init.rs:300`) the single source of the default constellation for a
+terminal and a bound caller alike.
 
 Errors: `USAGE` when the path is not a directory; `SECRET_UNAVAILABLE` (exit 3's
 code) when a store exists and its key cannot be opened; `IO_ERROR`. A private
 artifact whose access could not be confirmed is refused by the store, which is
 `swp-identity`'s rule, not a new one.
 
-## 3. `Session::open(project_root) -> Session`
+## 3. `Session::open(project_root, overrides) -> Session`
 
 Reopen a project without creating or changing anything.
 
 | | |
 | --- | --- |
-| Inputs | `project_root: Path`, absolute, named by the caller |
+| Inputs | `project_root: Path`, absolute, named by the caller; `overrides: Overrides` (see §11) |
 | Effects | reads `config.toml`, `identity.json` |
 | Secret | no |
 | Blocks | no |
@@ -151,37 +187,64 @@ and that requirement is a security property the binding must not blur: a
 candidate tree may contain its own `.swp/`, and the scanner must never read
 config from the tree it is scanning (`swp-identity/src/config.rs:1-8`). So
 `Session::open` takes an explicit path and there is no "find my project" default
-in the API — the CLI's `Store::discover(cwd)` (`store.rs:150`) walks up from the
-*process* working directory, which for an embedded library means whatever the
-host application's cwd happens to be, and a protection run whose scope depends
-on an ambient directory is not a protection run anyone should script. A binding
-may offer a `discover()` convenience; it must resolve it in the host and pass the
-result in.
+in the API — `Session::discover(from)` (`swp-sdk/src/session.rs:105`) is the CLI's
+walk-up-from-a-directory offered by name, not by default, and it takes the same
+`Overrides`. A binding may offer a `discover()` convenience; it must resolve it in
+the host and pass the result in, and `open` remains the recommended entry point
+because its error names the directory it was given.
 
 Errors: `NOT_PROTECTED` with the same two-cause message the CLI gives
-(`ctx.rs:59-76`), `INVALID_MANIFEST` for an unreadable identity.
+(`session.rs:106-121`), `INVALID_MANIFEST` for an unreadable identity. A directory
+that has a `.swp/` but no readable config is reported as an incomplete store
+(`incomplete_store`, `session.rs:479`, raised at `:94-96` and `:110`) rather than
+recommended for `swp init`, which is the one command that would make it worse.
 
-## 4. `Session::protect(options) -> Protection`
+## 4. `Session::protect(options) -> ProtectOutcome`
 
 The one operation that rewrites source, and — with `mode: plan` — the one that
 records a constellation without touching it. `swp generate` and `swp protect` are
-already the same function in the CLI (`swp-cli/src/lib.rs:131`
+already the same function in the CLI (`swp-cli/src/lib.rs:122-123`
 → `protect::run(.., mode)`), and they are one operation here for the same reason.
 
 | | |
 | --- | --- |
-| Inputs | `mode`, `release_id: Option<String>`, `sites: Option<u32>`, `tag_bits: Option<u8>`, `targets: Vec<String>`, `excludes: Vec<String>`, `embed_strings: Option<bool>`, `revision: Option<String>` |
-| Effects | `plan` → **writes store** (manifest, plan, release record); `release` → **writes store + source**; `dry_run` → **none** (`protect.rs:99, :106`) |
-| Secret | yes: `ManifestKeys::derive` (`swp-manifest/src/keys.rs:73`) and `ManifestSigningKey::from_root`. Dropped when the call returns (`swp-cli/src/protect.rs:119`). |
+| Inputs | `ProtectOptions { mode: Mode, release_id: Option<ReleaseId>, revision: Option<String> }`. The settings the run protects *with* — targets, excludes, site count, tag width, string literals — are the project's `[protect]` config as patched by the `Overrides` the `Session` was opened with, not per-call arguments (§11), because `swp-embedding` validates one coherent settings document rather than a config plus a set of exceptions. |
+| Effects | `plan` → **writes store** (manifest, plan, release record); `release` → **writes store + source**; `dry_run` → **none** (`swp-embedding/src/protect.rs:99, :106`) |
+| Secret | yes: `ManifestKeys::derive` (`swp-manifest/src/keys.rs:73`) and `ManifestSigningKey::from_root`. Dropped when the call returns (`swp-sdk/src/protect.rs:137`, immediately after `swp_embedding::protect` has derived what it needed). |
 | Blocks | yes, proportional to tree size. This is the call a binding must run off the host's main thread. |
 | Concurrent | one `protect` per project at a time. Two at once write the same files. |
 
 ```rust
-pub enum Mode { Plan, Release, DryRun }        // mirrors swp-embedding::Mode, protect.rs:78-87
+pub enum Mode { Plan, Release, DryRun }   // swp_embedding::Mode, re-exported (protect.rs:80-87)
+
+pub struct ProtectOptions {               // swp-sdk/src/protect.rs:35-57
+    pub mode: Mode,
+    pub release_id: Option<ReleaseId>,    // None allocates one
+    pub revision: Option<String>,         // display metadata; never hashed
+}
+
+pub struct ProtectOutcome {               // :73-84
+    pub protection: Protection,           // swp-embedding's result, unaltered
+    pub revision: Option<String>,         // what was recorded, after trimming
+}
 ```
 
-The returned `Protection` is the service crate's type
-(`swp-embedding/src/protect.rs:142-171`), which already derives `Serialize` and
+`ProtectOptions` has no `Default` on purpose: a struct reachable by `::default()`
+would be a struct whose default mode rewrites the source tree, so `mode` is an
+argument of `ProtectOptions::new` and cannot be reached by accident.
+
+`revision` is what the operator claims the source is — a git ref, a version, a
+build number. `None` records the content fingerprint as the revision
+(`SourceRevision::Content`); `Some(text)` records `text` trimmed, and `Some("")`
+is therefore a stated-but-empty revision, which is `swp protect --revision ""` and
+is not the stored value you get by passing nothing. `ProtectOutcome::revision` is
+`None` for both the unstated and the all-whitespace case, and it is returned
+because the release record holds what was *stored*: a caller that normalized the
+label a second time could disagree with it. There is no `git` shell-out on this
+path in either door (§21).
+
+The `Protection` inside the outcome is the service crate's type
+(`swp-embedding/src/protect.rs:143-171`), which already derives `Serialize` and
 already carries `artifacts` (store-relative, in write order, `:165-167`),
 `files_changed`, `sites_embedded`, `sites_skipped`, `candidates`, the fingerprint
 and its level, and the full `Plan` including every refusal with its reason. The
@@ -190,115 +253,255 @@ façade adds nothing to it and subtracts nothing from it.
 `release_id` is not cosmetic and is the easiest way for a binding to get this
 wrong. A plan is keyed by release id, so applying a generated constellation
 means passing the same id: `swp protect --release <id>` after `swp generate`
-(`swp-cli/src/protect.rs:89-95`). A binding that allocates a fresh id for the
-second call derives different keys, embeds different tags, and produces a second
-release the plan does not describe — while still succeeding. So the rule is:
-`mode: plan` returns `release_id` and `mode: release` accepts it; a fresh id is
-allocated only when the caller passes none, which is the "protect without a plan"
-case the CLI runs by default.
+(`swp-cli/src/protect.rs:89-95`, and the same field on `ProtectOptions`). A binding
+that allocates a fresh id for the second call derives different keys, embeds
+different tags, and produces a second release the plan does not describe — while
+still succeeding. So the rule is: `mode: plan` returns `release_id` in
+`protection.release_id` and `mode: release` accepts it; a fresh id is allocated
+only when the caller passes none, which is the "protect without a plan" case the
+CLI runs by default.
 
-`targets` are subject to the containment rule the CLI applies today: an absolute
-target must resolve inside the project root or it is `USAGE`
-(`ctx.rs:101-144`), because a target that escapes the root is a way to write
-outside the project. Warnings the CLI prints before a run (a limit clamped
-against the hard ceiling, `ctx.rs:81-89`) are returned as `notes` on the result,
-not raised as errors and not dropped.
+`Overrides::targets` are subject to the containment rule the CLI applies: an
+absolute target must resolve inside the project root or it is `USAGE`
+(`swp-sdk/src/session.rs:143-175`), because a target that escapes the root is a way
+to write outside the project. It is decided where the root is known — once, in
+`Session`, for a terminal and a bound caller alike. Warnings the CLI prints before
+a run (a limit clamped against the hard ceiling, `session.rs:129-131`) are read
+from `Session::warnings()`, not raised as errors and not dropped.
 
 Errors: `NO_SAFE_LOCATIONS` when every candidate failed a safety precondition —
 source unchanged, and that is the designed outcome, not a failure to work around
 (`AGENTS.md`, and `error.rs:148-154`); `LIMIT_REACHED` when a resource ceiling
 trimmed the run; `MALFORMED_SOURCE`/`PARSER_FAILURE` from the adapters;
 `RELEASE_MISMATCH` when a named release already exists with different content
-(`protect.rs:193`).
+(`swp-embedding/src/protect.rs:193`).
 
-## 5. `Session::scan(candidate, options) -> Report`
+## 5. `Session::scan(candidate, releases, save) -> ScanOutcome`
 
 Ask whether this build's provenance is present in an artifact you did not write.
 
 | | |
 | --- | --- |
-| Inputs | `candidate: Path` (directory, file, `.zip`/`.tar`/`.tar.gz`), `releases: ReleaseSelection` (`All` — the default — `Latest`, or explicit ids), `save: bool` |
+| Inputs | `candidate: Path` (directory, file, `.zip`/`.tar`/`.tar.gz`), `releases: &ReleaseSelection` (`All` — the default — `Latest`, or explicit ids), `save: bool` |
 | Effects | reads the candidate and the store; **writes outside the project** when unpacking an archive (`swp-detection/src/input.rs:333-343`, removed on `Drop`); writes `reports/` only if `save` |
-| Secret | yes, to derive each release's keys — and dropped before the candidate is opened (`ctx.rs:298`), because a scan should not hold a key while walking a stranger's tree |
+| Secret | yes, to derive each release's keys — and dropped before the candidate is opened (`swp-sdk/src/session.rs:403`, and the call order in `swp-sdk/src/scan.rs:119-121` is load → index → open), because a scan should not hold a key while walking a stranger's tree |
 | Blocks | yes, proportional to candidate size |
 | Concurrent | yes for *different* candidates; a `save` to the same store from two threads is one artifact per call and `Store::save_report` numbers a collision rather than overwriting (`store.rs:379`) |
 
 ```rust
-pub struct Report { /* the swp-evidence document, verbatim */ }
-
-impl Report {
-    pub fn from_json(text: &str) -> Result<Report, Error>;   // report.rs:140
-    pub fn to_json(&self) -> String;                          // report.rs:132
-    pub fn to_text(&self, full: bool) -> String;              // report.rs:170
-    pub fn result(&self) -> Outcome;                          // PROVENANCE_DETECTED | NO_PROVENANCE_DETECTED | INCONCLUSIVE
-    pub fn evidence_level(&self) -> EvidenceLevel;            // NONE … VERY_STRONG
-    pub fn exit_code(&self) -> i32;                           // report.rs:126 — a property of the document
+pub struct ScanOutcome {                     // swp-sdk/src/scan.rs:27-41
+    pub report: Report,                      // the swp-evidence document, verbatim
+    pub saved: Option<SavedReport>,          // Some only when `save` was asked for
+    pub sites: Vec<ScannedSite>,             // per-site rows, secret-free
 }
+
+pub struct SavedReport {                     // :78-87
+    pub name: String,                        // the stem `read_report` takes
+    pub path: String,                        // store-relative, forward-slashed
+}
+
+pub struct ScannedSite {                     // :51-74
+    pub release_id: String,                  // joins the row to the report's tally
+    pub site: usize,                         // index into that release's site list
+    pub status: &'static str,                // one of the four rungs listed below
+    pub probes: u32,                         // spans that reached a tag comparison
+    pub distinct_codes: u32,                 // this site's share of the bound's draws
+    pub found_tokens: u8,                    // literal size, saturating at 255
+    pub found_in: Option<String>,
+    pub found_line: Option<u32>,
+    pub found_excerpt: Option<String>,       // the same text an evidence item quotes
+}
+
+pub struct Report { /* swp-evidence's document, field for field */ }
 ```
 
-`Report` is not a binding type. It is `swp_evidence::Report` (`report.rs:69-92`),
-which derives `Serialize` + `Deserialize` with `deny_unknown_fields`, carries
-`schema` and `protocol` in itself, and refuses a document from another schema
-with `PROTOCOL_VERSION_UNSUPPORTED` (`report.rs:147-162`). Every binding exposes
-the same JSON and the same text rendering, so a report produced by the CLI, by a
-wheel, or by a `.node` addon is one artifact with one reading path.
+`Report` is the same in both doors. It is `swp_evidence::Report`
+(`swp-evidence/src/report.rs:71-92`), which derives `Serialize` + `Deserialize` with
+`deny_unknown_fields` and carries the verdict as **fields, not accessors**:
+`result: Outcome` (`PROVENANCE_DETECTED | NO_PROVENANCE_DETECTED | INCONCLUSIVE`),
+`evidence_level: EvidenceLevel` (`NONE` … `VERY_STRONG`), `explanation`,
+`releases: Vec<ReleaseTally>`, `evidence`, `omissions`, `notes`, `limitations`.
+The methods on it are the reading and writing ones: `from_json` (`:140`),
+`to_json` (`:132`), `to_text(full)` (`:170`), `to_text_items(items)` (`:182`), and
+`exit_code()` (`:126`) — which is a property of the document here, not a process
+instruction. Every binding exposes the same JSON and the same text rendering, so a
+report produced by the CLI, by a wheel, or by a `.node` addon is one artifact with
+one reading path.
+
+`ScanOutcome` is the façade's own envelope, and only two things are in it that the
+document does not already carry:
+
+* `saved` names the store entry a `save` actually wrote. `Store::save_report`
+  numbers a collision rather than overwriting, so the name to hand back is the one
+  in the path it returned, not the one asked for (`scan.rs:174-180`), and it is the
+  name `read_report` accepts (§7).
+* `sites` is the per-site view the report sums into a tally. A `ReleaseTally`
+  carries `sites`, `fragments`, `probes` and `draws` for a whole release, which is
+  what a verdict needs; a caller drawing the distribution needs the same numbers
+  one row at a time. `ScanOutcome.sites` is a *companion* to the document and never
+  a second grading — it copies the counts out of the detection's rows and nothing
+  else, so a site graded `absent` here is graded `absent` in the report
+  (`scan.rs:148-167`). A saved report never contained these rows, and re-reading
+  one gives the document, not this field.
+
+The rows are deliberately free of anything keyed. The location ids and the expected
+codes a match was decided against stay inside `swp-detection`, so a row says *that*
+a span confirmed and how much work reaching it took without becoming a list of the
+values that would let a caller test a guess against a site that was never hit —
+which is the tag oracle §10 refuses, per site.
+
+`status` carries the four rungs the detector draws in one place
+(`swp-detection/src/find.rs:86-100`): `absent` (nothing stood at that address),
+`location-only` (a span produced a key but the literal there does not carry the
+code — stripped, or a pre-protection build, which the scan cannot tell apart),
+`tag-confirmed` (the literal decodes to the expected fragment), `exact-rendering`
+(the literal is byte-for-byte the spelling the manifest recorded). Only the last
+two are watermark evidence, and that line is the detector's
+(`SiteStatus::is_watermark`, `:128-134`), not a caller's judgement. The words are
+stable strings, and `SiteStatus::parse` (`:112-126`) is their inverse for a reader
+holding a saved report's row: an unrecognised word yields `None` rather than a
+guess, because treating a newer build's status as evidence would be the silent
+strengthening §19 forbids.
 
 The release-selection default is `All`, and that is the protocol's choice rather
 than a convenience: a copy could have come from any release, and picking one
-silently would be a claim about which (`ctx.rs:179-184`).
+silently would be a claim about which (`swp-sdk/src/session.rs:51-65`).
 
 `scan` of a candidate that contains a store does not read that store's config
 (`config.rs:1-8`); a `PathRejected` error means the archive tried to escape its
 extraction directory and the whole candidate was refused rather than partially
 read (`error.rs:155-157`).
 
-## 6. `Session::verify(options) -> VerifyDocument` — **not in Beta 3's first cut**
+## 6. `Session::verify(options) -> VerifyOutcome`
 
-The operation is real, and so is the reason it is held back. `swp verify` answers
-a different question from `swp scan`: it reads *this* tree against *one named*
-release and gives a per-site verdict — `INTACT`, `INCOMPLETE`, `INCONCLUSIVE`
-(`swp-cli/src/verify.rs:189-195`) — in a `SWP-1-verify-v1` document whose type is
-module-private inside `swp-cli` (`verify.rs:104`).
-
-Two options exist and only one is honest. The document moves down into
-`swp-evidence`, unchanged, and `swp-cli` renders what the service produced; or
-`verify` is not exposed and a caller uses `scan` of their own project root, which
-returns a report and *not* a verdict. Offering the second and calling it
-`verify` would put a scan's outcome behind a verify's name, which is the kind of
-claim this project's rules close changes over. So: the move happens first, and
-this section documents the operation it will expose — same effects table as
-`scan`, no candidate path, `release: Option<String>` defaulting to the newest
-(`ctx.rs:215-224`), and the report written only with `save`.
-
-Until then, `verify` is absent from every binding, not present and weaker.
-
-## 7. Report access: `Session::reports()`, `read(stem)`, `Report` from a string
-
-Reading a stored report back is the operation with the fewest edges: no secret
-(mirrored by a test in the CLI's `inspect.rs:1006`), no tree walk, no write.
+The narrowest claim the tool makes, and the one an owner asks most often: *is this
+tree still the tree that was protected?* `swp verify` reads **this** project's root
+against **one** release, and answers per site with a verdict — `INTACT`,
+`INCOMPLETE`, `INCONCLUSIVE` — in the `SWP-1-verify-v1` document.
 
 | | |
 | --- | --- |
-| Inputs | `Session::reports()` → names; `read(stem)` → bytes → `Report::from_json`; or `Report.parse(text)` with no session at all |
-| Effects | reads `reports/`; `parse` touches nothing |
+| Inputs | `VerifyOptions { release: Option<ReleaseId>, save: bool, rows: Option<usize> }` |
+| Effects | reads the project tree and the store; writes `reports/` only if `save`. **No source is written and no candidate is opened.** |
+| Secret | yes, to derive the one release's keys, through the same loader `scan` uses, dropped before the tree is walked |
+| Blocks | yes, proportional to tree size |
+| Concurrent | yes for reads; one `protect` must not be in flight against it |
+
+```rust
+pub struct VerifyOptions {                   // swp-sdk/src/verify.rs:27-44
+    pub release: Option<ReleaseId>,          // None = the newest
+    pub save: bool,                          // a SWP-1-report-v2 copy of the scan
+    pub rows: Option<usize>,                 // how many rows the caller will render
+}
+
+pub struct VerifyOutcome {                   // :48-57
+    pub document: VerifyDocument,            // swp-evidence's, verbatim
+    pub report_saved: Option<String>,        // store-relative path, when `save`
+}
+```
+
+`VerifyDocument` is `swp_evidence`'s type (`swp-evidence/src/verify.rs:139-180`,
+schema constant `SCHEMA` at `:46`) — it moved out of `swp-cli` before this
+operation could be exposed, so that a bound caller and a terminal read one schema
+and one grading function. Its fields are the verdict (`verdict: Verdict`, plus
+`partial` and the counts behind it: `sites_expected`, `sites_confirmed`,
+`sites_exact`, `sites_stripped`, `sites_absent`, `sites_moved`,
+`sites_refactored`), the identity it authenticated against
+(`project_id`, `manifest_authenticated`), what the tree is (`tree`, `fingerprint`,
+`fingerprint_expected`, `revision`), the per-site `sites: Vec<SiteRow>`, and
+`exit_code` — which crosses as a document field, the same way `Report::exit_code`
+does.
+
+Three semantics a binding has to keep straight:
+
+* `release: None` is the **newest**, because "is the tree I am standing in still
+  the tree I protected?" is a question about the last protection run
+  (`session.rs:305-314`). A named release that is not in the store is
+  `NOT_PROTECTED` naming the releases that are, not the interrupted-run refusal —
+  the two need different answers from the operator (`swp-sdk/src/verify.rs:71-80`).
+* `save` writes a **report**, not a verification. The `SWP-1-verify-v1` document is
+  returned and never written; reading a saved report back is §7, and its numbers
+  belong to the moment they were measured.
+* `rows` fills in `document.omitted_rows` and nothing else. The document always
+  carries every row; `rows` is the record that a *rendering* left some out, so a
+  caller that intends to print the first twenty passes `Some(20)` and a caller that
+  prints all of them passes `None`.
+
+The reason this section was once a plan is the reason it is now short. Two options
+existed and only one was honest: move `VerifyDocument` down into `swp-evidence`
+unchanged and let `swp-cli` render what the service produced, or hold `verify` back
+and let a caller use `scan` of their own root, which returns a report and *not* a
+verdict. Offering the second and calling it `verify` would have put a scan's
+outcome behind a verify's name. The move happened first, on the original field set,
+ordering and serde names, with `docs_examples` and the CLI's own tests as the net;
+what is exposed now is the document the command has always printed.
+
+A `Verdict::Inconclusive` is not a weak `Incomplete`: it says part of the tree was
+never read, so this run could not have seen a missing site. `VerifyDocument`
+separates them with `partial`, and the exit codes differ (5 and 10).
+
+## 7. Report access: `Session::reports()`, `Session::read_report(name)`, `Report` from a string
+
+Reading a stored report back is the operation with the fewest edges: no secret
+(both calls reach `Store` only — `report_names`, `report_path`, `read_report` —
+and `report.rs:45-84` never asks the session for one), no tree walk, no write.
+
+| | |
+| --- | --- |
+| Inputs | `Session::reports()` → stems; `Session::read_report(name)` → bytes → `Report::from_json`; or `Report::from_json(text)` with no session at all |
+| Effects | reads `reports/`; `from_json` touches nothing |
 | Secret | no |
 | Blocks | no |
 | Concurrent | yes |
 
-`stem` is validated by `Store::report_path` (`store.rs:125`), which is the layer
-that refuses a name that would escape the reports directory; a binding must pass
-the stem it was given and not build a path.
+```rust
+pub struct StoredReport {                    // swp-sdk/src/report.rs:25-35
+    pub report: Report,                      // the document as it was graded
+    pub name: String,                        // the stem read_report takes
+    pub path: String,                        // store-relative, forward-slashed
+}
 
-`Report.parse` with no session is the operation a report viewer wants, and the
+pub fn report_stem(what: &str) -> String;    // :88
+```
+
+One entry has three spellings and all three are accepted: the stem `--save`
+printed, the store-relative path a listing prints, and the file name a shell
+completion offers. `report_stem` is the normalization, and it is public because a
+binding that shows a user a path needs to hand the same entry back to
+`read_report`. What a name may not do is leave the directory: the trimmed last
+segment goes to `Store::report_path` (`store.rs:125`), which is the layer that
+refuses an escaping name, and the path is never assembled from the caller's string
+here. A traversal is therefore stripped to its final segment and then refused or
+accepted on its own merits — `report_stem("../manifests/rel-…")` yields
+`rel-…`, and the store decides whether that is a report.
+
+`reports()` lists the directory, not the parseable documents in it: a file that is
+not a report this tool wrote still appears, because `read_report` is where it fails
+and the caller is the only party who can do anything about it. The names come back
+newest first — the stems are timestamped, so that is chronological order, and it is
+the order `swp report` prints (`swp-identity/src/store.rs:398-408`). That is also why a
+missing name is `USAGE` with the count of what *is* stored, rather than a
+`FILE_NOT_FOUND`-shaped surprise.
+
+`Report::from_json` with no session is the operation a report viewer wants, and the
 one that must not be mistaken for a scan: it grades a document that was already
 graded. The text and JSON it produces are the stored document's, and the numbers
 in it are the arithmetic of the build that wrote it — which is
-[VERSIONING_POLICY.md](VERSIONING_POLICY.md)'s subject.
+[VERSIONING_POLICY.md](VERSIONING_POLICY.md)'s subject. `StoredReport.report` is
+the parsed document, so re-serializing it yields the stored bytes unchanged: the
+report *is* this type rather than a re-reading of a `serde_json::Value`, and key
+order is part of what makes an export diffable against its original.
 
 ## 8. Errors
 
 Every failure is a `SwpError` re-projected, not a new taxonomy
-([audit §6](BETA3_ARCHITECTURE_AUDIT.md)):
+([audit §6](BETA3_ARCHITECTURE_AUDIT.md)). In **Rust** there is nothing to
+re-project: a façade call returns `Result<T, swp_core::error::SwpError>`, the same
+type the service crates raise, with the same stable `ErrorCode` discriminant
+(`code()`), `message()`, `path()`, `caused_by()`, `next_step()` and `render()`
+already public on it. There is no `swp_sdk::Error`, because turning one Rust error
+type into another adds a taxonomy and no information. The struct below is the
+**binding's** envelope, built from those six accessors at the FFI boundary:
 
 ```rust
 pub struct Error {
@@ -361,19 +564,239 @@ the design, each with the reason the audit supports.
 * **Key import or export.** No argument accepts key bytes and no field returns
   them. `RootSecret::from_bytes` exists in Rust (`secret.rs:56`) precisely so
   `Store::load_root` can rebuild a type after unsealing; across FFI those bytes
-  would live in garbage-collected memory this project cannot zeroize.
+  would live in garbage-collected memory this project cannot zeroize. In the Rust
+  façade the rule is a type rule and a capability rule: `Session::secret` is
+  `pub(crate)` (`swp-sdk/src/session.rs:265`), `swp-sdk` re-exports no secret type,
+  and `SecretBytes::as_slice` — the only accessor that turns held key material into a
+  byte slice — is `pub(crate)` inside `swp-crypto` (`secret.rs:39`), so a `RootSecret`
+  cannot be printed, cloned, serialized, or read back out as bytes.
+* **What that wall is not made of.** The façade withholds keyed material from its own
+  signatures; it does not sandbox the store. `Session::open_store()`
+  (`session.rs:221-231`) is public, `Store` is re-exported (`lib.rs:98`), and
+  `Store::load_root` (`swp-identity/src/store.rs:306`), `read_private_manifest`
+  (`:358`) and `root_key_path` (`:86`) are public methods of that re-exported type — so
+  a Rust caller that wants them can take a second handle and read them, exactly as
+  `swp inspect` does. Three things keep that honest rather than ironic: no bytes come
+  out of the secret type; the operating-system seal and the access list on `root.key`
+  are the protection a `swp` process relies on too, and a caller who can run
+  `swp inspect manifest` can already do all of this; and `open_store` exists for
+  `swp-cli`, which is a Rust crate. **It is therefore a Rust-only door: no binding may
+  wrap it**, and §11 marks it as the one public accessor whose return value opens the
+  private half of the store.
 * **Expected tags.** `ManifestKeys::fragment_tag` (`keys.rs:149`) and
   `ReleaseIndex::expected_tag` (`index.rs:257`) would turn a binding into a tag
   oracle: a caller could test a candidate without the evidence maths that decides
-  whether a match means anything, and quote the answer as a finding.
-* **Private store paths and private manifests.** `Store::root_key_path`
-  (`store.rs:86`), `read_private_manifest` (`:358`).
-* **`inspect`.** Nine renderings of a store, three of which print private
-  manifest contents (`inspect.rs:143-158` splits public from private views for
-  that reason). A typed accessor is the right answer to a real future need.
+  whether a match means anything, and quote the answer as a finding. The two
+  façade accessors that could reach them are `pub(crate)` for exactly this reason:
+  `load_releases` (`session.rs:371`) hands back the keyed constellation itself, and
+  `indexes` (`:428`) the built `ReleaseIndex`es. No public signature of the façade names
+  either type — which is a statement about the façade, not about a caller that links
+  `swp-manifest` directly.
+* **Private store paths and private manifests, through a `Session`.**
+  `Store::root_key_path`
+  (`store.rs:86`), `read_private_manifest` (`:358`). The façade's own private
+  manifest read is module-private (`private_manifest`, `session.rs:444`) — not even
+  `pub(crate)` — and the release loader refuses a manifest whose recorded id is not
+  the one asked for (`ReleaseMismatch`, `:380-389`). A `Session` offers no way to reach
+  either; the second handle in the bullet above does, by design, for the CLI.
+* **`inspect`.** Eight views of a store (`View::ALL`, `inspect.rs:62-71`), three of
+  which print private manifest contents — `manifest`, `plan`, `fragments`
+  (`view_names` and `private_view_names`, `inspect.rs:143-157`, both built from the
+  same table so a fourth private view cannot be added to one list and left out of
+  the other). A typed accessor is the right answer to a real future need; note
+  that the *public* half of what `inspect` prints is already reachable without
+  one, through `Session::identity`, `config`, `stored_config`, `release` and
+  `release_history`.
 * **`swp` as a subprocess.** Explicitly out of scope, and the boundary makes it
   unnecessary: `capabilities()`, `protect()`, `scan()` and `Report` reach the
   same code the binary runs.
 * **A "quick mode", a "strict mode", or any knob that overrides a safety
   refusal.** There is no such flag in the CLI and there will not be one in a
   binding (`docs/DEVELOPER-GUIDE.md`, "Skip, never force").
+
+## 11. The Rust surface as shipped
+
+This section is the freeze list: what `swp-sdk` exposes today, so that a binding
+plan can be written against names rather than against the prose above. Everything
+here is read from `crates/swp-sdk/src/`; nothing in it is a plan.
+
+**Modules.** `capabilities`, `init`, `protect`, `report`, `scan`, `session`,
+`verify` — all `pub mod`, and each one's items are also re-exported at the crate
+root (`lib.rs:84-98`), so `swp_sdk::Session` and `swp_sdk::session::Session` are
+one type.
+
+**Crate-level items.** `VERSION: &str` (`lib.rs:102`) and `banner()` (`:110`) —
+one function, because the same sentence goes into a report's `generator` field and
+into `swp --version`, and a library build and a CLI build that described
+themselves differently would put two generators on one release.
+
+**Types re-exported from the service crates, unchanged** — the façade defines no
+wrapper for any of them: `ErrorCode`, `SwpError`, `ProjectId`, `ReleaseId`,
+`Limits`, `Mode`, `Protection` (`swp-embedding`), `Report`, `SiteRow`, `Verdict`,
+`VerifyDocument` (`swp-evidence`), `ProjectIdentity`, `ReleaseRecord`, `Store`,
+`SwpConfig` (`swp-identity`).
+
+**`session`**
+
+```rust
+pub struct Overrides {                    // session.rs:36-49 — Default, PartialEq, Eq
+    pub targets: Vec<String>,             // appended to [protect] targets; containment applies
+    pub excludes: Vec<String>,            // appended to [protect] excludes
+    pub target_sites: Option<u32>,
+    pub tag_bits: Option<u8>,
+    pub embed_strings: Option<bool>,
+}
+
+pub enum ReleaseSelection {               // :57-65 — Default = All
+    All,
+    Latest,                               // newest by recorded time
+    Ids(Vec<ReleaseId>),                  // each one must exist
+}
+```
+
+`Overrides` is the whole of what a caller may change about the stored settings, and
+it is applied once, at open (`session.rs:143-175`), so nothing downstream knows a
+flag was involved — that is what keeps `swp_embedding::protect` validating one
+coherent settings document. An invalid patch is a `USAGE` error from
+`Session::open`/`discover`, before any operation runs. `Latest` means the newest
+**recorded time** in the release records, ties broken by id (`:500-512`).
+
+`Session` (`session.rs:76-81`) is `Debug + Clone`, and its public methods are:
+
+| | |
+| --- | --- |
+| openers | `init(project_root, &InitOptions) -> InitOutcome` (associated), `open(&Path, &Overrides)`, `discover(&Path, &Overrides)` |
+| what the project is | `identity()`, `config()`, `stored_config()`, `limits()`, `warnings()`, `project_root()`, `open_store()` |
+| which releases | `releases(&ReleaseSelection)`, `one_release(&ReleaseSelection)`, `release_history()`, `release(&ReleaseId)` |
+| the operations | `protect(&ProtectOptions)`, `verify(&VerifyOptions)`, `scan(&Path, &ReleaseSelection, bool)`, `reports()`, `read_report(&str)` |
+
+`config()` is the stored config *with this run's overrides applied*;
+`stored_config()` is the file on disk, unchanged, for a caller that must not act on
+a setting nobody wrote. `release_history()` sorts by `(created_at, release_id)`
+(`:317-328`) — which is the order a history is printed in and is deliberately not
+`Store::releases()`' alphabetical file order, so a listing parity assertion is
+made against this, not against the store's directory walk.
+
+`open_store()` is the one method in that list whose return value is not nothing: it
+hands back a second `Store` handle (`:221-231`), which can read the private half of
+the directory and load the sealed secret. It is public because `swp-cli` is a separate
+crate and `swp inspect`'s three private views need it; §10 states the rule that comes
+with it — Rust-only, never wrapped by a binding.
+
+**`init`** — `InitOptions` (`init.rs:66-74`), `Measurement` (`:39-48`), `Settings`
+(`:52-61`), `InitResult` (`:86-109`), `InitOutcome` (`:112-115`), and
+`suggest_sites(files: u32) -> u32` (`:300`), public because it is the single source
+of the default constellation (§9's no-hard-coded-site-count rule) and a caller that
+wants to explain a number must be able to compute it.
+
+**`protect`** — `ProtectOptions` (`protect.rs:35-57`) + `ProtectOptions::new(Mode)`
+(`:62`), `ProtectOutcome` (`:73-84`). **No `Default`** on `ProtectOptions`, by the
+reason stated in §4.
+
+**`verify`** — `VerifyOptions` (`verify.rs:27-44`, `Default`), `VerifyOutcome`
+(`:48-57`).
+
+**`scan`** — `ScanOutcome` (`scan.rs:27-41`), `ScannedSite` (`:51-74`),
+`SavedReport` (`:78-87`).
+
+**`report`** — `StoredReport` (`report.rs:25-35`), `report_stem(&str) -> String`
+(`:88`).
+
+**`capabilities`** — `capabilities()` (`capabilities.rs:112`) and the five structs
+§1 documents (`:23, :33, :51, :69, :87`), each `Serialize`, so the answer a
+binding shows is the same JSON on all three ecosystems.
+
+**Derives, stated because a binding's generated types depend on them.** The two
+versioned documents (`Report`, `VerifyDocument`) and `Capabilities`/`Measurement`/
+`Settings` and the capabilities range types derive `Serialize`, and the documents
+derive `Deserialize` with `deny_unknown_fields` as well. The *envelopes* —
+`InitOutcome`, `InitResult`, `ProtectOutcome`, `VerifyOutcome`, `ScanOutcome`,
+`ScannedSite`, `SavedReport`, `StoredReport` — are `Debug`/`Clone` data with typed
+fields and are read field by field, not serialized: a binding that wants JSON of a
+`ScanOutcome` serializes `report`, which is the artifact that has a schema.
+`VerifyOutcome` is `Debug` only (it holds the document by value), and `InitOutcome`
+derives nothing so that it can hold a `Session` and stay moveable.
+
+**The keyed-material boundary, by name.** These items are how the façade reaches what
+§10 refuses. All but the last are not `pub`, and the last is the one place the surface
+lets the store through.
+
+| item | where | visibility | why it stops there |
+| --- | --- | --- | --- |
+| `Session::secret` | `session.rs:265` | `pub(crate)` | returns a `RootSecret`; §10 keeps key bytes off the surface |
+| `Session::load_releases` | `:371` | `pub(crate)` | returns `swp_detection::CandidateRelease` — manifest, record and `ManifestKeys` together |
+| `Session::loaded` | `:414` | `pub(crate)` | a selection-resolving wrapper over the same |
+| `Session::indexes` | `:428` | `pub(crate)` | a built `ReleaseIndex` answers "what tag would this site carry" |
+| `Session::private_manifest` | `:444` | module-private | the keyed constellation is the document itself |
+| `Session::store` | `:453` | `pub(crate)` | the session's own handle, kept inside so the operations share one authenticated view of the store |
+| `Session::relabel` | `:449` | `pub(crate)` | not secret-bearing; internal because callers should see store-relative strings, not a path helper |
+| `Session::build` | `:125` | `pub(crate)` | the shared open path for `open`/`discover`/`init` |
+| `Session::open_store` | `:229` | **`pub`** | the exception, and a handle rather than bytes: §10 states why it is public and why no binding may wrap it |
+
+The rule that keeps the list honest: no signature in this crate hands out key bytes, a
+derived key, an expected tag or a parsed private manifest, and `swp-sdk` re-exports no
+type that can be turned back into bytes — `SecretBytes::as_slice` is `pub(crate)`
+inside `swp-crypto` (`secret.rs:39`), which is what makes that hold even of the handle
+above. What the crate does offer, deliberately and in Rust only, is the store itself.
+
+## 12. Binding-readiness notes
+
+Six questions a binding author asks first, answered with what the source actually
+says. Where the answer is "this is not specified", that is stated rather than
+smoothed over, because a binding that guesses becomes the second implementation
+this boundary exists to prevent.
+
+* **Release selection is specified.** `All` is the default and means *every*
+  release; `Latest` is the newest recorded time, ties by id
+  (`session.rs:500-512`); `Ids` requires each id to be present and refuses the
+  whole call otherwise — partially-matching a selection would be a silent claim
+  about which releases were skipped (`:286-301`). `one_release` narrows a selection
+  to one: the id named, or the newest when several matched (`:305-314`).
+* **Missing-release behaviour is specified, and it is not one code.** A project
+  with no releases is `NOT_PROTECTED` with the "run `swp generate`, then
+  `swp protect`" advice (`session.rs:272-282`); a selection that names a release
+  the store does not have is `NOT_PROTECTED` too, and it lists the ids that *are*
+  there (`:286-297`). Reading one release record directly, `Session::release(&id)`,
+  goes through `Store::read_release` and so reports `IO_ERROR` for an absent file
+  (`swp-identity/src/store.rs:465-473`). A binding that wants "does this release
+  exist" must ask the selection path, not the record path; the two otherwise
+  disagree in exactly the case where a user typed a wrong id. An
+  unreadable-but-present manifest or record is `INVALID_MANIFEST`, and one whose
+  stored id is not the id asked for is `RELEASE_MISMATCH` (`session.rs:380-389`).
+* **Scan per-site semantics are specified** in §5, down to which status words count
+  as evidence and what `probes` versus `distinct_codes` mean for the coincidence
+  bound. What is *not* specified is an ordering guarantee beyond "scan order, then
+  the release's own site order" (`scan.rs:32-40`) — a binding must not assume the
+  rows arrive strongest-first the way `Report.releases` does.
+* **Saved-report naming and read-back are specified** in §7: a stem is
+  `scan-<timestamp>` or `verify-<timestamp>`, the store numbers a collision instead
+  of overwriting (`store.rs:379`) and hands back the name it used (`scan.rs:174-180`),
+  and all three spellings of that entry resolve to the same document. A report is
+  never rewritten and never re-graded on the way back.
+* **Machine contract versus presentation text.** Contract: `ErrorCode::as_str()`
+  and its discriminant, the field names and value domains of `SWP-1-report-v2` and
+  `SWP-1-verify-v1`, the four status words, `Mode`, `Verdict`, the `&'static str`
+  value sets that `secret_state`, `secret_scheme` and `gitignore` carry, and
+  store-relative forward-slashed paths. Presentation: the CLI's stdout — its
+  column alignment, its next-step lists, its per-view renderings — and
+  `SwpError::render()`. In between sit
+  the *prose fields inside a versioned document*: `Report.explanation`,
+  `Report.limitations`, `VerifyDocument.next`, `SwpError::next_step`. Those are
+  wording rather than values, stable only in the sense that a schema version governs
+  them; a binding may display them and must not parse them.
+* **Which structures are binding-facing, and the two that are not.**
+  Every *type* in §11's list is binding-facing: it is the surface the Rust caller
+  reads, and `swp-cli` reads the same fields to print. Two items are the exception,
+  and both are in §10. `Session::open_store()` is Rust-only — it hands back the store
+  handle, which is a capability rather than a value, and a binding that wrapped it
+  would offer `swp inspect manifest` as a method. And `swp-sdk`'s own `Store`,
+  `ProjectIdentity` and `ReleaseRecord` re-exports exist so that the façade's
+  signatures can be spoken about in Rust; they are not a licence to expose private
+  reads across FFI. The two enum *types* that appear as `Report` field values —
+  `swp_evidence::Outcome` and
+  `swp_evidence::EvidenceLevel` — are **not re-exported by `swp-sdk`**, so a Rust
+  caller either names them through `swp-evidence` (which it may already depend on)
+  or reads `report.result.as_str()` / `report.evidence_level.as_str()` and the JSON.
+  This is a gap in the façade's export list rather than a boundary decision: nothing
+  key-shaped is behind either name, and closing it is a one-line `pub use` in a
+  commit that also fixes a binding's need, not a documentation change.

@@ -32,25 +32,36 @@ audit citation next to it is the place to argue.
 ```
 
 The line that matters is the one between `swp-sdk` and `swp-cli`: it does not
-exist. `swp-cli` does not gain a dependency on the façade in this release, and
-the façade does not depend on `swp-cli` in any release. The reason is the
-one-way rule restated for a new consumer: a binding must never have to parse
-text or branch on an exit code. What the façade *does* is get built out of
-`swp-cli`'s composition — see §2 — so that when it is done, there is one
-sequence that authenticates a release, and `swp-cli` is the rendering on top of
-it rather than a second implementation beside it.
+exist. The façade does not depend on `swp-cli` in any release, and `swp-cli` is now
+its consumer — the dependency this page's first draft expected but did not claim
+for this release, because until the extraction landed there was nothing to depend
+on. The reason the direction is one-way is the one-way rule restated for a new
+consumer: a binding must never have to parse text or branch on an exit code, and a
+façade must never have to render. What the façade *is* is `swp-cli`'s composition,
+moved out of it — see §2 — so that there is one sequence that authenticates a
+release, and `swp-cli` is the rendering on top of it rather than a second
+implementation beside it.
 
 ## 2. PHASE 1 decision: a façade, created by extraction
 
 The audit's §8 compares the options at length; the short version is that the
-three things a binding needs before it can produce a correct answer are already
-written, once, and they are in the CLI crate:
+three things a binding needs before it can produce a correct answer were already
+written, once, and they were in the CLI crate:
 
-| need | today | why a binding cannot re-do it |
+| need | where the audit found it | why a binding cannot re-do it |
 | --- | --- | --- |
 | open a project without a command line | `Ctx::open`, `crates/swp-cli/src/ctx.rs:48-92` | it is `Store::open`/`discover` + `identity()` + `config()` + the limit-ceiling warnings, in that order |
 | turn a store into something the detector may trust | `Ctx::load_releases`, `ctx.rs:266-306` | two signature checks against the *public* verify key (`ctx.rs:316-330`), manifest/release id agreement, key derivation under *this* identity's canonicalizer version, `drop(secret)` before the walk |
 | choose the defaults a project gets | `suggest_sites` `init.rs:387`, `write_settings` `init.rs:405`, `--target` containment `ctx.rs:101-144` | a re-implementation diverges from `swp init` on the same tree, in a value the user never typed |
+
+Those line numbers are the state this decision was made from, and they no longer
+point at the code: each row moved down rather than being copied. `Ctx::open` is
+`Session::open`/`discover` and `Session::build` (`crates/swp-sdk/src/session.rs:91,
+:105, :125`), `Ctx::load_releases` is `Session::load_releases` with the same four
+rules and the same `drop(secret)` (`session.rs:371-411`), and the defaults are
+`suggest_sites` (`swp-sdk/src/init.rs:300`), `write_settings` (`:318`) and the
+target-containment check (`session.rs:143-175`). `swp-cli/src/ctx.rs` is now the
+flag→`Overrides` translation and the private-artifact reads `swp inspect` needs.
 
 So: **`crates/swp-sdk`, a new publishable library crate whose `src/` holds types,
 ordering, and envelopes — no protocol, no crypto, no grading.** It is created by
@@ -64,22 +75,35 @@ Two invariants that keep the façade from becoming a second product:
 1. **Every operation is a call into a service crate.** If `swp-sdk/src/` ever
    contains arithmetic, canonicalization, a path rule, or a decision about
    evidence, that code belongs one layer down and this page is wrong about it.
+   The extraction held: the only rules the crate owns are which release id a run
+   uses, what the source is claimed to be, where the secret is dropped, and how a
+   report's three names normalize to one entry — and each of those is stated in
+   [SDK_API.md](SDK_API.md) with the call it delegates to.
 2. **The façade and the CLI must agree, and one test proves it** (§7, "parity").
    A binding that disagrees with `swp protect` on the same tree is a bug in the
    boundary, not a platform difference.
 
 What the façade adds that the crates do not have: a `Session` that owns no
-secret between calls (today's `Ctx` loads and drops one per operation,
-`ctx.rs:270`/`:298`, and the façade keeps that), owned plain-data argument types
-instead of eight-borrow `Request<'a>` (`swp-embedding/src/protect.rs:114-130`),
-one `catch_unwind` per operation, and one error conversion.
+secret between calls (the `Ctx` this came from loaded and dropped one per
+operation, `ctx.rs:270`/`:298` in the pre-extraction file, and `Session` keeps
+that at `session.rs:403` and `swp-sdk/src/protect.rs:137`), owned plain-data
+argument types instead of eight-borrow `Request<'a>`
+(`swp-embedding/src/protect.rs:114-130`), and one place for the errors to be
+shaped. The `catch_unwind` and the error *conversion* in this list belong to the
+FFI boundary, not to this crate: in Rust a façade call returns
+`Result<T, swp_core::error::SwpError>` with the service crate's own code and text,
+because converting one Rust error type into another adds a taxonomy and no
+information ([SDK_API.md](SDK_API.md) §8). A panic across that boundary is
+`INTERNAL_ERROR`, and a panic in Rust stays a panic.
 
 ## 3. PHASE 2 decision: the operation surface
 
 The protocol has seven verbs. The binding surface has five operations plus a
 data type, because the audit showed that two of the verbs are one call
 (`mode_of`, `crates/swp-cli/src/lib.rs:131`) and two of them are CLI
-affordances.
+affordances. Every row marked *yes* is reachable from `swp-sdk` as shipped; the
+`maps to` column is still the audit's map, so its line numbers are the
+pre-extraction ones except where a row below says otherwise.
 
 | operation | maps to | exposed | why |
 | --- | --- | --- | --- |
@@ -87,14 +111,14 @@ affordances.
 | `init` | `SealedSecret::generate` → `Store::init` → `measure` → `suggest_sites` → `write_settings` (`init.rs:105-151`) | yes | without it nothing else can run; the store cannot be hand-built |
 | `protect` (modes `plan` / `release` / `dry_run`) | `swp_embedding::protect(&Request)` with `Mode` (`protect.rs:78-108`) | yes, as **one** operation | `generate` and `protect` already are one function; splitting them into two binding methods invites divergence |
 | `scan` | `ctx` release load + `build_indexes` + `input::open` + `scan_against` + `Report::build` (`scan.rs:41-73`) | yes | the embedding question an integrator actually asks: "is my provenance in this artifact?" |
-| `verify` | the same, against the project root, plus the per-site verdict (`verify.rs:147-265`) | **not yet** | the answer is `VerifyDocument`, which is a module-private DTO inside `swp-cli` (`verify.rs:104`, schema `SWP-1-verify-v1` at `:47`). Exposing it means moving it down into `swp-evidence` first. Until then the façade offers `scan` of your own tree, which is *not* the same claim, and pretending otherwise is the overclaim this project's rules forbid |
+| `verify` | the same, against the project root, plus the per-site verdict — now `Session::verify` (`swp-sdk/src/verify.rs:71`) | yes | this row was the exception when the page was written: the answer was `VerifyDocument`, a module-private DTO inside `swp-cli`, and exposing it meant moving it down into `swp-evidence` first (`swp-evidence/src/verify.rs:139`, schema `SWP-1-verify-v1` at `:46`). The move happened, on the original field set, before the façade took it. Until it had, `scan` of your own tree was all the binding could offer — which is *not* the same claim, and pretending otherwise is the overclaim this project's rules forbid |
 | `report` | `Store::read_report`/`report_names` + `Report::from_json`/`to_json`/`to_text`/`exit_code` (`report.rs:118`, `swp-evidence/src/report.rs:126-182`) | yes, as a data type | already a versioned, fully serializable document with a schema guard; the cleanest existing model for what a binding result should look like |
-| `inspect` | `inspect.rs:159`, nine views | **no** | see below |
+| `inspect` | `inspect.rs:159`, eight views (`View::ALL`, `:62-71`) | **no** | see below |
 | `help`, `--version` | `help.rs` | no | terminal affordances; `capabilities()` is the machine form of the one that carries information |
 
 `inspect` is refused on three grounds, and the middle one is decisive. It is a
 human audit surface over `.swp/private/` whose views are renderings, not types.
-And three of its views — `plan`, `fragments`, `manifest` (`inspect.rs:143-158`
+And three of its views — `plan`, `fragments`, `manifest` (`inspect.rs:143-157`
 already splits public from private views for exactly this reason) — print
 private-manifest contents, which is material PHASE 5 puts on the
 must-not-cross list; putting them behind a binding method would make a routine
@@ -234,12 +258,12 @@ for Beta 3, recorded so that the next person does not have to redo this.
 
 The audit decides this, not habit. Three constraints: the root workspace is
 `members = ["crates/*"]` with no `exclude`; `check-release.sh`'s
-`PUBLISHABLE` list is the nine crates and its artefact sweep fails a tracked
+`PUBLISHABLE` list was the nine crates then and its artefact sweep fails a tracked
 `.so`/`.dll`/`.dylib`/`.wasm`/`.exe`; and `cargo build --workspace` + CI must
 not start requiring a Python interpreter or a Node headers download.
 
 ```text
-crates/swp-sdk/                 ← a tenth workspace member: the façade. Rust only,
+crates/swp-sdk/                 ← the tenth workspace member: the façade. Rust only,
                                      no binding dependency, so CI and the publish
                                      order are unchanged except for one more crate.
 bindings/
@@ -278,9 +302,12 @@ not be able to break `cargo test --workspace`.
 
 The consequence that has to be handled rather than discovered:
 `check-release.sh`'s artefact sweep means **no built binary is ever committed
-under `bindings/`**, and its `PUBLISHABLE` loop does not know about `swp-sdk`
-until it is added there (it is a tenth publishable crate, in dependency order
-after `swp-evidence` and before `swp-cli`).
+under `bindings/`**, and its `PUBLISHABLE` list did not know about `swp-sdk`
+until this crate was added there. Both are settled now: the list is ten crates,
+with `swp-sdk` in dependency order after `swp-evidence` and before `swp-cli`, and
+the sweep is a repo-wide `git ls-files` filter (`:166`), so a wheel or an addon
+committed under `bindings/` fails the release check as loudly as a `.dll`
+anywhere else in the tree.
 
 ## 6. PHASE 5: the security review of this design
 
@@ -288,16 +315,28 @@ The rule the boundary is built to satisfy: the SDK cannot expose the root
 secret, a derived key, an expected watermark tag, private-manifest contents, or
 a private store path, because no operation it offers asks for them.
 
+As shipped, that is a rule about **signatures**, and the honest way to say it is
+that the façade is not a capability sandbox around `.swp/`. No public signature in
+`swp-sdk` takes or returns keyed material, and the crate re-exports no type that can
+be turned back into bytes (`SecretBytes::as_slice` is `pub(crate)` in `swp-crypto`,
+`secret.rs:39`); but `Session::open_store()` is public, because `swp-cli` is a
+separate crate and `swp inspect`'s three private views are its job, and the `Store`
+it hands back can read those artifacts and unseal the project's own key. The
+protection that still holds is the one the CLI relies on — the operating-system seal
+and the access list on `root.key` — and the protection a bound caller gets is the
+binding's own surface, which therefore must not wrap `open_store`. [SDK_API.md](SDK_API.md)
+§10 and §11 name the item and the rule.
+
 | risk | where it comes from | what the design does |
 | --- | --- | --- |
-| key bytes as a value | `RootSecret::from_bytes` (`secret.rs:56`), `SecretBytes::from_vec` (`:21`) | no façade argument or field is `Vec<u8>`/`bytes`/`Buffer`; a session loads its own key through `Store::load_root` and drops it (`ctx.rs:298`). Importing a key from outside the store is not offered, in any language |
+| key bytes as a value | `RootSecret::from_bytes` (`secret.rs:56`), `SecretBytes::from_vec` (`:21`) | no façade argument or field is `Vec<u8>`/`bytes`/`Buffer`; the only accessor that returns key material — `Session::secret` — is `pub(crate)` (`session.rs:264-266`) and every caller of it drops the secret before returning (`session.rs:403`). Importing a key from outside the store is not offered, in any language |
 | key bytes as a *print* | `RootSecret`/`DerivedKey`/`SealedSecret` already redact (`secret.rs:44,106,135`, `seal.rs:70`) | the façade's own types must not be able to hold one: `Session` stores a `Store` (a `PathBuf`), and the result DTOs are plain data, so a `Debug`/`inspect`/`console.log` of any binding value prints paths and counts |
 | a tag oracle | `ManifestKeys::fragment_tag` (`keys.rs:149`), `ReleaseIndex::expected_tag` (`index.rs:257`) | neither is reachable from the façade surface. A caller with them could test a candidate without a report and without the maths that says whether the answer means anything — which is how a weak signal starts being quoted as a finding |
-| private-manifest disclosure | `Store::read_private_manifest` (`store.rs:358`); `PrivateManifest`/`SiteEntry` derive `Serialize` | not re-exported; the reason `inspect` is out (§3) |
+| private-manifest disclosure | `Store::read_private_manifest` (`store.rs:358`); `PrivateManifest`/`SiteEntry` derive `Serialize` | not re-exported, and the façade's own read is module-private (`session.rs:444`); the reason `inspect` is out (§3). The paragraph above states what that does not cover |
 | private paths | `root_key_path` (`store.rs:86`), `private_dir` (`:74`) | store artifacts are named store-relatively, as `Protection.artifacts` already does; absolute paths appear only for what the caller passed in |
 | silent unsealed key | `SWP_SECRET_PLAIN` (`seal.rs:211`), inherited from the embedding app's environment | `init` returns `secret_scheme`, and the binding page documents it, so an app that set the variable for another reason finds out on the first run instead of in an incident |
 | panic across FFI | unwinding into CPython or Node is UB-adjacent | `catch_unwind` per façade call → `INTERNAL_ERROR`, the code that already means "a defect in SWP-1: report it" (`error.rs:162`) |
-| error text as a leak | messages already use `Store::relabel` (`ctx.rs:280`, `:324`); `PermissionOutcome::detail()` can carry an `icacls` transcript | passed through verbatim — a redaction step here would hide a real refusal — and swept by `secret_leak` rather than by trust |
+| error text as a leak | messages already use `Store::relabel` (`session.rs:385`, `:449-451`, `swp-sdk/src/report.rs:69`, `:78`); `PermissionOutcome::detail()` can carry an `icacls` transcript | passed through verbatim — a redaction step here would hide a real refusal — and swept by `secret_leak` rather than by trust |
 | object lifetime | `Store` is a `PathBuf`; `Session` holds no borrow | bindings may hold a `Session` in a class/instance freely; nothing in the façade borrows a caller's buffer, and no `Request<'a>` reaches a binding signature |
 | concurrency | no store lock exists anywhere in this tree | documented as a caller obligation: one `protect`/`init` per project at a time, exactly as two CLI processes are uncoordinated today. The façade does not add a lock, because a lock that only the binding layer holds would be a lock that the CLI walks straight past |
 | zeroization at the boundary | `Zeroizing` covers the Rust side; Python `bytes` and Node `Buffer` are garbage-collected | the answer is not to zeroize harder across FFI, it is that nothing secret crosses. §"no key bytes as a value" above is the mitigation |
@@ -411,28 +450,47 @@ page that wants one cites it rather than printing its own.
 
 Each step is a commit-sized change with the full gate on it
 (`AGENTS.md`'s list, in that order), and none of them depends on a later one to
-be correct.
+be correct. Beta 3.1 landed steps 1, 2 and 3 and the crate part of step 6; steps
+4 and 5 have not started. The list below is the plan as approved, with what
+actually happened marked on it.
 
 1. **`swp-sdk` as an extraction.** `Session`, `Error`, `catch_unwind`, and the
    moved composition from `ctx.rs` — no new behaviour, no binding dependency.
    `swp-cli::ctx` delegates. Parity test lands here, because it is what proves
-   the move was a move.
+   the move was a move. *Done, with the correction §2 records: no `Error` type
+   and no `catch_unwind` went into this crate — they are the FFI boundary's, and
+   in Rust a façade call returns the service crate's own `SwpError`. The
+   composition moved, and `swp-test-suite`'s `sdk_parity` target is the evidence
+   that the move was a move.*
 2. **`init`, `protect` (three modes), `scan`, `report`, `capabilities`.**
    Result DTOs, JSON round-trip, `secret_scheme` in the init result, `secret_leak`
-   extended over the new types.
+   extended over the new types. *Done. `scan` came back with the per-site rows and
+   the saved-report companion this surface needs, and the settings a `protect`
+   call uses arrive through `Session::open`'s `Overrides` rather than per-call
+   options.*
 3. **Move `VerifyDocument` down into `swp-evidence`, then expose `verify`.**
    The riskiest step, because the document is a published schema
-   (`SWP-1-verify-v1`, `verify.rs:47`): the field set, ordering and serde names
-   must come out byte-identical, and `docs_examples` plus the CLI's own tests are
-   the net. If it cannot be moved without changing the document, the move waits
-   and `verify` stays unexposed — which is a supported outcome, not a failure.
+   (`SWP-1-verify-v1`, `verify.rs:47`; now `swp-evidence/src/verify.rs:46`): the
+   field set, ordering and serde names must come out byte-identical, and
+   `docs_examples` plus the CLI's own tests are the net. If it cannot be moved
+   without changing the document, the move waits and `verify` stays unexposed —
+   which is a supported outcome, not a failure. *Done as written, in that order:
+   the move was its own commit (`e73165a`), the document came out with its field
+   set, ordering and serde names intact, and `Session::verify` was exposed after
+   it. The condition was met, so the fallback outcome was not taken.*
 4. **Python binding.** `#[pymodule]`, error/`PathLike`/GIL handling, pytest suite,
    wheel matrix in CI, `bindings/python/README.md` with every example executed.
+   *Not started.*
 5. **Node binding + generated types.** Same list, plus the `.node` prebuild and
    `optionalDependencies` wiring and the `tsc --noEmit` type test.
+   *Not started.*
 6. **Release wiring.** `swp-sdk` into `check-release.sh`'s `PUBLISHABLE` order,
    publish job, binding version policy applied
-   ([VERSIONING_POLICY.md](VERSIONING_POLICY.md)), CHANGELOG entries.
+   ([VERSIONING_POLICY.md](VERSIONING_POLICY.md)), CHANGELOG entries. *The first
+   of these four landed with the crate: `PUBLISHABLE` is ten crates with
+   `swp-sdk` between `swp-evidence` and `swp-cli`. The publish job, the binding
+   version policy and the CHANGELOG entry are still open, and the binding half of
+   them is gated on steps 4 and 5.*
 
 Steps 1-3 are Rust-only and shippable on their own: they make the implementation
 embeddable whether or not a wheel is ever built. That ordering is deliberate —
