@@ -28,7 +28,7 @@ Conventions used below:
   where it is dropped. A `Session` never holds one between calls; the
   implementation loads inside the operation and drops it before the tree walk
   (`crates/swp-sdk/src/session.rs:403` in the release loader,
-  `crates/swp-sdk/src/protect.rs:137` after `swp-embedding` has derived what it
+  `crates/swp-sdk/src/protect.rs:367` after `swp-embedding` has derived what it
   needs, `crates/swp-sdk/src/init.rs:175, :190, :195` for the secret a run drew and
   did not use), and the boundary keeps that.
 * **Blocks** — whether the call is expected to take long enough that a binding
@@ -210,20 +210,20 @@ already the same function in the CLI (`swp-cli/src/lib.rs:122-123`
 | --- | --- |
 | Inputs | `ProtectOptions { mode: Mode, release_id: Option<ReleaseId>, revision: Option<String> }`. The settings the run protects *with* — targets, excludes, site count, tag width, string literals — are the project's `[protect]` config as patched by the `Overrides` the `Session` was opened with, not per-call arguments (§11), because `swp-embedding` validates one coherent settings document rather than a config plus a set of exceptions. |
 | Effects | `plan` → **writes store** (manifest, plan, release record); `release` → **writes store + source**; `dry_run` → **none** (`swp-embedding/src/protect.rs:99, :106`) |
-| Secret | yes: `ManifestKeys::derive` (`swp-manifest/src/keys.rs:73`) and `ManifestSigningKey::from_root`. Dropped when the call returns (`swp-sdk/src/protect.rs:137`, immediately after `swp_embedding::protect` has derived what it needed). |
+| Secret | yes: `ManifestKeys::derive` (`swp-manifest/src/keys.rs:73`) and `ManifestSigningKey::from_root`. Dropped when the call returns (`swp-sdk/src/protect.rs:367`, immediately after `swp_embedding::protect` has derived what it needed). |
 | Blocks | yes, proportional to tree size. This is the call a binding must run off the host's main thread. |
 | Concurrent | one `protect` per project at a time. Two at once write the same files. |
 
 ```rust
 pub enum Mode { Plan, Release, DryRun }   // swp_embedding::Mode, re-exported (protect.rs:80-87)
 
-pub struct ProtectOptions {               // swp-sdk/src/protect.rs:35-57
+pub struct ProtectOptions {               // swp-sdk/src/protect.rs:45-67
     pub mode: Mode,
     pub release_id: Option<ReleaseId>,    // None allocates one
     pub revision: Option<String>,         // display metadata; never hashed
 }
 
-pub struct ProtectOutcome {               // :73-84
+pub struct ProtectOutcome {               // :83-94
     pub protection: Protection,           // swp-embedding's result, unaltered
     pub revision: Option<String>,         // what was recorded, after trimming
 }
@@ -275,6 +275,84 @@ source unchanged, and that is the designed outcome, not a failure to work around
 trimmed the run; `MALFORMED_SOURCE`/`PARSER_FAILURE` from the adapters;
 `RELEASE_MISMATCH` when a named release already exists with different content
 (`swp-embedding/src/protect.rs:193`).
+
+### `Session::protect_summary(options) -> ProtectSummary`
+
+The same call, with the private plan left in Rust. A binding cannot wrap `protect`
+today because its result can: `ProtectOutcome` → `Protection` → `Plan` →
+`PlannedSite.locations: [LocationId; 4]`, and `Protection` derives `Serialize`, so
+printing the envelope prints every keyed site address in the project. This is the
+accepted answer to that — Option B of
+[ADR-0001](adr/0001-protect-generate-binding-boundary.md) — and it is one operation,
+not two: `protect_summary` calls `protect` (`swp-sdk/src/protect.rs:247-251`) and
+projects the result onto fields that carry no key (`summarize`, `:258`). Nothing is
+re-derived, so the two cannot disagree about what the run did, and the mode
+semantics, errors and the secret's lifetime are `protect`'s unchanged.
+```rust
+pub struct ProtectSummary {               // swp-sdk/src/protect.rs:173-231
+    pub mode: Mode,                       // serializes snake_case: `dry_run`, not `dry-run`
+    pub project_id: ProjectId,
+    pub release_id: ReleaseId,            // pass it back to apply this constellation
+    pub created_at: Timestamp,
+    pub revision: Option<String>,
+    pub fingerprint: Digest,              // public SHA-256 of the tree; §16
+    pub fingerprint_level: String,
+    pub tag_bits: u8,
+    pub requested_sites: u32,
+    pub target_sites: u32,                // after the ceilings trimmed it
+    pub sites_embedded: u32,
+    pub sites_skipped: u32,
+    pub files_walked: usize,
+    pub files_in_scope: usize,
+    pub candidates: usize,
+    pub files_changed: Vec<ProtectedFile>, // file, sites, bytes_before, bytes_after
+    pub sites: Vec<ProtectedSite>,        // file, line_hint, language, adapter, class,
+                                          // family, width, primary — one per embedded site
+    pub refusals: Vec<RefusedSite>,       // file, line_hint, reason — one per skipped candidate
+    pub artifacts: Vec<String>,           // in write order; empty for `dry_run`
+    pub notes: Vec<String>,
+}
+```
+
+What is *not* here, and what each absence is: the plan's four keyed identities per
+site (a `LocationId` is `HMAC(site_key, …)` truncated to 128 bits — not a key and
+not invertible, but a cross-release join address for one project's source layout,
+which is why `swp protect --format json` prints zero of them and this result carries
+zero of them); the refusal's `detail` sentence, because a dropped site's sentence
+is `no family reachable here rendered code <n>` with `<n>` a rendered tag
+(`swp-embedding/src/apply.rs:235, :256-266`, copied into the plan at
+`plan.rs:132-139`); and the plan document itself, which a binding has no use for —
+nothing downstream of a protection run reads a plan id, and M5 of the ADR measured
+that a release applies from its release id without the plan being an FFI object.
+
+`notes` crosses because every string that can appear there was read, not because it
+is a `String`. Seven push sites in five files, all in `swp-embedding`: `candidates.rs:358-361,
+:385-388` (a path with a count of literals left out; the limits in force),
+`plan.rs:155-157` — one line per walk omission, whose reason is fixed prose, a path,
+a byte count or a limit number (`walk.rs:239-424`) — `plan.rs:158-164` with
+`select.rs:312-320` (the shortfall line: two counts of sites), `protect.rs:274-278,
+:281-286` (the `plan`/`dry_run` explanations) and `:377-381` (how many files were
+modified). None interpolates a key, a keyed id or a tag.
+
+The claim is checked three ways, not asserted. `binding_surface` parses this
+struct's field types and field *names* and fails on a keyed type or a keyed name
+whatever type it carries. `sdk_parity` runs one tree through both doors and compares
+22 keys of `swp protect --format json` against the serialized summary
+key-for-key (`the_binding_facing_account_matches_the_cli_document_key_for_key`),
+draws one plan twice and proves the summary is the outcome minus `locations` and
+`detail`, then sweeps the summary's JSON and `Debug` against that run's own location
+ids — four per embedded site, read off that same plan (`the_summary_is_the_same_run_with_every_keyed_site_identity_left_behind`),
+and compares a release run through either door
+(`a_release_through_the_binding_door_reports_the_same_run_as_the_cli_document`).
+`no_value_the_sdk_hands_back_prints_the_key_it_just_used` sweeps this value for the
+root secret and a derived per-location MAC along with every other artifact the SDK
+hands back.
+
+For a caller, the shape is what makes it wrappable: owned `String`s and integers, no
+borrow of the `Session`, no handle into the store, nothing to free or zeroize across
+an FFI boundary, and `Serialize` so the JSON a binding shows is this document. It is
+also `PartialEq`/`Eq`, which the other result envelopes are not, because a test and a
+binding alike need to compare two accounts of a run.
 
 ## 5. `Session::scan(candidate, releases, save) -> ScanOutcome`
 
@@ -572,7 +650,7 @@ the design, each with the reason the audit supports.
   cannot be printed, cloned, serialized, or read back out as bytes.
 * **What that wall is not made of.** The façade withholds keyed material from its own
   signatures; it does not sandbox the store. `Session::open_store()`
-  (`session.rs:221-231`) is public, `Store` is re-exported (`lib.rs:98`), and
+  (`session.rs:221-231`) is public, `Store` is re-exported (`lib.rs:101`), and
   `Store::load_root` (`swp-identity/src/store.rs:306`), `read_private_manifest`
   (`:358`) and `root_key_path` (`:86`) are public methods of that re-exported type — so
   a Rust caller that wants them can take a second handle and read them, exactly as
@@ -625,10 +703,10 @@ when the file and the crate disagree in either direction.
 
 **Modules.** `capabilities`, `init`, `protect`, `report`, `scan`, `session`,
 `verify` — all `pub mod`, and each one's items are also re-exported at the crate
-root (`lib.rs:84-98`), so `swp_sdk::Session` and `swp_sdk::session::Session` are
+root (`lib.rs:85-101`), so `swp_sdk::Session` and `swp_sdk::session::Session` are
 one type.
 
-**Crate-level items.** `VERSION: &str` (`lib.rs:102`) and `banner()` (`:110`) —
+**Crate-level items.** `VERSION: &str` (`lib.rs:105`) and `banner()` (`:113`) —
 one function, because the same sentence goes into a report's `generator` field and
 into `swp --version`, and a library build and a CLI build that described
 themselves differently would put two generators on one release.
@@ -671,7 +749,7 @@ coherent settings document. An invalid patch is a `USAGE` error from
 | openers | `init(project_root, &InitOptions) -> InitOutcome` (associated), `open(&Path, &Overrides)`, `discover(&Path, &Overrides)` |
 | what the project is | `identity()`, `config()`, `stored_config()`, `limits()`, `warnings()`, `project_root()`, `open_store()` |
 | which releases | `releases(&ReleaseSelection)`, `one_release(&ReleaseSelection)`, `release_history()`, `release(&ReleaseId)` |
-| the operations | `protect(&ProtectOptions)`, `verify(&VerifyOptions)`, `scan(&Path, &ReleaseSelection, bool)`, `reports()`, `read_report(&str)` |
+| the operations | `protect(&ProtectOptions)`, `protect_summary(&ProtectOptions)`, `verify(&VerifyOptions)`, `scan(&Path, &ReleaseSelection, bool)`, `reports()`, `read_report(&str)` |
 
 `config()` is the stored config *with this run's overrides applied*;
 `stored_config()` is the file on disk, unchanged, for a caller that must not act on
@@ -692,8 +770,12 @@ with it — Rust-only, never wrapped by a binding.
 of the default constellation (§9's no-hard-coded-site-count rule) and a caller that
 wants to explain a number must be able to compute it.
 
-**`protect`** — `ProtectOptions` (`protect.rs:35-57`) + `ProtectOptions::new(Mode)`
-(`:62`), `ProtectOutcome` (`:73-84`). **No `Default`** on `ProtectOptions`, by the
+**`protect`** — `ProtectOptions` (`protect.rs:45-67`) + `ProtectOptions::new(Mode)`
+(`:72`), `ProtectOutcome` (`:83-94`), and the binding-facing account of the same run
+`ProtectSummary` (`:173-231`) with its three row types `ProtectedFile` (`:102`),
+`ProtectedSite` (`:119`) and `RefusedSite` (`:149`), returned by
+`Session::protect_summary` (`:247`) and built by the one private projection
+`summarize` (`:258`). **No `Default`** on `ProtectOptions`, by the
 reason stated in §4.
 
 **`verify`** — `VerifyOptions` (`verify.rs:27-44`, `Default`), `VerifyOutcome`
@@ -719,6 +801,15 @@ fields and are read field by field, not serialized: a binding that wants JSON of
 `ScanOutcome` serializes `report`, which is the artifact that has a schema.
 `VerifyOutcome` is `Debug` only (it holds the document by value), and `InitOutcome`
 derives nothing so that it can hold a `Session` and stay moveable.
+
+`ProtectSummary` and its three row types are the exception, and deliberately: they
+derive `Debug`/`Clone`/`PartialEq`/`Eq`/`Serialize` and nothing else. No
+`Deserialize` — a summary is what a run said, not something to be authored — and no
+borrowed fields, so the value an FFI caller receives is one it can keep, compare and
+print without holding the `Session` that produced it. It is serialized by a binding
+because there is no schema for it to obey; `swp protect --format json` remains the
+documented, versioned artifact, and this is the Rust-side account that a caller
+outside Rust can be given.
 
 **The keyed-material boundary, by name.** These items are how the façade reaches what
 §10 refuses. All but the last are not `pub`, and the last is the one place the surface
@@ -750,7 +841,12 @@ site identity, not a key, and not a tag, and the first thing a binding would pri
 it were free to walk the struct. Hence `protect`/`ProtectOutcome` as `pending` and
 `LocationId`/`Plan`/`PlannedSite`/`Protection` as `forbidden` in the boundary file,
 with the field read by a `const` closure in the suite so the classification changes
-only when the field does. And `open_store` in the table above is the only row marked
+only when the field does. The operation is not therefore unavailable to a binding:
+`Session::protect_summary` returns the same run projected onto fields that carry no
+key, and it is the door the boundary file names for protection. `protect` stays
+`pending` because narrowing *its* result to this shape is a `MAJOR` change to the
+Rust API (§11 of `VERSIONING_POLICY.md`), not because nothing crosses.
+And `open_store` in the table above is the only row marked
 `pub`; the row exists because being public is a fact about the Rust API, not a
 licence for a binding to wrap it.
 
@@ -806,8 +902,15 @@ this boundary exists to prevent.
   `forbidden` (would hand a caller keyed or private material), `pending` (meant to
   cross, blocked by a named item), `sealed` (must not become public at all) — and the
   `binding_surface` suite is what keeps the file describing this crate.
-  Every *type* in §11's list is `binding_facing`: it is the surface the Rust caller
-  reads, and `swp-cli` reads the same fields to print. Two items are `rust_only`, and
+  Every type in §11's list is `binding_facing` — it is the surface the Rust caller
+  reads, and `swp-cli` reads the same fields to print — except the two that §4
+  explains: `Session::protect` and `ProtectOutcome`, both `pending`, blocked by the
+  keyed plan their result reaches, with `Session::protect_summary` as the door that
+  crosses today. And one of §11's re-export list is not `binding_facing` at all:
+  `Protection` comes out of `swp-embedding` at `lib.rs:99` because `ProtectOutcome`
+  holds it, and the boundary marks it `forbidden` for the reason §4 gives. Naming a
+  type in a public signature and offering it to a binding are different decisions,
+  and the file keeps them apart. Two items are `rust_only`, and
   both are in §10: `Session::open_store()` — it hands back the store
   handle, which is a capability rather than a value, and a binding that wrapped it
   would offer `swp inspect manifest` as a method — and `Store` itself. That leaves the

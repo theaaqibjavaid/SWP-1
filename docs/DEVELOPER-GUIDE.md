@@ -174,8 +174,10 @@ distinct commands must be covered.
 `PAGES` is the index the suite reads, and it is a page's claim to be checked, not
 a directory listing. A page that quotes no output — the Beta 3 design set
 (`docs/BETA3_ARCHITECTURE_AUDIT.md`, `docs/SDK_ARCHITECTURE.md`, `docs/SDK_API.md`,
-`docs/VERSIONING_POLICY.md`) describes an interface this build does not have yet,
-and prints nothing — is deliberately outside it, because adding it would assert a
+`docs/VERSIONING_POLICY.md`) and any decision record under `docs/adr/`, which
+describe an interface this build does not have yet, state numbers only as the output
+of a harness run in this suite rather than as a transcript, and print nothing — is
+deliberately outside it, because adding it would assert a
 coverage the page does not ask for. The cost is real and is the one to weigh when
 one of those pages grows: prose commands named there are not parsed, so the suite
 will not catch a flag that does not exist. Add a transcript to a page and the page
