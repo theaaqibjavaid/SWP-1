@@ -479,9 +479,10 @@ page that wants one cites it rather than printing its own.
 
 Each step is a commit-sized change with the full gate on it
 (`AGENTS.md`'s list, in that order), and none of them depends on a later one to
-be correct. Beta 3.1 landed steps 1, 2 and 3 and the crate part of step 6; steps
-4 and 5 have not started. The list below is the plan as approved, with what
-actually happened marked on it.
+be correct. The Rust landing shipped with Beta 3 covers steps 1, 2 and 3, the crate
+part of step 6, and the binding-surface freeze §6 records; steps 4 and 5 have not
+started. The list below is the plan as approved, with what actually happened marked
+on it.
 
 1. **`swp-sdk` as an extraction.** `Session`, `Error`, `catch_unwind`, and the
    moved composition from `ctx.rs` — no new behaviour, no binding dependency.

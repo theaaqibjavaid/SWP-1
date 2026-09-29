@@ -94,7 +94,7 @@ path = "tests/acceptance/final_scenario.rs"
 name = "docs_examples"
 path = "tests/docs/examples.rs"
 
-# Beta 3.1: the CLI and the SDK driven over one state, and their answers compared
+# Beta 3: the CLI and the SDK driven over one state, and their answers compared
 # as data — the extraction is only an extraction if this passes.
 [[test]]
 name = "sdk_parity"

@@ -13,10 +13,10 @@ three must agree on. The rationale for the boundary is in
 [VERSIONING_POLICY.md](VERSIONING_POLICY.md) governs which of these values may
 change without a protocol change.
 
-As of Beta 3.1 the Rust side of this contract exists: `crates/swp-sdk` implements
-it, §11 lists the shipped surface, and the citations below point at that crate. Two
-things this page once held back — `verify` (§6) and the per-site scan rows (§5) —
-are now exposed as described there.
+The Rust side of this contract exists: `crates/swp-sdk` implements it, §11 lists the
+shipped surface, and the citations below point at that crate. Two things this page
+once held back — `verify` (§6) and the per-site scan rows (§5) — are now exposed as
+described there.
 
 Conventions used below:
 
