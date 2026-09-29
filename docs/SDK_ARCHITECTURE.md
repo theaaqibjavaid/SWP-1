@@ -516,11 +516,11 @@ on it.
    *Not started.*
 6. **Release wiring.** `swp-sdk` into `check-release.sh`'s `PUBLISHABLE` order,
    publish job, binding version policy applied
-   ([VERSIONING_POLICY.md](VERSIONING_POLICY.md)), CHANGELOG entries. *The first
-   of these four landed with the crate: `PUBLISHABLE` is ten crates with
-   `swp-sdk` between `swp-evidence` and `swp-cli`. The publish job, the binding
-   version policy and the CHANGELOG entry are still open, and the binding half of
-   them is gated on steps 4 and 5.*
+   ([VERSIONING_POLICY.md](VERSIONING_POLICY.md)), CHANGELOG entries. *Two of these
+   four have landed: `PUBLISHABLE` is ten crates with `swp-sdk` between `swp-evidence`
+   and `swp-cli`, and the Beta 3 CHANGELOG entry is part of the version preparation on
+   this branch. The publish job and the binding version policy are still open, and the
+   binding half of them is gated on steps 4 and 5.*
 
 Steps 1-3 are Rust-only and shippable on their own: they make the implementation
 embeddable whether or not a wheel is ever built. That ordering is deliberate —

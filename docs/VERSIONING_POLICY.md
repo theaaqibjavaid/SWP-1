@@ -18,7 +18,7 @@ it. Nothing below is such a value.
 | canonicalizer | `V1` | `version.rs:68` | the L1/L2/L3 rules change. Recorded per identity and re-checked per release: a disagreement is `RELEASE_MISMATCH` (`swp-detection/src/index.rs:128-144`) |
 | report schema | `SWP-1-report-v2` | `swp-evidence/src/report.rs:36`, `SchemaVersion::REPORT_V2` | grading arithmetic, field set, or meaning. A reader that does not recognise it refuses the document (`report.rs:147-154`) |
 | other artifact schemas | `SWP-1-manifest-v1`, `-identity-v1`, `-plan-v1` | `version.rs:44-52` | the stored documents' shape. Checked on read, same rule |
-| Rust crate version | `1.0.0-beta.2` | `[workspace.package] version`, inherited by all eleven workspace members; `check-release.sh:43-50` fails if one of the ten *publishable* crates is not pinned to it | a release. There is exactly one version across the workspace, and `swp-sdk` holds it |
+| Rust crate version | `1.0.0-beta.3` | `[workspace.package] version`, inherited by all eleven workspace members; `check-release.sh:43-50` fails if one of the ten *publishable* crates is not pinned to it | a release. There is exactly one version across the workspace, and `swp-sdk` holds it |
 | CLI version | same string | `swp_cli::VERSION` (`swp-cli/src/lib.rs:57`) | never independently |
 | binding package version | none yet | the wheel's / the npm package's own metadata | the binding's own surface, or the façade it wraps |
 | runtime support | CPython ≥ 3.10; Node per §4 | package metadata, binding README | the binding's floor, and only as a *major* |
