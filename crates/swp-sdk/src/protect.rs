@@ -200,7 +200,7 @@ pub struct ProtectSummary {
     pub files_in_scope: usize,
     /// Literals that could have carried a fragment.
     pub candidates: usize,
-    /// Every file rewritten, in write order. Empty for `plan` and `dry_run`.
+    /// Every file the constellation lands in, in write order. Only `release` writes them.
     pub files_changed: Vec<ProtectedFile>,
     /// Every site the release carries, in plan order. Its length is
     /// [`sites_embedded`](Self::sites_embedded).
