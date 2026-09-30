@@ -127,11 +127,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip maturin
           maturin build --release --locked -j 2
-      # The step-level `shell: bash` here is now redundant with the job's
-      # `defaults.run.shell: bash`; the comment kept is the one that still names
-      # the reason: a PowerShell step on a Windows runner would expand
-      # `target/wheels/*.whl` differently from a bash step, and a spell that
-      # needs quoting to read on every platform is not one worth proving.
+      # `target/wheels/*.whl` is a glob; on a Windows runner a PowerShell step
+      # would expand it with Windows rules, and the spell would need quoting to
+      # read on every platform. The job's `shell: bash` keeps one spelling.
       - name: install and run the suite
         working-directory: bindings/python
         run: |
