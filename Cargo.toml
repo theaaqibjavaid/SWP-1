@@ -45,7 +45,7 @@ swp-test-suite = { path = "crates/swp-test-suite" }
 # keeps its own older copies in the graph, and nothing of ours crosses to them.
 sha2 = "0.11"
 hmac = "0.13"
-ed25519-dalek = { version = "2", features = ["rand_core"] }
+ed25519-dalek = { version = "3", features = ["rand_core"] }
 getrandom = "0.3"
 subtle = "2"
 zeroize = { version = "1", features = ["derive"] }
