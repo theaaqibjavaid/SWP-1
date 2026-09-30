@@ -491,7 +491,7 @@ not your reports, not a usage ping — and requires no account, server or regist
 That is not a preference with a config switch: nothing in the dependency graph
 can open a connection, and the three grammars are compiled into `swp-adapters` as
 prebuilt sources, so a build on a machine with no network succeeds. The shipped
-binary pulls 77 third-party crates transitively — `serde`, `sha2`, `curve25519`,
+binary pulls 80 third-party crates transitively — `serde`, `sha2`, `curve25519`,
 archive readers, the grammars, and their proc-macro machinery — and none of them
 is an HTTP client or a socket library.
 
