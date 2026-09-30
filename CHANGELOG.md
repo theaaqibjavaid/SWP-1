@@ -20,6 +20,77 @@ every claim of that kind here was run before it was written
 An entry appears here between a change being merged and the tag that carries it,
 and not before.
 
+## [1.0.0-beta.4] - 2026-09-30
+
+The release that answered the limitation `1.0.0-beta.3` recorded, and then took the
+dependency updates that had been waiting behind it. What a user runs is still the
+same seven commands with the same options, the same exit codes and the same report:
+the protocol, every stored artifact's schema, the key derivation and the verdict
+arithmetic are `1.0.0-beta.3`'s. No foreign binding ships in this release.
+
+### Added
+
+**`Session::protect_summary`, the account of a protect run without its plan.**
+`ProtectSummary` — twenty fields — with its three row types `ProtectedFile`,
+`ProtectedSite` and `RefusedSite` carries the release id, the counts, which files
+were touched, which sites went in, and which locations were refused; it carries no
+keyed site identity. One private projection (`swp-sdk/src/protect.rs:258`) builds it
+out of the `ProtectOutcome` that `protect` already returns, so the library keeps one
+bookkeeping path rather than two that can disagree. `protect` and `ProtectOutcome`
+are still classified `pending` and that is unchanged; what moved is that a future
+Python or Node binding has a documented door to be written against.
+[`docs/BINDING_SURFACE.json`](docs/BINDING_SURFACE.json) counts 78 binding-facing
+items where `1.0.0-beta.3` counted 73, and `binding_surface` still fails the build
+when the crate and that file disagree in either direction.
+[ADR-0001](docs/adr/0001-protect-generate-binding-boundary.md) is accepted and
+implemented.
+
+### Changed
+
+**`sha2` 0.10.9 → 0.11.0, with `hmac` 0.12.1 → 0.13.0.** The hash bump on its own
+does not compile: `hmac` 0.12 sits on `digest` 0.10, so `Hmac<Sha256>` has no
+`KeyInit` inside the 0.11 universe the two crates must share. Construction now goes
+through `KeyInit::new_from_slice` at the two HMAC call sites,
+`swp-crypto/src/derive.rs:92` and `swp-crypto/src/secret.rs:98`.
+
+**`ed25519-dalek` 2.2.0 → 3.0.0**, which brings `ed25519` 3.0.0, `signature` 3.0.0,
+`curve25519-dalek` 5.0.0 and `rand_core` 0.10.1, and drops the PKCS#8 stack (`der`,
+`pkcs8`, `spki`, `base64ct`) that the crate used to carry. No call site moved: this
+project signs with `SigningKey::sign` and checks with `VerifyingKey::verify` over the
+canonical JSON of a document, and the bump needed only a manifest and a lockfile.
+
+**`thiserror` 2.0.20 → 2.0.21, and `tree-sitter-python` 0.23.6 → 0.25.0.** A grammar
+version is not a dialect: the Python adapter matches on node-kind strings, so
+`family_roundtrip` and `detection_matrix` re-run the corpora against the new grammar
+rather than assuming 0.25 parses the way 0.23 did.
+
+**One digest universe, and the count that goes with it.** `cargo tree --locked` on
+this tree resolves exactly one `sha2` (0.11.0) and one `digest` (0.11.3); the only
+name still present in two versions is `syn` (2.0.119 and 3.0.6), which is proc-macro
+machinery and links nothing at runtime. The shipped binary now pulls 80 third-party
+crates transitively where it pulled 77 — `const-oid`, `ctutils`, `cmov` and
+`hybrid-array` arrive with the new `digest`, `generic-array` leaves — and
+[docs/SECURITY.md](docs/SECURITY.md) states 80 for the same reason this page does:
+the number is a measurement, and it moved.
+
+### Compatibility, checked rather than assumed
+
+Every derivation is pinned in the test suite — `pinned_derivation_vectors`,
+`pinned_project_id_vector`, `pinned_site_identity_vector` — so a dependency that
+computed a different SHA-256, a different HMAC, or a different site identity would
+fail the build instead of quietly re-keying a project.
+
+What the pins do not cover is a stored ed25519 *signature*: no test carries one
+across a dependency version, so it was checked by hand on 2026-09-30 with two builds
+of this tree. A project protected by the pre-`ed25519-dalek`-3 build verifies under
+this one (`manifest authenticated`, verdict `INTACT`, exit 0), a project protected by
+this build verifies under that one, and a release record with one character of its
+signature flipped is refused by both with `INVALID_MANIFEST` and exit 5 — which is
+what makes the two passing runs a measurement rather than a check that always says
+yes. A tree protected by `1.0.0-beta.3` therefore stays verifiable by this build, and
+its public release records stay readable. Saved reports are unaffected in either
+direction: `SWP-1-report-v2` and the arithmetic behind the grade did not move here.
+
 ## [1.0.0-beta.3] - 2026-09-29
 
 The release that moved the implementation rather than the product. What a user runs is
@@ -244,7 +315,8 @@ These are absences with reasons, not a backlog:
   protected literal leaves nothing to key on, and produces the same report as an
   original. `NO_PROVENANCE_DETECTED` is not a finding of originality.
 
-[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.3...HEAD
+[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.4...HEAD
+[1.0.0-beta.4]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.1
