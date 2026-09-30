@@ -15,7 +15,7 @@
 //!    separator strings would collide, and the field count is prefixed too so a
 //!    trailing empty field is distinct from no field.
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
 use swp_core::error::SwpError;
@@ -88,7 +88,8 @@ pub fn derivation_message(domain: Domain, fields: &[&[u8]]) -> Vec<u8> {
 }
 
 fn hmac(key: &[u8], msg: &[u8]) -> [u8; 32] {
-    let mut m = <Hmac<Sha256> as Mac>::new_from_slice(key).expect("HMAC accepts any key length");
+    let mut m =
+        <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("HMAC accepts any key length");
     m.update(msg);
     m.finalize().into_bytes().into()
 }

@@ -93,7 +93,7 @@ impl RootSecret {
     /// recognised as the right one, without any path from the printed value back
     /// to the key.
     pub fn fingerprint(&self) -> String {
-        use hmac::{Hmac, Mac};
+        use hmac::{Hmac, KeyInit, Mac};
         use sha2::Sha256;
         let mut mac = Hmac::<Sha256>::new_from_slice(CHECK_VALUE_LABEL)
             .expect("label length is valid for HMAC");
