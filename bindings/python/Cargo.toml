@@ -1,0 +1,40 @@
+[package]
+name = "swp-python"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+description = "Python extension for SWP-1, the source-provenance watermark: the swp-sdk session, protect, verify and scan operations as native Python objects."
+license = "Apache-2.0"
+repository = "https://github.com/theaaqibjavaid/SWP-1"
+documentation = "https://github.com/theaaqibjavaid/SWP-1/tree/main/docs"
+keywords = ["watermarking", "provenance", "supply-chain", "code-analysis"]
+categories = ["development-tools", "filesystem"]
+# `cdylib` alone: this crate is loaded by an interpreter, and it is not a library
+# anybody links. `cargo test` against it would need an `rlib`, and the tests here
+# are Python tests for exactly that reason.
+publish = false
+
+[lib]
+name = "swp"
+crate-type = ["cdylib"]
+
+[workspace]
+# The empty table is what keeps this crate out of the repository's workspace.
+# Not a style choice: the published crates hold `rust-version = "1.85"`, and the
+# binding toolchain PyO3 asks for is newer than that. Inside the workspace, that
+# requirement would become the floor every crate advertises. See
+# docs/VERSIONING_POLICY.md §4 and docs/SDK_ARCHITECTURE.md §5.
+
+[dependencies]
+# The one product dependency, and the only one that could keep the boundary
+# intact: `swp-sdk` is the façade whose `binding_facing` surface
+# docs/BINDING_SURFACE.json records, so this crate cannot name a `Store`, a
+# `RootSecret` or a `LocationId` even by accident unless the SDK handed one out.
+swp-sdk = { path = "../../crates/swp-sdk" }
+# `extension-module` rather than a feature a build has to remember to pass: this
+# crate-type is only ever loaded by an interpreter, and a wheel built without the
+# feature would carry a link against one particular libpython.
+pyo3 = { version = "0.29.2", features = ["abi3-py310", "extension-module"] }
+# Used for exactly one thing: `VerifyDocument::to_json`, which has to be the
+# authoritative document rather than a rendering of a copy of it.
+serde_json = { version = "1", features = ["preserve_order"] }

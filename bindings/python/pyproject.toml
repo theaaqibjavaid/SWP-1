@@ -1,0 +1,60 @@
+[build-system]
+# `>=1.15,<2`: 1.15 is the release whose `module-name` handling for a top-level
+# extension module this layout depends on, and the major bound is what stops a
+# 2.x from changing it under a build.
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "jrs-swp"
+version = "0.1.0"
+description = "Native Python extension for the swp source-provenance watermark: open a project, protect a tree, verify a copy, read the evidence — through swp-sdk, with no subprocess and no second implementation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+keywords = ["provenance", "watermarking", "supply-chain", "software-composition"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Security",
+    "Topic :: Software Development :: Version Control",
+]
+
+# No dependencies at all. The extension carries the whole implementation, so a
+# wheel installed into an application adds nothing to its requirement set — which
+# is also why nothing here can pull a transitive package into a provenance tool's
+# own supply chain.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/theaaqibjavaid/SWP-1"
+Documentation = "https://github.com/theaaqibjavaid/SWP-1/tree/main/docs"
+Source = "https://github.com/theaaqibjavaid/SWP-1"
+
+[tool.maturin]
+# The import name, and there is no Python package behind it: `swp` *is* the
+# extension module. docs/SDK_ARCHITECTURE.md §5 chose this over a `swp/` package
+# wrapping `_swp`, because a wrapper layer is where a binding starts restating
+# Rust decisions in Python.
+module-name = "swp"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The suite writes real projects with real sealed secrets into temporary
+# directories, and one test sweeps every byte of them for key material. Leaving
+# those behind would be leaving key material in the system temp directory, so
+# nothing is kept; `--keep-tmp` is what a failing run gets read with.
+addopts = "-ra"
