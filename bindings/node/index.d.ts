@@ -9,16 +9,1048 @@
  */
 export declare const __napiBindingTarget: 'native' | 'wasm32-wasi' | 'wasm32-wasip1'
 
-/** The build this binding drives, in the words a report's `generator` uses. */
-export declare function banner(): string
+/** A project that is ready to protect, and what initializing it produced. */
+export declare class InitOutcome {
+  /** The opened session for the project `init` just created or re-opened. */
+  get session(): JsSession
+  /**
+   * What the run did: the identity, the seal's metadata, the measurement, the
+   * settings it wrote or left alone.
+   */
+  get result(): InitResult
+}
+export type JsInitOutcome = InitOutcome
 
-/** Lets the JS loader hand the addon its `SwpError` constructor. */
-export declare function installErrorFactory(ctor: new (code: string, message: string, path: string | null, causedBy: string | null, nextStep: string, rendered: string) => Error): void
+/** The whole document, as `swp-evidence` graded it. */
+export declare class Report {
+  /** `SWP-1-report-v2`. */
+  get schema(): string
+  /** The protocol this build speaks: `SWP-1`. */
+  get protocol(): string
+  get run(): Run
+  get candidate(): Candidate
+  /** `PROVENANCE_DETECTED`, `NO_PROVENANCE_DETECTED`, `INCONCLUSIVE`. */
+  get result(): string
+  /** The §23 level: `NONE`, `WEAK`, `MODERATE`, `STRONG`, `VERY_STRONG`. */
+  get evidenceLevel(): string
+  /**
+   * Why that level, one sentence per rule that fired, with the measured
+   * numbers.
+   */
+  get explanation(): Array<string>
+  /** One entry per release the candidate was scanned against, strongest first. */
+  get releases(): Array<ReleaseTally>
+  get evidence(): Array<EvidenceItem>
+  /** Files the walk refused, with the reason. */
+  get omissions(): Array<string>
+  /** Caveats: hypothesis caps, widths probed, containers not opened. */
+  get notes(): Array<string>
+  /**
+   * The §51 boundary, carried inside the document rather than left to a
+   * README.
+   */
+  get limitations(): Array<string>
+  /**
+   * What `swp scan` exits with: `0` nothing confirmed, `1` something was,
+   * `10` the scan could not have said either way.
+   */
+  exitCode(): number
+  /**
+   * Machine-readable form, pretty-printed with a trailing newline,
+   * byte-for-byte the document a saved report holds.
+   */
+  toJson(): string
+  /**
+   * The human-facing rendering, the same text `swp scan` prints. `full`
+   * prints every evidence item; without it the list is windowed and the
+   * remainder counted.
+   */
+  toText(full?: boolean | undefined | null): string
+  /**
+   * As `toText()`, with the evidence window sized by the caller — which is
+   * what `swp scan --limit <n>` asks for. Only the text is ever windowed.
+   */
+  toTextItems(items: number): string
+  /**
+   * Read a stored report back, refusing anything that is not this schema.
+   *
+   * A document from another schema is not damage: it is a record of
+   * arithmetic this build does not apply, and the refusal says so rather than
+   * re-grading it under rules it was not written under.
+   */
+  static fromJson(text: string): Report
+  /**
+   * The verdict line, and nothing else: this object's whole account is the
+   * document, and a `toString` that tried to list twelve fields would be a
+   * second copy of it in a log.
+   */
+  toString(): string
+}
+export type JsReport = Report
 
-export declare function probeAsync(mode: string): Promise<unknown>
+/** What a scan returned: the graded document, and where a saved copy went. */
+export declare class ScanOutcome {
+  /** The document `swp-evidence` graded, verbatim. */
+  get report(): Report
+  /**
+   * `undefined` unless the caller asked for a copy under
+   * `.swp/private/reports/`.
+   */
+  get saved(): SavedReport | null
+  /**
+   * Every site the scan looked for, in the order the releases were scanned
+   * and then the order the release records them.
+   */
+  get sites(): Array<ScannedSite>
+  /**
+   * The verdict word, the level, and how many sites were looked for — the
+   * three values a caller reads first, the Python `__repr__` carried across.
+   * The document itself is `report`.
+   */
+  toString(): string
+}
+export type JsScanOutcome = ScanOutcome
 
 /**
- * Probe: a synchronous failure arrives as the factory's object, not a
- * napi-synthesized `Error`.
+ * An opened SWP-1 project.
+ *
+ * Cloning a session is copying a path and two parsed documents: it opens
+ * nothing, locks nothing, and reads nothing. Two threads may hold two sessions
+ * for the same project, exactly as two shells can.
  */
-export declare function probeThrow(code: string): string
+export declare class Session {
+  /**
+   * Open the project rooted at `projectRoot`.
+   *
+   * A directory with no `.swp/` rejects with `code === "NOT_PROTECTED"`, and a
+   * store this build cannot read rejects with `PROTOCOL_VERSION_UNSUPPORTED`.
+   * Both are refusals to guess rather than partial results.
+   */
+  static open(projectRoot: string, overrides?: Overrides | undefined | null): Session
+  /** Walk up from `from` until a project root is found. */
+  static discover(from: string, overrides?: Overrides | undefined | null): Session
+  /**
+   * Draw and seal a project secret, measure the tree, and write the store.
+   *
+   * This is the one operation that creates a project, and the only place a
+   * root secret exists: it is drawn here, sealed by the operating system, and
+   * never returned. What comes back is *where* it went — `secretScheme` and
+   * `secretHandle` on the result — which is the whole of the disclosure.
+   * `init` on a directory that already has a `.swp/` is idempotent rather
+   * than an error: the existing identity and secret are kept (`preExisting`
+   * and `secretState === 'kept'` say so on the result), because SWP never
+   * replaces a project secret. Importing somebody else's secret is not
+   * offered, in any language.
+   */
+  static init(projectRoot: string, options?: InitOptions | undefined | null): InitOutcome
+  /** The directory the project is rooted at, as the caller named it. */
+  get projectRoot(): string
+  /**
+   * `.swp/public/identity.json` — the half of the identity meant to be
+   * distributed, and the one that needs no key to read.
+   */
+  get identity(): JsProjectIdentity
+  /** The `[protect]` settings in force for this session, overrides included. */
+  get config(): JsSwpConfig
+  /**
+   * What opening the project had to say about itself: a clamped limit, a
+   * config key it ignored, a stored config that did not validate.
+   */
+  get warnings(): Array<string>
+  /** The resource ceilings this build enforces. */
+  get limits(): JsLimits
+  /** The config as the file on disk reads, without this session's overrides. */
+  storedConfig(): JsSwpConfig
+  /** The release ids a selection names, in the order the store keeps them. */
+  releases(selection: ReleaseSelection): Array<string>
+  /** The one release a selection names, refusing a selection that names several. */
+  oneRelease(selection: ReleaseSelection): string
+  /** Every release record: the public history, signatures and all. */
+  releaseHistory(): Array<JsReleaseRecord>
+  /** One release record by id. */
+  release(releaseId: string): JsReleaseRecord
+  /**
+   * Protect the tree and await the summary of the run.
+   *
+   * This is the only protection operation on the class. The Rust `protect`
+   * returns the plan the run wrote, and that plan's site identities are keyed
+   * under the project secret; ADR-0001 settled that a foreign binding reads the
+   * summary instead, so `protectSummary` is that decision rather than a
+   * shorter spelling of the same call. Nothing about the run is smaller here:
+   * the same three modes, the same refusal list, the same release id.
+   *
+   * The returned promise settles exactly once and cannot be cancelled: there
+   * is no `AbortSignal` here because a cancelled protection can leave a tree
+   * half-rewritten, and a promise that outlives its caller's patience is the
+   * designed outcome.
+   */
+  protectSummary(options: ProtectOptions): Promise<unknown>
+  /** Grade this project's own tree against one of its releases. */
+  verify(options?: VerifyOptions | undefined | null): JsVerifyOutcome
+  /**
+   * Look for this project's provenance in a candidate tree or archive.
+   *
+   * `save` writes the document under `.swp/private/reports/`: it names your
+   * source paths and the sites you protect, so it belongs with the secret and
+   * not with the release. Like `protectSummary`, the promise settles once and
+   * cannot be cancelled — a cancelled scan can leave a half-saved report.
+   */
+  scan(candidate: string, releases?: ReleaseSelection | undefined | null, save?: boolean | undefined | null): Promise<unknown>
+  /** The names of the reports this store holds, newest first. */
+  reports(): Array<string>
+  /** Read one saved report back as the document it says it is. */
+  readReport(name: string): StoredReport
+  /**
+   * The root and the project id, and nothing else. A session is a path and
+   * two parsed documents, and this is the whole of what it can be asked to
+   * print — the Node counterpart of the Python `__repr__`, kept off
+   * `console.log`'s own property dump so there is one obvious line to put in
+   * a log.
+   */
+  toString(): string
+}
+export type JsSession = Session
+
+/** One saved report, and where it came from. */
+export declare class StoredReport {
+  /**
+   * The document as it was graded. Re-serializing it yields the stored bytes
+   * unchanged, because the report *is* this type.
+   */
+  get report(): Report
+  /** The name `readReport` takes for this document. */
+  get name(): string
+  /** Store-relative and forward-slashed. */
+  get path(): string
+  toString(): string
+}
+export type JsStoredReport = StoredReport
+
+/** A verification's answer: the document, and where a saved copy went. */
+export declare class VerifyOutcome {
+  /** `SWP-1-verify-v1`. */
+  get schema(): string
+  /** The protocol this document speaks: `SWP-1`. */
+  get protocol(): string
+  get projectId(): string
+  get displayName(): string
+  /** How the tree being verified was described by the code that opened it. */
+  get tree(): string
+  get releaseId(): string
+  /** RFC 3339, UTC, as the release record recorded it. */
+  get releaseCreatedAt(): string
+  /** `'content'`, or the label `revision` stated. Display metadata only. */
+  get revision(): string | null
+  /**
+   * Whether the release's manifest authenticated against the identity in
+   * `.swp/public/identity.json` — the precondition for every claim below.
+   */
+  get manifestAuthenticated(): boolean
+  get sitesExpected(): number
+  get sitesConfirmed(): number
+  get sitesExact(): number
+  get sitesStripped(): number
+  get sitesAbsent(): number
+  get sitesMoved(): number
+  get sitesRefactored(): number
+  get tagBits(): number
+  /** Keyed bits the confirmed sites carry. */
+  get confirmedBits(): number
+  get filesScanned(): number
+  get bytesScanned(): number
+  /**
+   * `'match'`, `'no-match'` or `'not-comparable'`: did the tree hash to the
+   * §16 fingerprint this release published?
+   */
+  get fingerprint(): string
+  /** The fingerprint this release published, hex. */
+  get fingerprintExpected(): string
+  /** `INTACT`, `INCOMPLETE` or `INCONCLUSIVE` — the document's own word. */
+  get verdict(): string
+  /**
+   * True when some of the tree was never read, which is what separates
+   * `INCOMPLETE` from `INCONCLUSIVE`.
+   */
+  get partial(): boolean
+  /** Every site of the release, in the order the document records them. */
+  get sites(): Array<SiteRow>
+  /** Rows the text rendering left out, counted rather than hidden. */
+  get omittedRows(): number
+  get omissions(): Array<string>
+  get notes(): Array<string>
+  /** Where `save` wrote the underlying `SWP-1-report-v2` copy, when it did. */
+  get reportSaved(): string | null
+  /**
+   * The §51 boundary, carried inside the document so a forwarded copy cannot
+   * lose it.
+   */
+  get limitations(): Array<string>
+  /** What the tool would suggest next, as sentences in the document. */
+  get next(): Array<string>
+  /**
+   * The code a shell would have got, as data: `0` intact, `5` a site is not
+   * carrying its code, `10` this run could not have said either way.
+   */
+  get exitCode(): number
+  /**
+   * The document as its schema defines it — the same bytes `swp verify
+   * --format json` prints, because this is the same value `swp-evidence`
+   * graded.
+   */
+  toJson(): string
+  /**
+   * The release, the verdict and the confirmation count — the line a log
+   * carries, while `toJson()` is the document.
+   */
+  toString(): string
+}
+export type JsVerifyOutcome = VerifyOutcome
+
+/**
+ * Whether a language was parsed by an AST adapter or fell back to the lexical
+ * one.
+ */
+export interface AdapterUse {
+  language: string
+  mode: string
+  files: number
+}
+
+/**
+ * The build this binding drives, in the words a report's `generator` field
+ * uses.
+ *
+ * One sentence rather than two guesses: this is the same string `swp
+ * --version` prints and the same one a saved document records, so a finding
+ * made through Node and a finding made through the CLI name the same rules.
+ */
+export declare function banner(): string
+
+/**
+ * The binding's own version. Two numbers with two lifecycles: an addon can be
+ * rebuilt for a Node fix without the protocol or the tool moving, and
+ * `docs/VERSIONING_POLICY.md` §1 keeps them apart.
+ */
+export declare const BINDING_VERSION: string
+
+/** The `candidate` block: what was looked at, and how completely. */
+export interface Candidate {
+  /** How the input was described on the command line, or where it was staged. */
+  described: string
+  /** `'file'`, `'directory'`, `'zip'`, `'tar'`, `'tar.gz'`, … */
+  kind: string
+  filesScanned: number
+  bytesScanned: number
+  /** True when something in the candidate was not examined. */
+  partial: boolean
+}
+
+/**
+ * The machine-readable answer to "what can this build do".
+ *
+ * It touches nothing: no filesystem, no project, no secret. It cannot fail.
+ */
+export declare function capabilities(): Capabilities
+
+/** Everything about this build a caller may need to know without asking a human. */
+export interface Capabilities {
+  protocol: string
+  swpVersion: string
+  reportSchema: string
+  canonicalizerVersion: number
+  languages: Array<JsLanguageInfo>
+  /**
+   * The parsed language names on their own, for a caller that only branches
+   * on them.
+   */
+  languageNames: Array<string>
+  tagBits: JsTagRange
+  targetSites: JsSiteRange
+  defaults: JsDefaultPolicy
+}
+
+/** The settings a project starts from before it edits its config. */
+export interface DefaultPolicy {
+  /** Directories and patterns never walked, whatever a project configures. */
+  excludes: Array<string>
+}
+
+/**
+ * Every failure code this build can raise, in the order the Rust table lists
+ * them.
+ *
+ * The codes are the stable half of the error contract; the messages are not. A
+ * caller branches on `error.code`, and this is the list to check a branch
+ * against. What is deliberately *not* here is `ErrorCode::exit_code`, which is
+ * `swp`'s contract with a shell and not a library caller's: the two numbers
+ * that do reach Node are a [`Report`](report::JsReport)'s and a
+ * [`VerifyOutcome`](verify::JsVerifyOutcome)'s, and there they are fields of a
+ * document.
+ */
+export declare function errorCodes(): Array<string>
+
+/** One thing a scan observed. */
+export interface EvidenceItem {
+  /** Stable handle for a citation: `EV-001`. Ordering is deterministic. */
+  id: string
+  /**
+   * `EXACT_SOURCE_MATCH`, `WATERMARK_FRAGMENT_MATCH`,
+   * `PARTIAL_WATERMARK_MATCH`, `CANONICAL_MATCH`, `STRUCTURAL_MATCH`,
+   * `TOKEN_MATCH`, `NEGATIVE_CONTROL`.
+   */
+  kind: string
+  projectId: string
+  releaseId: string
+  /** Where it was found in the candidate. */
+  location?: JsRegion
+  /**
+   * Where the corresponding site was in our protected release. Never a
+   * lookup key, but the line a reviewer opens first.
+   */
+  sourceRegion?: JsRegion
+  /** Why this counts, in words, with the measured numbers in it. */
+  basis: string
+  /** The strength of *this item*, on the same ladder as the overall level. */
+  strength: string
+  protocol: string
+  schema: number
+}
+
+/** The build that wrote a document. */
+export interface GeneratorInfo {
+  swpVersion: string
+  generator: string
+}
+
+/** What `Session.init` is told. */
+export interface InitOptions {
+  /** The label the project asked for. Never hashed, never trusted. */
+  name?: string
+  force?: boolean
+}
+
+/** What a store now holds, in the form an application can act on. */
+export interface InitResult {
+  projectId: string
+  displayName: string
+  /**
+   * Whether the store was already there. A pre-existing store keeps its
+   * identity and its secret: SWP never replaces a project secret.
+   */
+  preExisting: boolean
+  /** `'created'` when this run drew the secret, `'kept'` when one was there. */
+  secretState: string
+  /**
+   * `'dpapi'` or `'plain'` — how the key on disk is protected. On the plain
+   * path a caller that expected sealing has to be able to *see* that it did
+   * not get it, which is the whole reason this field crosses.
+   */
+  secretScheme: string
+  /**
+   * A 40-bit non-secret handle, so a restored `root.key` can be recognised as
+   * the same key without printing it.
+   */
+  secretHandle: string
+  /** Whether the access list on the private half was read back and checked. */
+  permissionsVerified: boolean
+  /** What that check saw, in the tool's own words. */
+  permissionsDetail: string
+  /** `'created'`, `'updated'`, `'already ignored'` or `'not written'`. */
+  gitignore: string
+  /** Paths this run created, store-relative and forward-slashed. */
+  created: Array<string>
+  /** Whether this run changed the project's display label. */
+  renamed: boolean
+  measurement: JsMeasurement
+  settings: JsSettings
+}
+
+/** A language this build analyzes, and the file names it answers to. */
+export interface LanguageInfo {
+  /** The stable identifier a manifest records. Never renamed. */
+  name: string
+  /** Lowercase, without the dot. */
+  extensions: Array<string>
+}
+
+/**
+ * The ceilings one operation will not go past. Byte-sized widths are `number`
+ * (`f64`) for the reason recorded at the top of `protect.rs`.
+ */
+export interface Limits {
+  maxFileBytes: number
+  maxParseBytes: number
+  maxNodesPerTree: number
+  maxDepth: number
+  maxParseMillis: number
+  maxFiles: number
+  maxTotalBytes: number
+  maxSitesPerFile: number
+  maxArchiveEntries: number
+  maxArchiveMemberBytes: number
+  maxArchiveExpandedBytes: number
+  maxArchiveRatio: number
+  /**
+   * `1` is "the container named on the command line and no further"; `0`
+   * refuses containers outright.
+   */
+  maxArchiveDepth: number
+  maxLocationsPerManifest: number
+  maxDigestSetEntries: number
+  maxShinglesPerRegion: number
+  maxRenderedItems: number
+}
+
+/** What the tree holds, measured the way a scan would measure it. */
+export interface Measurement {
+  /** Files with a parser-covered extension. */
+  files: number
+  bytes: number
+  /** Files skipped by the walk, whatever it skipped them for. */
+  skipped: number
+  /**
+   * Source files per language. `BTreeMap` order is the SDK's alphabetical
+   * order, and JSON preserves insertion order, so a caller that prints this
+   * prints it the same way every run.
+   */
+  languages: Record<string, number>
+  /**
+   * Source files per top-level directory, which is what `[protect] targets`
+   * is chosen from.
+   */
+  tops: Record<string, number>
+}
+
+/** The §8 `Overrides`: what one session's run changes about `[protect]`. */
+export interface Overrides {
+  /**
+   * Directories to protect, project-relative or absolute-inside-the-project,
+   * appended to the configured targets.
+   */
+  targets?: Array<string>
+  /** Patterns to skip, appended to `[protect] excludes`. */
+  excludes?: Array<string>
+  /** `[protect] target_sites`, when the caller chose a constellation size. */
+  targetSites?: number
+  /** `[protect] tag_bits`, when the caller chose a tag width. */
+  tagBits?: number
+  /**
+   * `[protect] embed_strings`, when the caller chose whether string literals
+   * carry marks.
+   */
+  embedStrings?: boolean
+}
+
+/** `.swp/public/identity.json`. */
+export interface ProjectIdentity {
+  protocol: string
+  schema: number
+  projectId: string
+  /** RFC 3339, UTC. */
+  createdAt: string
+  verification: JsPublicKeys
+  canonicalizerVersion: number
+  generator: JsGeneratorInfo
+  displayName: string
+}
+
+/** The `[protect]` table. */
+export interface ProtectConfig {
+  /** Paths, project-relative, that may hold protected source. */
+  targets: Array<string>
+  excludes: Array<string>
+  targetSites: number
+  tagBits: number
+  embedStrings: boolean
+}
+
+/** One file a protection run changes, or would change, and how much of it moves. */
+export interface ProtectedFile {
+  /** Canonical project-relative path, forward-slashed. */
+  file: string
+  /** Sites this run embedded in this file. */
+  sites: number
+  bytesBefore: number
+  bytesAfter: number
+}
+
+/**
+ * One site the release carries, as far as a caller outside Rust may see it.
+ *
+ * Which four keyed addresses a site answers to decides which tags a copy must
+ * carry, so a list of them is the private constellation in printable form. What
+ * a caller acts on is where the mark went and how it was carried, which is every
+ * field here.
+ */
+export interface ProtectedSite {
+  /** Canonical project-relative path. */
+  file: string
+  /**
+   * 1-based line in the protected text, where a reader will look. A hint: it
+   * is measured before the rewrite, so the line of a multi-line literal is
+   * approximate by design.
+   */
+  lineHint: number
+  language: string
+  /** `'ast'` or `'lexical'`: how much the tool understood here. */
+  adapter: string
+  /**
+   * `'integer'` or `'string'`. `class` is a reserved word only where the
+   * *parser* cares; an object property may carry the document's own key.
+   */
+  class: string
+  /** The equivalent-form family that carried the mark. */
+  family: string
+  /** Bits the tag carries, which equals `ProtectSummary.tag_bits`. */
+  width: number
+  /**
+   * The radius kind the tag derived from: `0` statement+identifiers, `1`
+   * scope+identifiers, `2` statement+names, `3` scope+names. A slot selector,
+   * not a key and not keyed material.
+   */
+  primary: number
+}
+
+/** What one `protectSummary` call is told. */
+export interface ProtectOptions {
+  /** A run that plans, applies or does neither. */
+  mode: 'plan' | 'release' | 'dry-run'
+  /**
+   * The release to write; `undefined` allocates one, which is the ordinary
+   * case. A plan is keyed by its release id, so applying a generated
+   * constellation requires passing back the id the plan reported.
+   */
+  releaseId?: string
+  /**
+   * A label for the source this run protected, recorded but never trusted.
+   * `undefined` records the content fingerprint; `''` records an
+   * intentionally-empty label — the same distinction `swp protect --revision`
+   * makes, carried here because JS can spell both.
+   */
+  revision?: string
+}
+
+/** What a protection run decided, as far as a caller outside Rust may see it. */
+export interface ProtectSummary {
+  /**
+   * Which of the three modes ran. Only `'release'` rewrites source; `'plan'`
+   * leaves a plan document in the private store and `'dry-run'` leaves
+   * nothing at all, which is what `artifacts` reports.
+   */
+  mode: 'plan' | 'release' | 'dry-run'
+  projectId: string
+  /**
+   * The release this run minted or was given. For `'plan'` this is the id to
+   * pass back as `releaseId` to apply the constellation, and passing a
+   * different one derives different keys and silently makes a second release.
+   */
+  releaseId: string
+  /** RFC 3339, UTC. */
+  createdAt: string
+  /**
+   * What the operator said the source was, trimmed; `undefined` when nothing
+   * was said. Display metadata, never hashed.
+   */
+  revision?: string
+  /** §16 fingerprint of the tree as it now stands, hex. */
+  fingerprint: string
+  /** How that fingerprint was taken, so a later tree can be compared honestly. */
+  fingerprintLevel: string
+  tagBits: number
+  /** Sites the caller asked for, before the ceilings trimmed it. */
+  requestedSites: number
+  /** Sites the ceilings allowed. */
+  targetSites: number
+  sitesEmbedded: number
+  sitesSkipped: number
+  /** Files analyzed inside the project's `[protect] targets`. */
+  filesWalked: number
+  /** Files counted into the fingerprint across the whole tree. */
+  filesInScope: number
+  /** Literals that could have carried a fragment. */
+  candidates: number
+  /**
+   * Every file the constellation lands in, in write order, with the byte
+   * counts of the rewrite it produces. `'release'` leaves those bytes on
+   * disk; `'plan'` and `'dry-run'` report the same list as what they *would*
+   * change and touch no source — so `mode` and `artifacts`, not this list,
+   * say whether the tree moved.
+   */
+  filesChanged: Array<JsProtectedFile>
+  /**
+   * Every site the release carries, in plan order. Its length is
+   * `sitesEmbedded`.
+   */
+  sites: Array<JsProtectedSite>
+  /**
+   * Every candidate the run did not use, in the order the refusals were
+   * recorded. Its length is `sitesSkipped`.
+   */
+  refusals: Array<JsRefusedSite>
+  /**
+   * Every artifact the run wrote, in write order: store-relative under
+   * `.swp/`, project-relative for protected source. Empty for `'dry-run'`.
+   */
+  artifacts: Array<string>
+  /** What the walk and the ceilings reported but did not act on. */
+  notes: Array<string>
+  /** How many files hold at least one embedded site. */
+  filesWithSites: number
+  /** The distinct languages this run wrote sites into, sorted. */
+  languages: Array<string>
+  /**
+   * The refusal tokens this run produced with how often each fired, sorted by
+   * token, so a caller that prints this prints the same thing every run.
+   */
+  refusalCounts: Array<JsRefusalCount>
+}
+
+/** The Ed25519 verify key, and the scheme that produced it. */
+export interface PublicKeys {
+  /** Base64. Public by design — releases are signed against it. */
+  verifyKeyB64: string
+  algorithm: string
+}
+
+/** One refusal token and its count. */
+export interface RefusalCount {
+  reason: string
+  count: number
+}
+
+/** One candidate location the run refused, and why. */
+export interface RefusedSite {
+  file: string
+  lineHint: number
+  /**
+   * `overlapping-radius`, `constellation-full`, `changed-after-scan`,
+   * `refused-by-validation`, and the other tokens `swp-embedding` uses.
+   */
+  reason: string
+}
+
+/** Where an observation was: a file, a line, and what was seen there. */
+export interface Region {
+  /** Project-relative path, forward slashes. */
+  file: string
+  /** One-based line, as the adapter counted it. */
+  line: number
+  /**
+   * The matched text, truncated to the report hint bound. Absent for a
+   * source-side region.
+   */
+  excerpt?: string
+  /** How many tokens the matched span covers. */
+  tokens?: number
+  /** Which of the release's four keyed radii reproduced this span. */
+  radii: Array<string>
+}
+
+/** A signed, public record of one protected release. */
+export interface ReleaseRecord {
+  protocol: string
+  schema: number
+  projectId: string
+  releaseId: string
+  createdAt: string
+  /**
+   * The revision string, when the record carries one: `git`, `manual`, or
+   * `content`. `undefined` means content-only, and is the common case for a
+   * project that is not under git. Display metadata — an attacker can write
+   * anything here, and the detector reads nothing from it.
+   */
+  revision?: string
+  /**
+   * `SHA-256` over the L1 canonical tree, hex. An exact copy reproduces it;
+   * a refactoring does not.
+   */
+  fingerprint: string
+  fingerprintLevel: string
+  /**
+   * The digest of the *private* manifest, hex. One-way, and published by
+   * design so a restored backup can be confirmed against it.
+   */
+  privateManifestDigest: string
+  watermark: JsWatermarkParams
+  generator: GeneratorInfo
+  /** The Ed25519 signature over this document, base64. */
+  signature: string
+  /**
+   * Why the record refuses itself, or `undefined` when it does not — the
+   * Python surface asks this as `validation_error()`; a plain object carries
+   * it as a field. It is still the Rust document's own `validate` answering:
+   * the binding re-derives none of its rules, and a record that does not
+   * validate is a reason to stop rather than a set of fields to print anyway.
+   */
+  validationError?: string
+}
+
+/**
+ * Which of a project's releases an operation reads. Omit it, and — exactly as in
+ * the CLI and in `swp-sdk` — every release the project has is loaded, because
+ * picking one silently would be an unstated claim about which.
+ */
+export interface ReleaseSelection {
+  /** Which of the three this is. */
+  kind: 'all' | 'latest' | 'ids'
+  /**
+   * The ids, for `'ids'` only. An id this project never published is an error
+   * at the call that uses the selection, not here.
+   */
+  ids?: Array<string>
+}
+
+/** One release's tally: the strongest match first. */
+export interface ReleaseTally {
+  projectId: string
+  releaseId: string
+  /** Keyed sites this release holds. */
+  sites: number
+  /** Sites whose literal carries this project's code. */
+  fragments: number
+  /** Sites present as an address without a code. */
+  stripped: number
+  /** Sites with no matching span. */
+  absent: number
+  /** Confirmations that are byte-for-byte the recorded rendering. */
+  exactRenderings: number
+  /** Confirmations reached only through the rename-tolerant radii. */
+  canonicalOnly: number
+  /** Confirmations found in a file other than the one we protected. */
+  moved: number
+  /** Confirmations found as a multi-token rendering. */
+  renderings: number
+  /** Distinct candidate files holding a confirmation. */
+  files: number
+  /** Keyed bits carried by the confirmed sites. */
+  bits: number
+  tagBits: number
+  /** Spans that reached a tag comparison. */
+  probes: number
+  /**
+   * Distinct keyed codes the candidate presented, summed over sites: the
+   * draws `chance` is computed from.
+   */
+  draws: number
+  literalsTried: number
+  windowsTried: number
+  /** `'match'`, `'no-match'` or `'not-comparable'`. */
+  fingerprint: string
+  /**
+   * `Σ_s [1 − (1 − 2^-tag_bits)^d_s]` over the sites' distinct-code counts:
+   * the upper bound on coincidental confirmations. Printed beside the
+   * verdict, always as the document's own number.
+   */
+  chance: number
+  /**
+   * Confirmations above that bound — the size of the excess. The verdict is
+   * decided by `coincidenceProbability`, not by this.
+   */
+  guarantee: number
+  /**
+   * The probability that an unrelated tree holding these addresses and none
+   * of this project's codes produces `fragments` confirmations or more: the
+   * upper tail of `Poisson(chance)`.
+   */
+  coincidenceProbability: number
+  /** `NONE`, `WEAK`, `MODERATE`, `STRONG`, `VERY_STRONG`. */
+  level: string
+  /**
+   * The rules that produced `level`, in plain sentences with the numbers in
+   * them.
+   */
+  reasons: Array<string>
+}
+
+/**
+ * The name a report is stored under, from however it was spelled.
+ *
+ * A stem, a file name and a store-relative path are three spellings of one
+ * entry, and `Session.readReport` accepts all three; this is the normalisation,
+ * exposed because the listing that shows a name is not where the path came
+ * from.
+ */
+export declare function reportStem(what: string): string
+
+/** The `run` block: who made this document, and when. */
+export interface Run {
+  /** `scan`, `verify`, or `report`: the command whose output this is. */
+  command: string
+  /** RFC 3339 UTC, supplied by the caller because this crate takes no clock. */
+  createdAt: string
+  /**
+   * The build that wrote the document, so an old report can be re-read with
+   * the rules that produced it in hand.
+   */
+  generator: string
+}
+
+/** The name and the path of one report a run saved. */
+export interface SavedReport {
+  /**
+   * What `readReport` takes to get this document back. When two saves land in
+   * the same second the store numbers the collision, so this is the name it
+   * wrote under, which is not necessarily the one it was given.
+   */
+  name: string
+  /**
+   * Store-relative and forward-slashed, so it is safe to print and will not
+   * reveal where the project lives.
+   */
+  path: string
+}
+
+/** One expected site, and what the candidate presented at its address. */
+export interface ScannedSite {
+  /**
+   * Which release this site belongs to. The report's `releases` are ordered
+   * best first; these rows are in scan order, so the id is what joins a row
+   * to its tally.
+   */
+  releaseId: string
+  /** Index into that release's site list, matching `swp inspect manifest`. */
+  site: number
+  /** `'absent'`, `'location-only'`, `'tag-confirmed'` or `'exact-rendering'`. */
+  status: string
+  /** Spans at this site's address that reached a tag comparison. */
+  probes: number
+  /**
+   * Distinct codes those spans presented: this site's share of the draws the
+   * report's coincidence bound is computed from.
+   */
+  distinctCodes: number
+  /**
+   * How many tokens the confirming span covers. `255` stands for "at least
+   * 255": the count saturates rather than wrapping.
+   */
+  foundTokens: number
+  /** Where the match actually was, when the candidate had it at all. */
+  foundIn?: string
+  foundLine?: number
+  /**
+   * The literal found there, truncated to the report hint bound — the same
+   * text an evidence item quotes as its `excerpt`.
+   */
+  foundExcerpt?: string
+}
+
+/** The `[protect]` section this run left behind. */
+export interface Settings {
+  targets: Array<string>
+  targetSites: number
+  tagBits: number
+  embedStrings: boolean
+  /** Whether this run wrote the config, or left the operator's alone. */
+  written: boolean
+  /** What the measurement suggested, whether or not it was applied. */
+  suggestion: number
+}
+
+/** The inclusive range of constellation sizes a project may aim at. */
+export interface SiteRange {
+  min: number
+  default: number
+  max: number
+}
+
+/**
+ * One site of the release, and whether it is still there.
+ *
+ * `SiteRow` is not `Clone`, so these rows are copied out when the outcome is
+ * built. `confirmed` is not this binding's judgement: it is `SiteRow::confirmed`,
+ * which asks the one place the protocol draws the watermark/not-watermark line.
+ */
+export interface SiteRow {
+  /** Index into the release's site list, matching `swp inspect manifest`. */
+  site: number
+  /**
+   * Where this site was when the release was made. A hint for a human, never
+   * a lookup key — a site that moved is still the same site.
+   */
+  file: string
+  lineHint: number
+  language: string
+  adapter: string
+  /** `'integer'` or `'string'`. */
+  class: string
+  family: string
+  width: number
+  /** `'absent'`, `'location-only'`, `'tag-confirmed'` or `'exact-rendering'`. */
+  status: string
+  /** Whether this row is watermark evidence, as `swp-evidence` grades it. */
+  confirmed: boolean
+  /** Which of the four keyed radii the tree reproduced. */
+  slots: Array<string>
+  /** Where the site was actually found, when that differs from `file`. */
+  foundIn?: string
+  foundLine?: number
+  refactored: boolean
+  moved: boolean
+}
+
+/**
+ * The §9 ladder: how many sites a project of this size should aim at.
+ *
+ * It is a suggestion in the strongest sense available in the tool — `init`
+ * measures the tree, calls this, and writes what it returns into a config the
+ * operator owns. The step function is the SDK's, not a table copied here.
+ */
+export declare function suggestSites(files: number): number
+
+/** The version of the tool this binding drives, as `swp --version` prints it. */
+export declare const SWP_VERSION: string
+
+/** `.swp/public/config.toml`, or the built-in defaults where it is silent. */
+export interface SwpConfig {
+  protocol: string
+  protect: JsProtectConfig
+  limits: JsLimits
+}
+
+/** The inclusive range of tag widths a site may carry. */
+export interface TagRange {
+  min: number
+  max: number
+  default: number
+}
+
+/** What one `verify` call is told. */
+export interface VerifyOptions {
+  /**
+   * The release to check against; `undefined` is the newest, because "is the
+   * tree I am standing in still the tree I protected?" is a question about
+   * the last protection run.
+   */
+  release?: string
+  /**
+   * Whether the run writes its `SWP-1-report-v2` copy into
+   * `.swp/private/reports/`. The verification document itself is returned,
+   * never written.
+   */
+  save?: boolean
+  /**
+   * How many site rows the caller intends to render; `undefined` is the
+   * build's own limit. Only `omittedRows` depends on this — the document
+   * always carries every row.
+   */
+  rows?: number
+}
+
+/**
+ * The watermark parameters a release used, so a later scan can tell *why* an
+ * old release behaves differently without revealing a single location.
+ */
+export interface WatermarkParams {
+  targetSites: number
+  tagBits: number
+  sitesEmbedded: number
+  sitesSkipped: number
+  canonicalizerVersion: number
+  /**
+   * A digest of the sorted, deduplicated transformation-family names that
+   * were permitted — a digest rather than the list so the record stays fixed
+   * size.
+   */
+  formSet: string
+  adapters: Array<JsAdapterUse>
+}

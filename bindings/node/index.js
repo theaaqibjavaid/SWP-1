@@ -778,7 +778,22 @@ function __napiStampBindingTarget(exportsObject, target) {
 // linked import resolves to `undefined`.
 module.exports.__napiBindingTarget = __napiStampBindingTarget(nativeBinding, __napiLoadedBindingTarget)
 module.exports = nativeBinding
+module.exports.InitOutcome = nativeBinding.InitOutcome
+module.exports.JsInitOutcome = nativeBinding.JsInitOutcome
+module.exports.Report = nativeBinding.Report
+module.exports.JsReport = nativeBinding.JsReport
+module.exports.ScanOutcome = nativeBinding.ScanOutcome
+module.exports.JsScanOutcome = nativeBinding.JsScanOutcome
+module.exports.Session = nativeBinding.Session
+module.exports.JsSession = nativeBinding.JsSession
+module.exports.StoredReport = nativeBinding.StoredReport
+module.exports.JsStoredReport = nativeBinding.JsStoredReport
+module.exports.VerifyOutcome = nativeBinding.VerifyOutcome
+module.exports.JsVerifyOutcome = nativeBinding.JsVerifyOutcome
 module.exports.banner = nativeBinding.banner
-module.exports.installErrorFactory = nativeBinding.installErrorFactory
-module.exports.probeAsync = nativeBinding.probeAsync
-module.exports.probeThrow = nativeBinding.probeThrow
+module.exports.BINDING_VERSION = nativeBinding.BINDING_VERSION
+module.exports.capabilities = nativeBinding.capabilities
+module.exports.errorCodes = nativeBinding.errorCodes
+module.exports.reportStem = nativeBinding.reportStem
+module.exports.suggestSites = nativeBinding.suggestSites
+module.exports.SWP_VERSION = nativeBinding.SWP_VERSION
