@@ -194,14 +194,7 @@ pub fn protect(req: &Request<'_>) -> Result<Protection, SwpError> {
     }
 
     let walked = walk::walk(req.root, &req.config.protect, &limits)?;
-    let scan = candidates::scan(
-        req.root,
-        &walked,
-        &keys,
-        &req.config.protect,
-        width,
-        &limits,
-    )?;
+    let scan = candidates::scan(&walked, &keys, &req.config.protect, width, &limits)?;
     let selection = select::select(&scan, req.config.protect.target_sites, &limits)?;
     let applied = apply::apply(req.root, &scan, &selection, &keys, width, &limits)?;
     if applied.entries.is_empty() {
@@ -463,7 +456,7 @@ fn release_fingerprint(
             max_total_bytes: remaining,
             ..limits.clone()
         };
-        for (rel, digest) in candidates::tree_digests(req.root, &extra, &scoped)? {
+        for (rel, digest) in candidates::tree_digests(&extra, &scoped)? {
             inputs.insert(rel, digest);
         }
     }
@@ -696,7 +689,7 @@ mod tests {
     fn scanned_fingerprint(root: &Path, canonicalizer: u16) -> Result<Digest, SwpError> {
         let limits = Limits::default();
         let walked = walk::walk(root, &ProtectConfig::scan_scope(), &limits)?;
-        let files: Vec<FileCanonical> = candidates::tree_digests(root, &walked, &limits)?
+        let files: Vec<FileCanonical> = candidates::tree_digests(&walked, &limits)?
             .into_iter()
             .map(|(path, digest)| FileCanonical::new(path, digest))
             .collect();

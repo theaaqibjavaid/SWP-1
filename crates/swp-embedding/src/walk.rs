@@ -53,6 +53,10 @@ pub struct ScannedFile {
     /// is the string that reaches the manifest and the fingerprint, so it reads
     /// the same on every platform.
     pub rel: String,
+    /// Absolute, ready to read: `walk_tree` absolutizes its root, so a consumer
+    /// needs neither the root nor the working directory to resolve this. A
+    /// relative `abs` would be joined back onto the root it was already joined
+    /// from, and reading the file would fail on a path doubled at the join.
     pub abs: PathBuf,
     /// Size from the walk's own stat, so an oversized file is reported without
     /// being read first.
@@ -210,8 +214,18 @@ fn walk_tree(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Result<Walk, 
     // a caller-written `..` in that path would otherwise make every file on the
     // candidate look like it sits outside the walked root: `join_target` below
     // resolves `.` and `..` lexically, so the walk has to compare against the
-    // same spelling it walks from.
-    let root = normalize(root);
+    // same spelling it walks from. Absolutizing comes first because `normalize`
+    // pops `..` from the path text: on a working-directory-relative root that
+    // silently drops the leading `..` instead of resolving it, and every
+    // [`ScannedFile::abs`] it yields would be relative — a consumer that joined
+    // one back onto the root would read a path doubled at the join.
+    let root = std::path::absolute(root).map_err(|e| {
+        SwpError::io(format!(
+            "cannot resolve {} against the working directory: {e}",
+            root.display()
+        ))
+    })?;
+    let root = normalize(root.as_path());
     let root = root.as_path();
 
     let mut out = Walk::default();
