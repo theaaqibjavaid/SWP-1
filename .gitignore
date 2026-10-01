@@ -49,5 +49,15 @@ __pycache__/
 # so the ignore rule below — never committing a built addon — is the control
 # that keeps a compiled binary out of the history, and widening the sweep is
 # a separate decision for the owner.
+#
+# `binding.cjs` and `binding.d.ts` are `napi build`'s output beside the addon:
+# the loader that selects the platform binary, and the declarations typegen
+# reads off the Rust surface. Both are rewritten by every build and by nothing
+# else — the entry point callers load, `index.js`, and the types `package.json`
+# advertises, `index.d.ts`, are hand-written and tracked. The `files` list in
+# package.json ships all four, so ignoring the generated pair costs a published
+# package nothing.
 /bindings/*/node_modules/
 /bindings/**/*.node
+/bindings/*/binding.cjs
+/bindings/*/binding.d.ts

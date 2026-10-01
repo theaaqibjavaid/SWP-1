@@ -48,6 +48,11 @@ thread_local! {
 /// Not in the generated types: it is the seam between `index.js` and the addon,
 /// and a caller who has the addon but not the loader has a build that never
 /// finishes loading anyway.
+///
+/// napi emits the registration that calls this behind `cfg(not(test))`, so under
+/// `cargo test` the only caller is the JavaScript loader — which rustc cannot
+/// see. The lint fires on the test target alone and means nothing.
+#[allow(dead_code)]
 #[napi(skip_typescript)]
 pub fn install_error_factory(
     factory: Function<'_, FnArgs<FactoryArgs>, Unknown<'static>>,

@@ -9,7 +9,7 @@
     "directory": "bindings/node"
   },
   "main": "index.js",
-  "types": "index.d.ts",
+  "types": "binding.d.ts",
   "engines": {
     "node": "^20.17.0 || ^22.13.0 || >=23.5.0"
   },
@@ -21,7 +21,8 @@
   ],
   "files": [
     "index.js",
-    "index.d.ts",
+    "binding.cjs",
+    "binding.d.ts",
     "README.md",
     "*.node"
   ],
@@ -35,8 +36,8 @@
     ]
   },
   "scripts": {
-    "build": "napi build --platform --release",
-    "build:dev": "napi build --platform",
+    "build": "napi build --platform --release --js binding.cjs --dts binding.d.ts",
+    "build:dev": "napi build --platform --js binding.cjs --dts binding.d.ts",
     "test": "node --test tests/",
     "typecheck": "tsc --noEmit"
   },
