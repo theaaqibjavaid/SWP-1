@@ -33,6 +33,7 @@ use swp_evidence::{Outcome, Report};
 use swp_sdk::SavedReport;
 
 use crate::args::{Flag, Parsed};
+use crate::compliance::{self, ComplianceReport};
 use crate::ctx::{self, Ctx};
 use crate::output::{self, Sink};
 
@@ -77,8 +78,45 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
         )),
     }
     let lines = render(report, parsed, saved)?;
-    output::deliver(sink, report, &lines, parsed.value(Flag::Output))?;
+    if parsed.has(Flag::Compliance) {
+        let compliance_doc = ComplianceReport::from_report(report.clone(), true);
+        let compliance_lines = render_compliance_lines(&compliance_doc, parsed)?;
+        deliver_compliance(
+            sink,
+            &compliance_doc,
+            &compliance_lines,
+            parsed.value(Flag::Output),
+        )?;
+    } else {
+        output::deliver(sink, report, &lines, parsed.value(Flag::Output))?;
+    }
     Ok(report.exit_code())
+}
+
+/// Deliver a compliance document: in JSON mode the whole JSON (report + compliance
+/// block) is printed or written to `--output`; in text mode the standard report's
+/// text lines are printed with the compliance block appended.
+fn deliver_compliance(
+    sink: &mut Sink,
+    doc: &compliance::ComplianceReport,
+    lines: &[String],
+    output: Option<&str>,
+) -> Result<(), SwpError> {
+    let json_text = doc.to_json();
+    if let Some(path) = output.filter(|p| !p.trim().is_empty()) {
+        crate::help::write_document(path, &json_text)?;
+        sink.note(&format!(
+            "wrote the JSON document to {path}; {} line(s) of text were not printed",
+            lines.len()
+        ));
+        return Ok(());
+    }
+    if sink.json() {
+        sink.result_json_bytes(json_text.as_bytes(), lines)?;
+    } else {
+        sink.result(&doc.report, lines)?;
+    }
+    Ok(())
 }
 
 /// The one positional this command takes, and nothing else.
@@ -176,6 +214,33 @@ fn next_steps(report: &Report, json: bool, saved: Option<&SavedReport>) -> Vec<S
         out.push("--format json for the same facts as one document".to_string());
     }
     out
+}
+
+/// The text lines for a compliance report: the standard report's lines, plus
+/// the compliance block's lines.
+fn render_compliance_lines(
+    doc: &ComplianceReport,
+    parsed: &Parsed,
+) -> Result<Vec<String>, SwpError> {
+    let limit = crate::output::window(parsed.has(Flag::Full), parsed.number(Flag::Limit)?);
+    let mut lines: Vec<String> = doc
+        .report
+        .to_text_items(limit)
+        .lines()
+        .map(|l| l.to_string())
+        .collect();
+    lines.push(String::new());
+    if let Some(block) = &doc.compliance {
+        lines.extend(compliance::render_compliance_text(block, limit));
+    }
+    lines.push(String::new());
+    lines.push("Next".to_string());
+    for step in next_steps(&doc.report, parsed.json()?, None) {
+        lines.push(format!("  {step}"));
+    }
+    lines.push(String::new());
+    lines.push(format!("exit {}", doc.exit_code()));
+    Ok(lines)
 }
 
 #[cfg(test)]

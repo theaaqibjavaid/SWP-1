@@ -115,13 +115,26 @@ impl Session {
         releases: &ReleaseSelection,
         save: bool,
     ) -> Result<ScanOutcome, SwpError> {
+        self.scan_with_command(candidate, releases, save, "scan")
+    }
+
+    /// As [`Session::scan`] with the command name recorded in the report's `run`
+    /// block, so a pre-commit run can report itself as `pre-commit` rather than
+    /// `scan`. The rest of the pipeline is identical; only the label differs.
+    pub fn scan_with_command(
+        &self,
+        candidate: &Path,
+        releases: &ReleaseSelection,
+        save: bool,
+        command: &str,
+    ) -> Result<ScanOutcome, SwpError> {
         let limits = self.limits();
         let loaded = self.loaded(releases)?;
         let indexes = self.indexes(&loaded)?;
         let opened = swp_detection::input::open(candidate, &limits)?;
         let detection = swp_detection::scan_against(&opened, &indexes, &limits)?;
         let at = Timestamp::now_utc();
-        let report = Report::build(&detection, "scan", &at.to_rfc3339(), &crate::banner());
+        let report = Report::build(&detection, command, &at.to_rfc3339(), &crate::banner());
         let saved = if save {
             let stem = format!("scan-{}", at.filename_stem());
             let path = self

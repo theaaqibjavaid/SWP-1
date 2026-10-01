@@ -80,6 +80,18 @@ pub fn overview(sink: &mut Sink<'_>) -> Result<(), SwpError> {
         "  swp verify               confirm this tree still carries that release".to_string(),
     );
     lines.push("  swp scan ./copy          look at somebody else's tree".to_string());
+    lines.push(
+        "  swp pre-commit           scan your own sources, exit 1 if a release is found"
+            .to_string(),
+    );
+    lines.push(
+        "  swp registry publish     write a signed release index to .swp/public/registry.json"
+            .to_string(),
+    );
+    lines.push("  swp registry search <f>  look up a release in a registry file".to_string());
+    lines.push(
+        "  swp badge                generate a trust anchor badge for the project".to_string(),
+    );
     lines.push(String::new());
     lines.push("Every command takes --help. Machine-readable output is --format json.".to_string());
     lines.push(String::new());
@@ -226,6 +238,34 @@ fn detail(cmd: Command) -> Option<Vec<String>> {
             "supplies the keys, never the tree being judged.",
             "--save keeps the report with the project being scanned, not with the candidate.",
         ],
+        Command::PreCommit => &[
+            "pre-commit scans the project's own target directories against its releases. It",
+            "is meant to run from inside a git pre-commit hook: no git commands are executed,",
+            "the .swp/ directory is never scanned, and exit 1 blocks the commit when a",
+            "release is found — the sources carry a watermark they should not.",
+            "Without --release every release is a suspect; with --latest only the newest is.",
+            "Exit 0 is clean, 1 is a finding (block the commit), 10 is inconclusive.",
+        ],
+        Command::Registry => &[
+            "registry publish writes .swp/public/registry.json, a signed index of the",
+            "project's releases. Every entry carries the release's own signature plus the",
+            "document-level signature, so a reader can authenticate without ever contacting",
+            "the publisher. This is not a network service; the file is committed to the",
+            "repository and mirrors the release records in .swp/public/releases/.",
+            "registry search <file> reads a registry JSON and prints one release (with",
+            "--release <id>) or the whole document (without it). A revoked release is",
+            "flagged on stderr.",
+        ],
+        Command::Badge => &[
+            "badge generates .swp/public/badge.json: a trust anchor document that lets a",
+            "project assert 'I am really project X' without revealing the root secret.",
+            "The anchor key is HMAC(key = root_secret, message = domain || project_id),",
+            "so anyone who holds the root secret can recompute it, and no one else can.",
+            "The badge carries the project's public identity, the release count, the",
+            "newest release id, and an Ed25519 signature. It is safe to commit.",
+            "swp badge show re-reads and prints the badge; swp badge (or no argument)",
+            "regenerates it.",
+        ],
         Command::Inspect => &[
             "inspect reads the local store only. It cannot report anything about a candidate;",
             "that is `swp scan`.",
@@ -295,6 +335,19 @@ fn command_exit_codes(cmd: Command) -> Vec<(i32, &'static str)> {
             (0, "no watermark evidence found in a candidate that was fully examined"),
             (1, "watermark evidence found: the candidate carries one of your releases"),
             (10, "inconclusive: nothing was confirmed and part of the candidate was not examined"),
+        ],
+        Command::PreCommit => vec![
+            (0, "no watermark evidence found in the project sources"),
+            (1, "watermark evidence found: one of your releases is in the sources — the commit is blocked"),
+            (10, "inconclusive: the scan could not examine everything"),
+        ],
+        Command::Registry => vec![
+            (0, "the registry was read or written"),
+            (5, "the release named is not in this registry file"),
+        ],
+        Command::Badge => vec![
+            (0, "the badge was generated or read"),
+            (4, "the project is not protected yet, or no badge exists"),
         ],
         Command::Verify => vec![
             (0, "every site of the release is present and still carries its code"),

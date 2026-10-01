@@ -575,6 +575,7 @@ dependencies = [
  "serde",
  "serde_json",
  "swp-core",
+ "swp-crypto",
  "swp-embedding",
  "swp-evidence",
  "swp-identity",

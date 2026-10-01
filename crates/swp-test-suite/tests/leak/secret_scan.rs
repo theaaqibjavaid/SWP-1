@@ -597,6 +597,24 @@ fn every_command_prints_and_writes_nothing_searchable() {
     cli.at(&["report"], &bare);
     cli.at(&["scan", &at], &bare);
 
+    // --- pre-commit: the project's own sources against its releases ----------
+    cli.run(&["pre-commit"]);
+    cli.run(&["pre-commit", "--format", "json"]);
+    cli.run(&["pre-commit", "--latest"]);
+
+    // --- registry: publish and search ----------------------------------------
+    cli.run(&["registry", "publish"]);
+    cli.run(&["registry", "publish", "--format", "json"]);
+    let registry_path = tmp.path().join(".swp/public/registry.json");
+    let registry_str = registry_path.display().to_string();
+    cli.run(&["registry", "search", &registry_str]);
+    cli.run(&["registry", "search", &registry_str, "--release", &release]);
+
+    // --- badge: generate and show --------------------------------------------
+    cli.run(&["badge"]);
+    cli.run(&["badge", "show"]);
+    cli.run(&["badge", "show", "--format", "json"]);
+
     // --- the tree, afterwards ------------------------------------------------
     // Every artifact the runs above wrote is on disk by now: plans, manifests,
     // release records, saved reports, the watermarked sources themselves. Sweep it

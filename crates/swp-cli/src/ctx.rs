@@ -129,6 +129,15 @@ impl Ctx {
     pub fn manifest(&self, id: &ReleaseId) -> Result<swp_manifest::PrivateManifest, SwpError> {
         swp_manifest::PrivateManifest::from_store(&self.store, self.identity(), id)
     }
+
+    /// The project's signing key, used to sign documents that are committed
+    /// alongside the project rather than kept private — the registry, a
+    /// compliance report, a trust anchor badge. Loaded per call, dropped after
+    /// the operation, the same lifetime rule as every other root-secret use.
+    pub fn signing_key(&self) -> Result<swp_crypto::ManifestSigningKey, SwpError> {
+        let root = self.store.load_root()?;
+        swp_crypto::ManifestSigningKey::from_root(&root, self.identity().project_id.as_str())
+    }
 }
 
 /// What this run's flags change about the stored settings.

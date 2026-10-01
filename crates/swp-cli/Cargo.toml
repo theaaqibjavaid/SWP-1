@@ -26,5 +26,6 @@ swp-identity.workspace = true
 swp-manifest.workspace = true
 swp-embedding.workspace = true
 swp-evidence.workspace = true
+swp-crypto.workspace = true
 serde.workspace = true
 serde_json.workspace = true

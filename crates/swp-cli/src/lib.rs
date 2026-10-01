@@ -39,12 +39,16 @@ use std::path::Path;
 use swp_core::error::{ErrorCode, SwpError};
 
 pub mod args;
+pub mod badge;
+pub mod compliance;
 pub mod ctx;
 pub mod help;
 pub mod init;
 pub mod inspect;
 pub mod output;
+pub mod precommit;
 pub mod protect;
+pub mod registry;
 pub mod report;
 pub mod scan;
 pub mod verify;
@@ -123,6 +127,9 @@ fn dispatch(
         args::Command::Protect => protect::run(parsed, cwd, sink, mode_of(parsed)),
         args::Command::Verify => verify::run(parsed, cwd, sink),
         args::Command::Scan => scan::run(parsed, cwd, sink),
+        args::Command::PreCommit => precommit::run(parsed, cwd, sink),
+        args::Command::Registry => registry::run(parsed, cwd, sink),
+        args::Command::Badge => badge::run(parsed, cwd, sink),
         args::Command::Inspect => inspect::run(parsed, cwd, sink),
         args::Command::Report => report::run(parsed, cwd, sink),
     }

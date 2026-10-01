@@ -84,6 +84,20 @@ impl<'a> Sink<'a> {
         let _ = writeln!(self.err, "{text}");
     }
 
+    /// Write pre-serialized JSON bytes to the output stream. Used when the
+    /// JSON shape is not a `Serialize`-compatible struct (e.g. a merged
+    /// report + compliance block built via `serde_json::Value`).
+    pub fn result_json_bytes(
+        &mut self,
+        json_bytes: &[u8],
+        _lines: &[String],
+    ) -> Result<(), SwpError> {
+        self.out
+            .write_all(json_bytes)
+            .map_err(|e| SwpError::io(format!("cannot write the result: {e}")))?;
+        Ok(())
+    }
+
     /// A line that must survive `--quiet`: something was refused, not merely
     /// observed.
     pub fn warn(&mut self, text: &str) {
