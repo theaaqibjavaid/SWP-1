@@ -31,9 +31,15 @@ import pytest
 import swp
 
 #: How often the heartbeat thread tries to run, in seconds. Windows coalesces short
-#: sleeps to the scheduler tick (~15 ms), which is why the assertions are proportional
-#: to the measured call length instead of a bare tick count.
+#: sleeps to the scheduler tick (~15 ms), which is why the assertions count wakes
+#: rather than compare a wake rate to the measured call length.
 HEARTBEAT = 0.005
+
+#: The shortest call whose release of the lock this can tell from a lucky window.
+#: GitHub runners finish `protect` over the big tree in ~0.1 s; a slower dev box
+#: (this suite was first written on one) in ~0.5 s. The floor is set for the fast
+#: end, and a call below it fails loudly instead of being skipped.
+MIN_MEASURABLE = 0.03
 
 
 def beats_during(fn):
@@ -51,23 +57,33 @@ def beats_during(fn):
         # Let the rival settle into its sleep, so the window measured is the call.
         time.sleep(4 * HEARTBEAT)
         started = time.perf_counter()
+        beats_before = state["ticks"]
         value = fn()
         elapsed = time.perf_counter() - started
+        ticks = state["ticks"] - beats_before
     finally:
         state["running"] = False
         rival.join(timeout=30)
-    return value, elapsed, state["ticks"]
+    return value, elapsed, ticks
 
 
 def assert_lock_was_released(elapsed, ticks, label):
-    """The rival got at least half of what a released lock would have allowed it.
+    """A sleeping rival ran during the call, which it cannot do if the lock is held.
 
-    Held for the whole call, it would have got nothing: a sleeping thread cannot run
-    without the interpreter, so the tick count during the call is the measurement.
+    A held lock keeps the rival at zero: its wake needs the interpreter, so a
+    tick counted inside the window is a release. Two are demanded because one
+    could be boundary luck — the rival waking as the call returns. The count is
+    not compared to a ratio of the window: a shared runner may schedule the
+    rival far less often than `HEARTBEAT` promises, and a missed beat is not a
+    held lock. `MIN_MEASURABLE` keeps the claim honest: a call that short
+    cannot distinguish a released lock from a lucky window, and says so rather
+    than passing.
     """
-    assert elapsed > 0.2, f"{label} took {elapsed:.3f}s — too short to measure anything"
-    reachable = elapsed / max(HEARTBEAT, 0.015)
-    assert ticks >= reachable / 2, f"{label} appears to hold the GIL: {ticks} ticks in {elapsed:.3f}s"
+    assert elapsed > MIN_MEASURABLE, (
+        f"{label} took {elapsed:.3f}s — too short to measure anything; "
+        "give this test a bigger tree rather than lowering the floor"
+    )
+    assert ticks >= 2, f"{label} appears to hold the GIL: {ticks} ticks in {elapsed:.3f}s"
 
 
 def run_in_threads(bodies):
