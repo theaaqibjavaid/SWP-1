@@ -1,0 +1,49 @@
+[package]
+name = "swp-node"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+description = "Node-API addon for SWP-1, the source-provenance watermark: the swp-sdk session, protect, verify and scan operations as native JavaScript objects, with generated TypeScript declarations."
+license = "Apache-2.0"
+repository = "https://github.com/theaaqibjavaid/SWP-1"
+documentation = "https://github.com/theaaqibjavaid/SWP-1/tree/main/docs"
+keywords = ["watermarking", "provenance", "supply-chain", "code-analysis"]
+categories = ["development-tools", "filesystem"]
+# `cdylib` alone: this crate is loaded by an interpreter, and it is not a library
+# anybody links. `cargo test` against it would need an `rlib`, and the tests here
+# are JavaScript tests for exactly that reason.
+publish = false
+
+[lib]
+name = "swp_node"
+crate-type = ["cdylib"]
+
+[workspace]
+# The empty table is what keeps this crate out of the repository's workspace.
+# The same reason as the Python binding's, stated once so it does not have to be
+# rediscovered: the published crates hold `rust-version = "1.85"`, and napi-rs
+# asks for 1.88. Inside the workspace, that requirement would become the floor
+# every crate advertises. See docs/VERSIONING_POLICY.md §4 and
+# docs/SDK_ARCHITECTURE.md §4.2 and §5.
+
+[dependencies]
+# The one product dependency, and the only one that could keep the boundary
+# intact: `swp-sdk` is the façade whose `binding_facing` surface
+# docs/BINDING_SURFACE.json records, so this crate cannot name a `Store`, a
+# `RootSecret` or a `LocationId` even by accident unless the SDK handed one out.
+swp-sdk = { path = "../../crates/swp-sdk" }
+# `napi4` is already in this crate's default features; it is named because the
+# deferred promises the async operations are built on *are* the Node-API 4
+# surface, and a downgrade of the feature set would break them at compile time
+# rather than at somebody's install time. `dyn-symbols` resolves the Node-API
+# entries from the host at load, which is what keeps one binary working across
+# the supported Node majors.
+napi = { version = "3.14.0", features = ["napi4"] }
+napi-derive = { version = "3.6.10" }
+# Used for exactly the same thing the Python binding spends it on: rendering a
+# `VerifyDocument`/`Report` JSON string verbatim — key order is part of what
+# makes an export diffable against its original, so no map here may reorder.
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[build-dependencies]
+napi-build = "2.6.0"

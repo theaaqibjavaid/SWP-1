@@ -41,3 +41,13 @@ __pycache__/
 /bindings/**/*.pyd
 /bindings/**/*.so
 /bindings/**/*.dylib
+
+# The Node binding's own build output: the compiled addon and the package
+# manager's install tree. `**/target/` above already covers bindings/node/
+# target. Note the asymmetry this file has to carry: `check-release.sh`'s
+# artifact sweep matches .pyc/.so/.dll/.dylib/.wasm/.exe but *not* `.node`,
+# so the ignore rule below — never committing a built addon — is the control
+# that keeps a compiled binary out of the history, and widening the sweep is
+# a separate decision for the owner.
+/bindings/*/node_modules/
+/bindings/**/*.node
