@@ -244,11 +244,19 @@ def test_an_empty_path_names_the_working_directory_not_a_made_up_one(project, mo
 
     Refusing it would be the binding inventing a rule its caller does not have;
     passing it through lets the operating system resolve it, so the answer is about
-    the working directory rather than about a path nobody typed.
+    the working directory rather than about a path nobody typed. A lone space is the
+    same string with two platform answers: Win32 strips trailing spaces from a name,
+    so " " resolves like "", while POSIX reads it as a directory literally called
+    " " — one that does not exist here, and the refusal is what says so.
     """
     monkeypatch.chdir(project.root)
     assert swp.Session.open("").project_root == project.session.project_root
-    assert swp.Session.open(" ").project_root == project.session.project_root
+    if WINDOWS:
+        assert swp.Session.open(" ").project_root == project.session.project_root
+    else:
+        with pytest.raises(swp.Error) as caught:
+            swp.Session.open(" ")
+        assert caught.value.code == "PATH_REJECTED"
     monkeypatch.chdir(project.root.parent)
     with pytest.raises(swp.Error) as caught:
         swp.Session.open("")
@@ -290,8 +298,20 @@ def test_the_candidate_root_is_part_of_the_path_the_binding_passes(protected):
     assert part.report.releases[0].fingerprint == "no-match"
 
 
-@pytest.mark.parametrize("suffix", ["", os.sep, "/", "\\\\", "/.", "/src/..", "  "])
+@pytest.mark.parametrize("suffix", ["", os.sep, "/", "/.", "/src/.."])
 def test_extra_separators_and_dot_segments_do_not_change_the_project(project, suffix):
+    assert swp.Session.open(str(project.root) + suffix).project_root == project.session.project_root
+
+
+@pytest.mark.skipif(
+    not WINDOWS,
+    reason=(
+        "Win32 strips a trailing separator and trailing spaces from a directory name; "
+        "POSIX reads both as part of a name that no entry carries"
+    ),
+)
+@pytest.mark.parametrize("suffix", ["\\\\", "  "])
+def test_the_windows_trailing_spellings_of_a_directory_name_the_same_project(project, suffix):
     assert swp.Session.open(str(project.root) + suffix).project_root == project.session.project_root
 
 
