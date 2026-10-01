@@ -97,6 +97,45 @@ jobs:
         run: cargo test --locked -p swp-test-suite --test docs_examples
         shell: bash
 
+  binding-python:
+    name: python binding (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      # Windows runners run steps in PowerShell by default, and none of these is
+      # a PowerShell idiom; every step here is spelled once and read on all three
+      # operating systems.
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+      # `python -m pip` is spelled out rather than using the `pip` console
+      # script, so the command reads identically on a runner where `pip` might
+      # be shadowed by a different Python's entry point. The binding is its own
+      # workspace (see bindings/python/Cargo.toml §[workspace]): an empty table
+      # keeps it out of the repository's, and the toolchain PyO3 asks for is
+      # newer than the `rust-version` the published crates advertise.
+      - name: build the wheel
+        working-directory: bindings/python
+        run: |
+          python -m pip install --upgrade pip maturin
+          maturin build --release --locked -j 2
+      # `target/wheels/*.whl` is a glob; on a Windows runner a PowerShell step
+      # would expand it with Windows rules, and the spell would need quoting to
+      # read on every platform. The job's `shell: bash` keeps one spelling.
+      - name: install and run the suite
+        working-directory: bindings/python
+        run: |
+          python -m pip install --force-reinstall target/wheels/*.whl pytest
+          pytest -q
+
   release-readiness:
     name: release readiness
     runs-on: ubuntu-latest

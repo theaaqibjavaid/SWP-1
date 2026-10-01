@@ -28,3 +28,16 @@ __pycache__/
 # naming every embedded site — is kept out of the history.
 !/.swp/
 .swp/private/
+
+# The Python binding's own build output. `**/target/` above already covers
+# bindings/python/target, so what is listed here is everything maturin and pytest
+# write *beside* it: the wheel directory, the interpreter environments the suite
+# runs under, and their caches. A built extension in the history is what
+# `check-release.sh` fails a release on, so this list is not tidiness.
+/bindings/*/dist/
+/bindings/*/.venv*/
+/bindings/*/.maturin/
+/bindings/**/.pytest_cache/
+/bindings/**/*.pyd
+/bindings/**/*.so
+/bindings/**/*.dylib
