@@ -526,7 +526,7 @@ mod tests {
         let cfg = ProtectConfig::default();
         let limits = Limits::default();
         let walked = crate::walk::walk(root, &cfg, &limits).unwrap();
-        let scan = crate::candidates::scan(root, &walked, k, &cfg, width(), &limits).unwrap();
+        let scan = crate::candidates::scan(&walked, k, &cfg, width(), &limits).unwrap();
         let sel = crate::select::select(&scan, target, &limits).unwrap();
         (scan, sel)
     }

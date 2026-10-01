@@ -19,9 +19,10 @@ the caller typed (a candidate) or the store's own forward-slashed spelling (anyt
 under `.swp/`), and a trailing separator, a doubled separator or a `.` segment does
 not change which project a string names.
 
-One gap is marked rather than papered over: a *relative* scan candidate is handed to
-Rust exactly as typed, and `swp-detection`'s walk then reads it as relative to
-itself. See `test_a_relative_scan_candidate_is_walked`.
+One more property carries the same crossing: a *relative* scan candidate means the
+directory it means to the caller, because the Rust walk absolutizes the candidate
+against the working directory before it reads a file from it. See
+`test_a_relative_scan_candidate_is_walked`.
 """
 
 from __future__ import annotations
@@ -356,23 +357,34 @@ def test_a_relative_root_is_resolved_where_the_process_stands(project, monkeypat
     assert swp.Session.discover("..").project_root == project.session.project_root
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "a relative scan candidate is handed to Rust as typed, and swp-detection's "
-        "walk then joins it to itself: 'src' becomes 'src/src/app.js' "
-        "(read_source, crates/swp-detection/src/find.rs:959). The CLI never reaches "
-        "this because ctx::resolve makes every typed path absolute first. Passing the "
-        "path through unchanged is the binding's contract, so this is a Rust-side "
-        "defect found by the binding work; it is reported, not worked around here."
-    ),
-)
 def test_a_relative_scan_candidate_is_walked(protected, monkeypatch):
-    """`scan("src")` should examine `src` exactly as the absolute spelling does."""
+    """`scan("src")` examines `src` exactly as the absolute spelling does.
+
+    The candidate still crosses as typed; what the Rust walk does with it is
+    resolve it against the working directory once, up front, so the paths it
+    reads files by are absolute. The defect this replaces joined the relative
+    path back onto the root it was already joined from — `'src'` became
+    `'src/src/app.js'` — and the scan could not open a file it had walked one
+    line earlier. The CLI never reached that path because `ctx::resolve` made
+    every typed path absolute first; the binding, which passes through, found it.
+
+    The verdict is then the one `test_the_candidate_root_is_part_of_the_path_
+    the_binding_passes` documents for any spelling of `src`: those files sit one
+    level above where the release recorded them, so every site has moved. What
+    changes here is that the relative spelling gets that considered answer at
+    all, instead of an I/O failure over a path that never existed.
+    """
     monkeypatch.chdir(protected.root)
     from_here = protected.session.scan("src")
+    from_there = protected.session.scan(str(protected.root / "src"))
     assert from_here.report.candidate.files_scanned == 3
-    assert from_here.report.result == "PROVENANCE_DETECTED"
+    assert from_here.report.result == from_there.report.result == "INCONCLUSIVE"
+    assert from_here.report.releases[0].fingerprint == "no-match"
+    assert from_here.report.releases[0].moved == from_there.report.releases[0].moved
+    # And from the project itself, the relative whole-tree scan is the strong one.
+    whole = protected.session.scan(".")
+    assert whole.report.candidate.files_scanned == 3
+    assert whole.report.result == "PROVENANCE_DETECTED"
 
 
 # -- names inside the tree ---------------------------------------------------

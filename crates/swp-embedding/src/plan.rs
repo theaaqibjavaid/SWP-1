@@ -319,15 +319,8 @@ mod tests {
         let limits = Limits::default();
         let k = keys("rel-aaaaaaaaaaaa");
         let walked = crate::walk::walk(&root, &cfg, &limits).unwrap();
-        let scan = crate::candidates::scan(
-            &root,
-            &walked,
-            &k,
-            &cfg,
-            swp_core::TagWidth::DEFAULT,
-            &limits,
-        )
-        .unwrap();
+        let scan = crate::candidates::scan(&walked, &k, &cfg, swp_core::TagWidth::DEFAULT, &limits)
+            .unwrap();
         let selection = crate::select::select(&scan, target, &limits).unwrap();
         let applied = crate::apply::apply(
             &root,
@@ -453,15 +446,8 @@ mod tests {
         let limits = Limits::default();
         let k = keys("rel-aaaaaaaaaaaa");
         let walked = crate::walk::walk(&root, &cfg, &limits).unwrap();
-        let scan = crate::candidates::scan(
-            &root,
-            &walked,
-            &k,
-            &cfg,
-            swp_core::TagWidth::DEFAULT,
-            &limits,
-        )
-        .unwrap();
+        let scan = crate::candidates::scan(&walked, &k, &cfg, swp_core::TagWidth::DEFAULT, &limits)
+            .unwrap();
         let selection = crate::select::select(&scan, 6, &limits).unwrap();
         let applied = crate::apply::apply(
             &root,

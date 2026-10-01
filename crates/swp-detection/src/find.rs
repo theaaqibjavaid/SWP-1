@@ -457,7 +457,7 @@ pub fn scan_against(
             ..scan_config()
         };
 
-        let scan = candidates::scan(&opened.root, &walked, keys, &cfg, width, limits)?;
+        let scan = candidates::scan(&walked, keys, &cfg, width, limits)?;
         notes.extend(scan.notes.clone());
         refusals.extend(scan.omissions.iter().cloned());
         if let std::collections::btree_map::Entry::Vacant(slot) = trees.entry(group.canonicalizer) {
@@ -494,7 +494,7 @@ pub fn scan_against(
 
         // Pass B: the spans a rendering could occupy, which no literal is.
         for entry in &walked.files {
-            let Some(text) = read_source(&opened.root, entry, limits)? else {
+            let Some(text) = read_source(entry, limits)? else {
                 continue;
             };
             let Ok(analysis) = registry.analyze(Path::new(&entry.rel), &text, limits) else {
@@ -952,17 +952,15 @@ fn observed_code(obs: &Observation, family: FormFamily, width: TagWidth) -> Opti
 /// Read one file for pass B. `None` means the walk's own bounds now exclude it,
 /// which the walk already reported.
 fn read_source(
-    root: &Path,
     entry: &swp_embedding::walk::ScannedFile,
     limits: &Limits,
 ) -> Result<Option<String>, SwpError> {
-    let abs = if entry.abs.is_absolute() {
-        entry.abs.clone()
-    } else {
-        root.join(&entry.abs)
-    };
-    let bytes = std::fs::read(&abs)
-        .map_err(|e| SwpError::new(ErrorCode::Io, format!("cannot read {}: {e}", abs.display())))?;
+    let bytes = std::fs::read(&entry.abs).map_err(|e| {
+        SwpError::new(
+            ErrorCode::Io,
+            format!("cannot read {}: {e}", entry.abs.display()),
+        )
+    })?;
     if bytes.len() as u64 > limits.max_file_bytes {
         return Ok(None);
     }

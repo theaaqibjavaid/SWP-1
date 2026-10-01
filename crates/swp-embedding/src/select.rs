@@ -423,7 +423,7 @@ mod tests {
         let cfg = ProtectConfig::default();
         let limits = Limits::default();
         let walked = crate::walk::walk(root, &cfg, &limits).unwrap();
-        crate::candidates::scan(root, &walked, &keys(), &cfg, TagWidth::DEFAULT, &limits).unwrap()
+        crate::candidates::scan(&walked, &keys(), &cfg, TagWidth::DEFAULT, &limits).unwrap()
     }
 
     /// A tree of `files` modules, each with `sites` literals in separate scopes.
@@ -625,8 +625,7 @@ export const B = 2000;
                 swp_core::version::CanonicalizerVersion::V1,
             );
             let s =
-                crate::candidates::scan(&root, &walked, &keys, &cfg, TagWidth::DEFAULT, &limits)
-                    .unwrap();
+                crate::candidates::scan(&walked, &keys, &cfg, TagWidth::DEFAULT, &limits).unwrap();
             let sel = select(&s, 8, &limits).unwrap();
             let mut footprint: Vec<(usize, u32)> = sel
                 .chosen

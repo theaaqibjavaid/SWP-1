@@ -268,7 +268,6 @@ impl KeyCounts {
 
 /// Read and analyze every file the walk admitted.
 pub fn scan(
-    root: &Path,
     walked: &Walk,
     keys: &ManifestKeys,
     cfg: &ProtectConfig,
@@ -284,7 +283,7 @@ pub fn scan(
     let mut budget = limits.max_total_bytes;
 
     for entry in &walked.files {
-        let admitted = match admit(&registry, root, entry, limits, &mut budget)? {
+        let admitted = match admit(&registry, entry, limits, &mut budget)? {
             Admission::Skip(omission) => {
                 scan.omissions.push(omission);
                 continue;
@@ -441,16 +440,10 @@ enum Admission {
 /// that reads as "this copy was modified".
 fn admit(
     registry: &Registry,
-    root: &Path,
     entry: &ScannedFile,
     limits: &Limits,
     budget: &mut u64,
 ) -> Result<Admission, SwpError> {
-    let abs = if entry.abs.is_absolute() {
-        entry.abs.clone()
-    } else {
-        root.join(&entry.abs)
-    };
     // Everything `admit` refuses here is a file the walk had already decided was
     // source, so every skip below is a hole in the examination rather than a
     // non-source file being ignored (§45).
@@ -461,7 +454,7 @@ fn admit(
             kind: OmissionKind::NotExamined,
         })
     };
-    let bytes = match std::fs::read(&abs) {
+    let bytes = match std::fs::read(&entry.abs) {
         Ok(b) => b,
         Err(e) => return Ok(skip(format!("cannot read: {e}"))),
     };
@@ -505,11 +498,7 @@ fn admit(
 /// exclude, because a release's fingerprint covers the tree as a scanner will
 /// walk it — see [`swp_identity::ProtectConfig::scan_scope`]. Candidate hunting is
 /// the expensive half of [`scan`], and none of it is wanted here.
-pub fn tree_digests(
-    root: &Path,
-    walked: &Walk,
-    limits: &Limits,
-) -> Result<BTreeMap<String, Digest>, SwpError> {
+pub fn tree_digests(walked: &Walk, limits: &Limits) -> Result<BTreeMap<String, Digest>, SwpError> {
     let registry = Registry::standard();
     let mut budget = limits.max_total_bytes;
     let mut out = BTreeMap::new();
@@ -517,7 +506,7 @@ pub fn tree_digests(
         // A file this pass leaves out is a file the scanner's own pass over the
         // same tree leaves out too, because both call the same `admit`; the
         // omission is not recorded, since neither side can report it.
-        if let Admission::Use(admitted) = admit(&registry, root, entry, limits, &mut budget)? {
+        if let Admission::Use(admitted) = admit(&registry, entry, limits, &mut budget)? {
             out.insert(entry.rel.clone(), admitted.l1_digest);
         }
     }
@@ -580,7 +569,7 @@ mod tests {
 
     fn scanned(root: &Path, cfg: &ProtectConfig, limits: &Limits) -> Scan {
         let walked = crate::walk::walk(root, cfg, limits).unwrap();
-        scan(root, &walked, &keys(), cfg, TagWidth::DEFAULT, limits).unwrap()
+        scan(&walked, &keys(), cfg, TagWidth::DEFAULT, limits).unwrap()
     }
 
     fn cfg(t: &[&str]) -> ProtectConfig {
@@ -812,15 +801,7 @@ mod tests {
             ..Limits::default()
         };
         let walked = crate::walk::walk(&root, &cfg(&["src"]), &limits).unwrap();
-        let e = scan(
-            &root,
-            &walked,
-            &keys(),
-            &cfg(&["src"]),
-            TagWidth::DEFAULT,
-            &limits,
-        )
-        .unwrap_err();
+        let e = scan(&walked, &keys(), &cfg(&["src"]), TagWidth::DEFAULT, &limits).unwrap_err();
         assert_eq!(e.code(), ErrorCode::LimitExceeded);
         std::fs::remove_dir_all(&root).unwrap();
     }
