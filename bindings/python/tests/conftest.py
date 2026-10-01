@@ -102,14 +102,21 @@ def _purge(root: Path) -> None:
 
     Windows seals `root.key` with an ACL, and DPAPI-protected files can carry a
     deny-read entry that makes `shutil.rmtree` fail on a first pass, so the walk
-    gives the owner write permission before deleting. The final check is the point:
-    a leftover directory holding `root.key` is the one thing this suite must not
-    leave behind, so it raises instead of being logged.
+    gives the owner write permission before deleting. The two modes are not
+    interchangeable: on POSIX a directory without the search bit turns every
+    later stat into EACCES and the rmtree into a silent no-op, so directories
+    are opened to the owner (0700) and files to read/write (0600). The final
+    check is the point: a leftover directory holding `root.key` is the one thing
+    this suite must not leave behind, so it raises instead of being logged.
     """
     if not root.exists():
         return
-    for dirpath, dirnames, filenames in os.walk(root):
-        for name in filenames + dirnames:
+    for dirpath, _dirnames, filenames in os.walk(root):
+        try:
+            os.chmod(dirpath, stat.S_IRWXU)
+        except OSError:
+            pass
+        for name in filenames:
             try:
                 os.chmod(os.path.join(dirpath, name), stat.S_IWRITE | stat.S_IREAD)
             except OSError:
