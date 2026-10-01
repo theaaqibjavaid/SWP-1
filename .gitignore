@@ -61,3 +61,10 @@ __pycache__/
 /bindings/**/*.node
 /bindings/*/binding.cjs
 /bindings/*/binding.d.ts
+
+# A build that cannot unlink the addon a process still has mapped — the usual
+# case on Windows, where a loaded `.node` file is shared and undeletable —
+# renames it aside instead. The retired copy ends in `.tmp`, so neither the
+# `**/*.node` rule above nor `check-release.sh`'s anchored sweep sees it, and an
+# `git add -A` after a rebuild would commit a second compiled binary.
+/bindings/*/*.retired.tmp*
