@@ -9,7 +9,7 @@
     "directory": "bindings/node"
   },
   "main": "index.js",
-  "types": "binding.d.ts",
+  "types": "index.d.ts",
   "engines": {
     "node": "^20.17.0 || ^22.13.0 || >=23.5.0"
   },
@@ -23,6 +23,7 @@
     "index.js",
     "binding.cjs",
     "binding.d.ts",
+    "index.d.ts",
     "README.md",
     "*.node"
   ],
@@ -42,6 +43,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.10.5"
+    "@napi-rs/cli": "^3.10.5",
+    "typescript": "^6.0.3"
   }
 }

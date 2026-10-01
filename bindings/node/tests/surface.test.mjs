@@ -9,7 +9,7 @@
 // addon's internal names stay off the package's API.
 
 import { createRequire } from 'node:module'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -177,6 +177,63 @@ test('SwpError is the only error class the package exports', () => {
   // one, so the surface offers exactly one name that reads like an exception.
   assert.deepEqual(classes.filter((name) => /Error$/.test(name)), ['SwpError'], classes.join(','))
 })
+
+test('the declarations name exactly what the loader exports', () => {
+  // `index.d.ts` is hand-written and `binding.d.ts` is generated, so neither is
+  // derived from the other and the runtime is the only place they can be joined:
+  // this is that place. `tsc` checks that a caller can compile against the two
+  // files together (`types/surface.test-d.ts`); this checks that what they compile
+  // against is what `require('jrs-swp')` actually hands back — a name declared and
+  // never exported, or exported and never declared, is a lie in whichever tool the
+  // caller reaches for first.
+  const hand = readFileSync(path.join(here, '..', 'index.d.ts'), 'utf8')
+  const generated = readFileSync(path.join(here, '..', 'binding.d.ts'), 'utf8')
+
+  const values = reexports(hand, 'export')
+  const types = reexports(hand, 'export type')
+  const exported = Object.keys(swp).filter((name) => name !== 'SwpError').sort()
+
+  assert.deepEqual(values.sort(), exported, 'the value exports and the declared values differ')
+  for (const name of [...values, ...types]) {
+    assert.ok(declaredNames(generated).has(name), `${name} is declared nowhere in the generated surface`)
+  }
+  // The reverse direction: a new type on the Rust side has to be *chosen* at the
+  // entry point, which is what keeps `installErrorFactory` and the two napi task
+  // handles off the surface a caller autocompletes from.
+  for (const name of declaredNames(generated)) {
+    if (INTERNAL.has(name)) continue
+    assert.ok(values.includes(name) || types.includes(name), `${name} reaches the binary and is undeclared`)
+  }
+})
+
+test('the package advertises the hand-written types entry', () => {
+  // `main` and `types` both point at the loader and its declaration beside it, and
+  // both files ship: a package whose `types` names the generated file would give a
+  // TypeScript caller an `Error` class that does not exist and a surface the
+  // runtime refuses to export.
+  assert.equal(manifest.main, 'index.js')
+  assert.equal(manifest.types, 'index.d.ts')
+  for (const entry of [manifest.main, manifest.types]) {
+    assert.ok(manifest.files.includes(entry), `${entry} is not in files`)
+    assert.ok(existsSync(path.join(here, '..', entry)), `${entry} is missing`)
+  }
+})
+
+/** The names inside `export { … } from './binding'`, in either its value or type form. */
+function reexports (text, keyword) {
+  const block = new RegExp(`${keyword} \\{([^}]*)\\} from '\\./binding'`).exec(text)
+  assert.ok(block, `${keyword} block is missing from the declarations`)
+  return block[1].split(',').map((name) => name.trim()).filter(Boolean)
+}
+
+/** Every top-level name the generated declarations export. */
+function declaredNames (text) {
+  const names = new Set()
+  for (const [, name] of text.matchAll(/^export (?:declare )?(?:class|interface|function|const|type|enum) (\w+)/gm)) {
+    names.add(name)
+  }
+  return names
+}
 
 test('the reserved word stays a document key and never a property name', () => {  // `class` is the protocol's field. napi puts it behind `class` on the JS side,
   // which a caller can reach only as `row.class` — legal in JavaScript, and the
