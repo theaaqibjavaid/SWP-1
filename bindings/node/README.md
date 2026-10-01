@@ -18,8 +18,10 @@ fence under a program is the transcript it printed. `…` stands for whatever th
 influences — a release id, a byte total that moves with the width of the tag literal — and matches
 the rest of a word or a run of words on its own; whitespace is insignificant. So a line with no `…`
 is a number this build re-derives on every run: what `tag_bits` defaults to, how many sites this
-tree can hold, what a scan of a copy of it says. The `sh` fences are the commands
-[`ci.yml`](../../.github/workflows/ci.yml) runs, in that order.
+tree can hold, what a scan of a copy of it says. The `sh` fences are the commands this package's
+[job in `ci.yml`](../../.github/workflows/ci.yml) runs, in that order — the job puts
+`cargo fmt --check` and `cargo clippy` between `npm ci` and the build, because the binding is its
+own Cargo workspace and the repository's lint jobs never see it.
 
 Every program runs in a directory holding this, and nothing else:
 
