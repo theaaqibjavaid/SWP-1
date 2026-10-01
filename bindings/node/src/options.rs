@@ -116,9 +116,11 @@ pub struct ProtectOptions {
     /// constellation requires passing back the id the plan reported.
     pub release_id: Option<String>,
     /// A label for the source this run protected, recorded but never trusted.
-    /// `undefined` records the content fingerprint; `''` records an
-    /// intentionally-empty label — the same distinction `swp protect --revision`
-    /// makes, carried here because JS can spell both.
+    /// `undefined` records the content fingerprint; a stated label is stored
+    /// trimmed, so padding costs nothing. A label that is empty, longer than 200
+    /// characters or carries a control character is refused with
+    /// `INVALID_MANIFEST` before anything is written — `''` is not a third state
+    /// beside `undefined`, whatever `--revision ""` appears to offer.
     pub revision: Option<String>,
 }
 

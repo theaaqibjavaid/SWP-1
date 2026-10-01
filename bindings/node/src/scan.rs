@@ -84,7 +84,7 @@ impl ScanOutcome {
         Report::from(self.inner.report.clone())
     }
 
-    /// `undefined` unless the caller asked for a copy under
+    /// `null` unless the caller asked for a copy under
     /// `.swp/private/reports/`.
     #[napi(getter)]
     pub fn saved(&self) -> Option<SavedReport> {

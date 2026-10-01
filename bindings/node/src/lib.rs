@@ -18,7 +18,7 @@
 //!   the store handle are not on any JavaScript object, and are not reachable
 //!   by walking a field graph from one that is.
 //! * **No unwind crosses the boundary.** Every operation runs through
-//!   [`error::capture`] or [`error::guarded`], which catch a panic and raise
+//!   `error::capture` or `error::guarded`, which catch a panic and raise
 //!   the documented `INTERNAL_ERROR` instead of killing the host process.
 //! * **Nothing is re-derived on this side.** No tag, no location id, no
 //!   coincidence probability, no verdict, no exit-code mapping. Where a value
@@ -76,9 +76,8 @@ pub fn report_stem(what: String) -> String {
 /// caller branches on `error.code`, and this is the list to check a branch
 /// against. What is deliberately *not* here is `ErrorCode::exit_code`, which is
 /// `swp`'s contract with a shell and not a library caller's: the two numbers
-/// that do reach Node are a [`Report`](report::Report)'s and a
-/// [`VerifyOutcome`](verify::VerifyOutcome)'s, and there they are fields of a
-/// document.
+/// that do reach Node are a `Report`'s and a `VerifyOutcome`'s, and there they
+/// are fields of a document.
 #[napi]
 pub fn error_codes() -> Vec<String> {
     ErrorCode::ALL

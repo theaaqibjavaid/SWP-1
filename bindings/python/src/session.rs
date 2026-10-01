@@ -425,10 +425,10 @@ pub struct PyReleaseRecord {
     release_id: String,
     #[pyo3(get)]
     created_at: String,
-    /// The revision string, when the record carries one: `git`, `manual`, or
-    /// `content`. `None` means content-only, and is the common case for a project
-    /// that is not under git. Display metadata — an attacker can write anything
-    /// here, and the detector reads nothing from it.
+    /// The label the release carries, or `None` when it recorded content only —
+    /// which is what a run that passed no `revision` stores. Display metadata —
+    /// an attacker can write anything here, and the detector reads nothing from
+    /// it.
     #[pyo3(get)]
     revision: Option<String>,
     /// `SHA-256` over the L1 canonical tree, hex. An exact copy reproduces it; a

@@ -65,9 +65,11 @@ pub struct Session {
 impl Session {
     /// Open the project rooted at `projectRoot`.
     ///
-    /// A directory with no `.swp/` rejects with `code === "NOT_PROTECTED"`, and a
-    /// store this build cannot read rejects with `PROTOCOL_VERSION_UNSUPPORTED`.
-    /// Both are refusals to guess rather than partial results.
+    /// A directory with no `.swp/` throws `code === "NOT_PROTECTED"`, and a store
+    /// this build cannot read throws `PROTOCOL_VERSION_UNSUPPORTED`. Both are
+    /// refusals to guess rather than partial results. `open` is synchronous, so
+    /// its `SwpError` arrives thrown: only `protectSummary` and `scan` hand back
+    /// a promise that can reject.
     #[napi]
     pub fn open(env: &Env, project_root: String, overrides: Option<Overrides>) -> Result<Session> {
         let overrides = overrides.map(|o| o.into_inner()).unwrap_or_default();
@@ -391,10 +393,10 @@ pub struct ReleaseRecord {
     pub project_id: String,
     pub release_id: String,
     pub created_at: String,
-    /// The revision string, when the record carries one: `git`, `manual`, or
-    /// `content`. `undefined` means content-only, and is the common case for a
-    /// project that is not under git. Display metadata — an attacker can write
-    /// anything here, and the detector reads nothing from it.
+    /// The label the release carries, or `undefined` when it recorded content
+    /// only — which is what a run that stated no `revision` stores. Display
+    /// metadata: an attacker can write anything here, and the detector reads
+    /// nothing from it.
     pub revision: Option<String>,
     /// `SHA-256` over the L1 canonical tree, hex. An exact copy reproduces it;
     /// a refactoring does not.

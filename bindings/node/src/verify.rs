@@ -100,7 +100,9 @@ impl VerifyOutcome {
         self.document.release_created_at.clone()
     }
 
-    /// `'content'`, or the label `revision` stated. Display metadata only.
+    /// The label the release recorded, or `null` when it recorded content only.
+    /// Display metadata: an attacker can write anything here and the detector
+    /// reads nothing from it.
     #[napi(getter)]
     pub fn revision(&self) -> Option<String> {
         self.document.revision.clone()
