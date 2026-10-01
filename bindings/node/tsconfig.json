@@ -1,0 +1,33 @@
+{
+  // The type-check of the declarations a TypeScript caller compiles against:
+  // this package's own two declaration files, and the compile-time tests under
+  // `types/`. Nothing is emitted — `index.js` and the addon are the runtime, and
+  // a build step here would be a second copy of a surface that already exists.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    // The tests are a type-check, never an emit, so the module system here only
+    // decides how a bare `'./binding'` is resolved. TypeScript 6 deprecates the
+    // old `node10` lookup outright, and `bundler` is the mode made for a
+    // `noEmit` graph: extensionless, no `package.json` `exports` maze to walk.
+    // What a real caller compiles against is this package's `types` entry, which
+    // their own bundler or `node16` setting resolves the same way.
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    // No `@types/*` is pulled in on purpose: the compile-time tests are about
+    // this package's declarations, and a Node-typings dependency bought only to
+    // say `process` in a test would be the package's heaviest dev dependency.
+    "types": [],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    // The generated `binding.d.ts` is checked as rigorously as the hand-written
+    // half: it ships in the package, so a signature that does not compile is a
+    // defect in what a caller receives, not a detail of the build.
+    "skipLibCheck": false,
+    "noEmit": true
+  },
+  "include": ["index.d.ts", "binding.d.ts", "types/**/*.ts"]
+}
