@@ -38,7 +38,7 @@
   "scripts": {
     "build": "napi build --platform --release --js binding.cjs --dts binding.d.ts",
     "build:dev": "napi build --platform --js binding.cjs --dts binding.d.ts",
-    "test": "node --test tests/",
+    "test": "node --test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
