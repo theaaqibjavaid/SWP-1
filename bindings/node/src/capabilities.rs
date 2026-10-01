@@ -14,29 +14,32 @@
 //! whole value `JSON.stringify`-able for the binding's own leak sweep.
 
 use napi_derive::napi;
-use swp_sdk::{Capabilities, DefaultPolicy, LanguageInfo, SiteRange, TagRange};
+use swp_sdk::{
+    Capabilities as SdkCapabilities, DefaultPolicy as SdkDefaultPolicy,
+    LanguageInfo as SdkLanguageInfo, SiteRange as SdkSiteRange, TagRange as SdkTagRange,
+};
 
 /// Everything about this build a caller may need to know without asking a human.
 #[napi(object, js_name = "Capabilities")]
 #[derive(Clone)]
-pub struct JsCapabilities {
+pub struct Capabilities {
     pub protocol: String,
     pub swp_version: String,
     pub report_schema: String,
     pub canonicalizer_version: u16,
-    pub languages: Vec<JsLanguageInfo>,
+    pub languages: Vec<LanguageInfo>,
     /// The parsed language names on their own, for a caller that only branches
     /// on them.
     pub language_names: Vec<String>,
-    pub tag_bits: JsTagRange,
-    pub target_sites: JsSiteRange,
-    pub defaults: JsDefaultPolicy,
+    pub tag_bits: TagRange,
+    pub target_sites: SiteRange,
+    pub defaults: DefaultPolicy,
 }
 
 /// A language this build analyzes, and the file names it answers to.
 #[napi(object, js_name = "LanguageInfo")]
 #[derive(Clone)]
-pub struct JsLanguageInfo {
+pub struct LanguageInfo {
     /// The stable identifier a manifest records. Never renamed.
     pub name: String,
     /// Lowercase, without the dot.
@@ -46,7 +49,7 @@ pub struct JsLanguageInfo {
 /// The inclusive range of tag widths a site may carry.
 #[napi(object, js_name = "TagRange")]
 #[derive(Clone)]
-pub struct JsTagRange {
+pub struct TagRange {
     pub min: u8,
     pub max: u8,
     pub default: u8,
@@ -55,7 +58,7 @@ pub struct JsTagRange {
 /// The inclusive range of constellation sizes a project may aim at.
 #[napi(object, js_name = "SiteRange")]
 #[derive(Clone)]
-pub struct JsSiteRange {
+pub struct SiteRange {
     pub min: u32,
     pub default: u32,
     pub max: u32,
@@ -64,13 +67,13 @@ pub struct JsSiteRange {
 /// The settings a project starts from before it edits its config.
 #[napi(object, js_name = "DefaultPolicy")]
 #[derive(Clone)]
-pub struct JsDefaultPolicy {
+pub struct DefaultPolicy {
     /// Directories and patterns never walked, whatever a project configures.
     pub excludes: Vec<String>,
 }
 
-pub(crate) fn project(inner: &Capabilities) -> JsCapabilities {
-    JsCapabilities {
+pub(crate) fn project(inner: &SdkCapabilities) -> Capabilities {
+    Capabilities {
         protocol: inner.protocol.clone(),
         swp_version: inner.swp_version.clone(),
         report_schema: inner.report_schema.clone(),
@@ -87,31 +90,31 @@ pub(crate) fn project(inner: &Capabilities) -> JsCapabilities {
     }
 }
 
-fn project_language(inner: &LanguageInfo) -> JsLanguageInfo {
-    JsLanguageInfo {
+fn project_language(inner: &SdkLanguageInfo) -> LanguageInfo {
+    LanguageInfo {
         name: inner.name.to_string(),
         extensions: inner.extensions.clone(),
     }
 }
 
-fn project_tag(inner: &TagRange) -> JsTagRange {
-    JsTagRange {
+fn project_tag(inner: &SdkTagRange) -> TagRange {
+    TagRange {
         min: inner.min,
         max: inner.max,
         default: inner.default,
     }
 }
 
-fn project_site(inner: &SiteRange) -> JsSiteRange {
-    JsSiteRange {
+fn project_site(inner: &SdkSiteRange) -> SiteRange {
+    SiteRange {
         min: inner.min,
         default: inner.default,
         max: inner.max,
     }
 }
 
-fn project_defaults(inner: &DefaultPolicy) -> JsDefaultPolicy {
-    JsDefaultPolicy {
+fn project_defaults(inner: &SdkDefaultPolicy) -> DefaultPolicy {
+    DefaultPolicy {
         excludes: inner.excludes.clone(),
     }
 }

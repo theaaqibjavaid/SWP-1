@@ -31,22 +31,22 @@
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use swp_sdk::{Report, StoredReport};
+use swp_sdk::{Report as SdkReport, StoredReport as SdkStoredReport};
 
 use crate::error::{guarded, Failure};
 
 /// The whole document, as `swp-evidence` graded it.
 #[napi(js_name = "Report")]
 #[derive(Clone)]
-pub struct JsReport {
-    pub(crate) inner: Report,
+pub struct Report {
+    pub(crate) inner: SdkReport,
 }
 
 /// One saved report, and where it came from.
 #[napi(js_name = "StoredReport")]
 #[derive(Clone)]
-pub struct JsStoredReport {
-    pub(crate) report: JsReport,
+pub struct StoredReport {
+    pub(crate) report: Report,
     pub(crate) name: String,
     pub(crate) path: String,
 }
@@ -54,7 +54,7 @@ pub struct JsStoredReport {
 /// The `run` block: who made this document, and when.
 #[napi(object, js_name = "Run")]
 #[derive(Clone)]
-pub struct JsRun {
+pub struct Run {
     /// `scan`, `verify`, or `report`: the command whose output this is.
     pub command: String,
     /// RFC 3339 UTC, supplied by the caller because this crate takes no clock.
@@ -67,7 +67,7 @@ pub struct JsRun {
 /// The `candidate` block: what was looked at, and how completely.
 #[napi(object, js_name = "Candidate")]
 #[derive(Clone)]
-pub struct JsCandidate {
+pub struct Candidate {
     /// How the input was described on the command line, or where it was staged.
     pub described: String,
     /// `'file'`, `'directory'`, `'zip'`, `'tar'`, `'tar.gz'`, …
@@ -81,7 +81,7 @@ pub struct JsCandidate {
 /// One release's tally: the strongest match first.
 #[napi(object, js_name = "ReleaseTally")]
 #[derive(Clone)]
-pub struct JsReleaseTally {
+pub struct ReleaseTally {
     pub project_id: String,
     pub release_id: String,
     /// Keyed sites this release holds.
@@ -135,7 +135,7 @@ pub struct JsReleaseTally {
 /// One thing a scan observed.
 #[napi(object, js_name = "EvidenceItem")]
 #[derive(Clone)]
-pub struct JsEvidenceItem {
+pub struct EvidenceItem {
     /// Stable handle for a citation: `EV-001`. Ordering is deterministic.
     pub id: String,
     /// `EXACT_SOURCE_MATCH`, `WATERMARK_FRAGMENT_MATCH`,
@@ -145,10 +145,10 @@ pub struct JsEvidenceItem {
     pub project_id: String,
     pub release_id: String,
     /// Where it was found in the candidate.
-    pub location: Option<JsRegion>,
+    pub location: Option<Region>,
     /// Where the corresponding site was in our protected release. Never a
     /// lookup key, but the line a reviewer opens first.
-    pub source_region: Option<JsRegion>,
+    pub source_region: Option<Region>,
     /// Why this counts, in words, with the measured numbers in it.
     pub basis: String,
     /// The strength of *this item*, on the same ladder as the overall level.
@@ -160,7 +160,7 @@ pub struct JsEvidenceItem {
 /// Where an observation was: a file, a line, and what was seen there.
 #[napi(object, js_name = "Region")]
 #[derive(Clone)]
-pub struct JsRegion {
+pub struct Region {
     /// Project-relative path, forward slashes.
     pub file: String,
     /// One-based line, as the adapter counted it.
@@ -175,7 +175,7 @@ pub struct JsRegion {
 }
 
 #[napi]
-impl JsReport {
+impl Report {
     /// `SWP-1-report-v2`.
     #[napi(getter)]
     pub fn schema(&self) -> String {
@@ -189,9 +189,9 @@ impl JsReport {
     }
 
     #[napi(getter)]
-    pub fn run(&self) -> JsRun {
+    pub fn run(&self) -> Run {
         let inner = &self.inner.run;
-        JsRun {
+        Run {
             command: inner.command.clone(),
             created_at: inner.created_at.clone(),
             generator: inner.generator.clone(),
@@ -199,9 +199,9 @@ impl JsReport {
     }
 
     #[napi(getter)]
-    pub fn candidate(&self) -> JsCandidate {
+    pub fn candidate(&self) -> Candidate {
         let inner = &self.inner.candidate;
-        JsCandidate {
+        Candidate {
             described: inner.described.clone(),
             kind: inner.kind.clone(),
             files_scanned: inner.files_scanned,
@@ -231,11 +231,11 @@ impl JsReport {
 
     /// One entry per release the candidate was scanned against, strongest first.
     #[napi(getter)]
-    pub fn releases(&self) -> Vec<JsReleaseTally> {
+    pub fn releases(&self) -> Vec<ReleaseTally> {
         self.inner
             .releases
             .iter()
-            .map(|tally| JsReleaseTally {
+            .map(|tally| ReleaseTally {
                 project_id: tally.project_id.clone(),
                 release_id: tally.release_id.clone(),
                 sites: tally.sites as f64,
@@ -264,23 +264,23 @@ impl JsReport {
     }
 
     #[napi(getter)]
-    pub fn evidence(&self) -> Vec<JsEvidenceItem> {
+    pub fn evidence(&self) -> Vec<EvidenceItem> {
         self.inner
             .evidence
             .iter()
-            .map(|item| JsEvidenceItem {
+            .map(|item| EvidenceItem {
                 id: item.id.clone(),
                 kind: item.kind.as_str().to_string(),
                 project_id: item.project_id.clone(),
                 release_id: item.release_id.clone(),
-                location: item.location.as_ref().map(|r| JsRegion {
+                location: item.location.as_ref().map(|r| Region {
                     file: r.file.clone(),
                     line: r.line,
                     excerpt: r.excerpt.clone(),
                     tokens: r.tokens,
                     radii: r.radii.clone(),
                 }),
-                source_region: item.source_region.as_ref().map(|r| JsRegion {
+                source_region: item.source_region.as_ref().map(|r| Region {
                     file: r.file.clone(),
                     line: r.line,
                     excerpt: r.excerpt.clone(),
@@ -349,9 +349,9 @@ impl JsReport {
     /// arithmetic this build does not apply, and the refusal says so rather than
     /// re-grading it under rules it was not written under.
     #[napi(factory)]
-    pub fn from_json(env: &Env, text: String) -> Result<JsReport> {
-        let report = guarded(env, || Report::from_json(&text).map_err(Failure::from))?;
-        Ok(JsReport::from(report))
+    pub fn from_json(env: &Env, text: String) -> Result<Report> {
+        let report = guarded(env, || SdkReport::from_json(&text).map_err(Failure::from))?;
+        Ok(Report { inner: report })
     }
 
     /// The verdict line, and nothing else: this object's whole account is the
@@ -369,11 +369,11 @@ impl JsReport {
 }
 
 #[napi]
-impl JsStoredReport {
+impl StoredReport {
     /// The document as it was graded. Re-serializing it yields the stored bytes
     /// unchanged, because the report *is* this type.
     #[napi(getter)]
-    pub fn report(&self) -> JsReport {
+    pub fn report(&self) -> Report {
         self.report.clone()
     }
 
@@ -400,16 +400,16 @@ impl JsStoredReport {
     }
 }
 
-impl From<Report> for JsReport {
-    fn from(inner: Report) -> Self {
-        JsReport { inner }
+impl From<SdkReport> for Report {
+    fn from(inner: SdkReport) -> Self {
+        Report { inner }
     }
 }
 
-impl JsStoredReport {
-    pub(crate) fn from_stored(inner: StoredReport) -> Self {
-        JsStoredReport {
-            report: JsReport::from(inner.report),
+impl StoredReport {
+    pub(crate) fn from_stored(inner: SdkStoredReport) -> Self {
+        StoredReport {
+            report: Report::from(inner.report),
             name: inner.name,
             path: inner.path,
         }

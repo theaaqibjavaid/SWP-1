@@ -21,7 +21,11 @@
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use swp_sdk::{ProtectOptions, ProtectSummary, ProtectedFile, ProtectedSite, RefusedSite, Session};
+use swp_sdk::{
+    ProtectOptions as SdkProtectOptions, ProtectSummary as SdkProtectSummary,
+    ProtectedFile as SdkProtectedFile, ProtectedSite as SdkProtectedSite,
+    RefusedSite as SdkRefusedSite, Session as SdkSession,
+};
 
 use crate::error::{capture, Failure};
 use crate::options::mode_word;
@@ -29,7 +33,7 @@ use crate::options::mode_word;
 /// What a protection run decided, as far as a caller outside Rust may see it.
 #[napi(object, js_name = "ProtectSummary")]
 #[derive(Clone)]
-pub struct JsProtectSummary {
+pub struct ProtectSummary {
     /// Which of the three modes ran. Only `'release'` rewrites source; `'plan'`
     /// leaves a plan document in the private store and `'dry-run'` leaves
     /// nothing at all, which is what `artifacts` reports.
@@ -67,13 +71,13 @@ pub struct JsProtectSummary {
     /// disk; `'plan'` and `'dry-run'` report the same list as what they *would*
     /// change and touch no source — so `mode` and `artifacts`, not this list,
     /// say whether the tree moved.
-    pub files_changed: Vec<JsProtectedFile>,
+    pub files_changed: Vec<ProtectedFile>,
     /// Every site the release carries, in plan order. Its length is
     /// `sitesEmbedded`.
-    pub sites: Vec<JsProtectedSite>,
+    pub sites: Vec<ProtectedSite>,
     /// Every candidate the run did not use, in the order the refusals were
     /// recorded. Its length is `sitesSkipped`.
-    pub refusals: Vec<JsRefusedSite>,
+    pub refusals: Vec<RefusedSite>,
     /// Every artifact the run wrote, in write order: store-relative under
     /// `.swp/`, project-relative for protected source. Empty for `'dry-run'`.
     pub artifacts: Vec<String>,
@@ -85,13 +89,13 @@ pub struct JsProtectSummary {
     pub languages: Vec<String>,
     /// The refusal tokens this run produced with how often each fired, sorted by
     /// token, so a caller that prints this prints the same thing every run.
-    pub refusal_counts: Vec<JsRefusalCount>,
+    pub refusal_counts: Vec<RefusalCount>,
 }
 
 /// One refusal token and its count.
 #[napi(object, js_name = "RefusalCount")]
 #[derive(Clone)]
-pub struct JsRefusalCount {
+pub struct RefusalCount {
     pub reason: String,
     pub count: u32,
 }
@@ -99,7 +103,7 @@ pub struct JsRefusalCount {
 /// One file a protection run changes, or would change, and how much of it moves.
 #[napi(object, js_name = "ProtectedFile")]
 #[derive(Clone)]
-pub struct JsProtectedFile {
+pub struct ProtectedFile {
     /// Canonical project-relative path, forward-slashed.
     pub file: String,
     /// Sites this run embedded in this file.
@@ -116,7 +120,7 @@ pub struct JsProtectedFile {
 /// field here.
 #[napi(object, js_name = "ProtectedSite")]
 #[derive(Clone)]
-pub struct JsProtectedSite {
+pub struct ProtectedSite {
     /// Canonical project-relative path.
     pub file: String,
     /// 1-based line in the protected text, where a reader will look. A hint: it
@@ -143,7 +147,7 @@ pub struct JsProtectedSite {
 /// One candidate location the run refused, and why.
 #[napi(object, js_name = "RefusedSite")]
 #[derive(Clone)]
-pub struct JsRefusedSite {
+pub struct RefusedSite {
     pub file: String,
     pub line_hint: u32,
     /// `overlapping-radius`, `constellation-full`, `changed-after-scan`,
@@ -151,8 +155,8 @@ pub struct JsRefusedSite {
     pub reason: String,
 }
 
-impl JsProtectSummary {
-    pub(crate) fn from_summary(inner: ProtectSummary) -> Self {
+impl ProtectSummary {
+    pub(crate) fn from_summary(inner: SdkProtectSummary) -> Self {
         let languages = {
             let mut seen: Vec<String> = Vec::new();
             for site in &inner.sites {
@@ -174,10 +178,10 @@ impl JsProtectSummary {
             counts.sort();
             counts
                 .into_iter()
-                .map(|(reason, count)| JsRefusalCount { reason, count })
-                .collect::<Vec<JsRefusalCount>>()
+                .map(|(reason, count)| RefusalCount { reason, count })
+                .collect::<Vec<RefusalCount>>()
         };
-        JsProtectSummary {
+        ProtectSummary {
             mode: mode_word(inner.mode).to_string(),
             project_id: inner.project_id.as_str().to_string(),
             release_id: inner.release_id.as_str().to_string(),
@@ -205,8 +209,8 @@ impl JsProtectSummary {
     }
 }
 
-fn project_file(inner: &ProtectedFile) -> JsProtectedFile {
-    JsProtectedFile {
+fn project_file(inner: &SdkProtectedFile) -> ProtectedFile {
+    ProtectedFile {
         file: inner.file.clone(),
         sites: inner.sites,
         bytes_before: inner.bytes_before as f64,
@@ -214,8 +218,8 @@ fn project_file(inner: &ProtectedFile) -> JsProtectedFile {
     }
 }
 
-fn project_site(inner: &ProtectedSite) -> JsProtectedSite {
-    JsProtectedSite {
+fn project_site(inner: &SdkProtectedSite) -> ProtectedSite {
+    ProtectedSite {
         file: inner.file.clone(),
         line_hint: inner.line_hint,
         language: inner.language.clone(),
@@ -227,8 +231,8 @@ fn project_site(inner: &ProtectedSite) -> JsProtectedSite {
     }
 }
 
-fn project_refusal(inner: &RefusedSite) -> JsRefusedSite {
-    JsRefusedSite {
+fn project_refusal(inner: &SdkRefusedSite) -> RefusedSite {
+    RefusedSite {
         file: inner.file.clone(),
         line_hint: inner.line_hint,
         reason: inner.reason.clone(),
@@ -245,13 +249,14 @@ fn project_refusal(inner: &RefusedSite) -> JsRefusedSite {
 /// envelope is built on the JS thread, so the worker never touches a JavaScript
 /// value.
 pub struct ProtectTask {
-    pub(crate) session: Session,
-    pub(crate) options: ProtectOptions,
+    pub(crate) session: SdkSession,
+    pub(crate) options: SdkProtectOptions,
 }
 
+#[napi]
 impl Task for ProtectTask {
-    type Output = std::result::Result<JsProtectSummary, Failure>;
-    type JsValue = JsProtectSummary;
+    type Output = std::result::Result<ProtectSummary, Failure>;
+    type JsValue = ProtectSummary;
 
     fn compute(&mut self) -> Result<Self::Output> {
         let session = self.session.clone();
@@ -259,7 +264,7 @@ impl Task for ProtectTask {
         Ok(capture(move || {
             session
                 .protect_summary(&options)
-                .map(JsProtectSummary::from_summary)
+                .map(ProtectSummary::from_summary)
                 .map_err(Failure::from)
         }))
     }

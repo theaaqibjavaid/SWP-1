@@ -20,22 +20,25 @@ use std::path::PathBuf;
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use swp_sdk::{ReleaseSelection, SavedReport, ScanOutcome, ScannedSite, Session};
+use swp_sdk::{
+    ReleaseSelection as SdkReleaseSelection, SavedReport as SdkSavedReport,
+    ScanOutcome as SdkScanOutcome, ScannedSite as SdkScannedSite, Session as SdkSession,
+};
 
 use crate::error::{capture, Failure};
-use crate::report::JsReport;
+use crate::report::Report;
 
 /// What a scan returned: the graded document, and where a saved copy went.
 #[napi(js_name = "ScanOutcome")]
 #[derive(Clone)]
-pub struct JsScanOutcome {
-    pub(crate) inner: ScanOutcome,
+pub struct ScanOutcome {
+    pub(crate) inner: SdkScanOutcome,
 }
 
 /// The name and the path of one report a run saved.
 #[napi(object, js_name = "SavedReport")]
 #[derive(Clone)]
-pub struct JsSavedReport {
+pub struct SavedReport {
     /// What `readReport` takes to get this document back. When two saves land in
     /// the same second the store numbers the collision, so this is the name it
     /// wrote under, which is not necessarily the one it was given.
@@ -48,7 +51,7 @@ pub struct JsSavedReport {
 /// One expected site, and what the candidate presented at its address.
 #[napi(object, js_name = "ScannedSite")]
 #[derive(Clone)]
-pub struct JsScannedSite {
+pub struct ScannedSite {
     /// Which release this site belongs to. The report's `releases` are ordered
     /// best first; these rows are in scan order, so the id is what joins a row
     /// to its tally.
@@ -74,24 +77,24 @@ pub struct JsScannedSite {
 }
 
 #[napi]
-impl JsScanOutcome {
+impl ScanOutcome {
     /// The document `swp-evidence` graded, verbatim.
     #[napi(getter)]
-    pub fn report(&self) -> JsReport {
-        JsReport::from(self.inner.report.clone())
+    pub fn report(&self) -> Report {
+        Report::from(self.inner.report.clone())
     }
 
     /// `undefined` unless the caller asked for a copy under
     /// `.swp/private/reports/`.
     #[napi(getter)]
-    pub fn saved(&self) -> Option<JsSavedReport> {
+    pub fn saved(&self) -> Option<SavedReport> {
         self.inner.saved.as_ref().map(project_saved)
     }
 
     /// Every site the scan looked for, in the order the releases were scanned
     /// and then the order the release records them.
     #[napi(getter)]
-    pub fn sites(&self) -> Vec<JsScannedSite> {
+    pub fn sites(&self) -> Vec<ScannedSite> {
         self.inner.sites.iter().map(project_site).collect()
     }
 
@@ -116,15 +119,16 @@ impl JsScanOutcome {
 /// there is no cancellation path here either — the same rule `ProtectTask`
 /// records, for the same reason.
 pub struct ScanTask {
-    pub(crate) session: Session,
+    pub(crate) session: SdkSession,
     pub(crate) candidate: PathBuf,
-    pub(crate) selection: ReleaseSelection,
+    pub(crate) selection: SdkReleaseSelection,
     pub(crate) save: bool,
 }
 
+#[napi]
 impl Task for ScanTask {
-    type Output = std::result::Result<JsScanOutcome, Failure>;
-    type JsValue = JsScanOutcome;
+    type Output = std::result::Result<ScanOutcome, Failure>;
+    type JsValue = ScanOutcome;
 
     fn compute(&mut self) -> Result<Self::Output> {
         let session = self.session.clone();
@@ -134,7 +138,7 @@ impl Task for ScanTask {
         Ok(capture(move || {
             session
                 .scan(&candidate, &selection, save)
-                .map(|inner| JsScanOutcome { inner })
+                .map(|inner| ScanOutcome { inner })
                 .map_err(Failure::from)
         }))
     }
@@ -144,15 +148,15 @@ impl Task for ScanTask {
     }
 }
 
-fn project_saved(inner: &SavedReport) -> JsSavedReport {
-    JsSavedReport {
+fn project_saved(inner: &SdkSavedReport) -> SavedReport {
+    SavedReport {
         name: inner.name.clone(),
         path: inner.path.clone(),
     }
 }
 
-fn project_site(inner: &ScannedSite) -> JsScannedSite {
-    JsScannedSite {
+fn project_site(inner: &SdkScannedSite) -> ScannedSite {
+    ScannedSite {
         release_id: inner.release_id.clone(),
         site: inner.site as f64,
         status: inner.status.to_string(),

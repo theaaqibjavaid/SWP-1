@@ -15,7 +15,9 @@
 
 use napi_derive::napi;
 use swp_sdk::{
-    InitOptions, Mode, Overrides, ProtectOptions, ReleaseId, ReleaseSelection, VerifyOptions,
+    InitOptions as SdkInitOptions, Mode, Overrides as SdkOverrides,
+    ProtectOptions as SdkProtectOptions, ReleaseId, ReleaseSelection as SdkReleaseSelection,
+    VerifyOptions as SdkVerifyOptions,
 };
 
 use crate::error::Failure;
@@ -23,7 +25,7 @@ use crate::error::Failure;
 /// The §8 `Overrides`: what one session's run changes about `[protect]`.
 #[napi(object, js_name = "Overrides")]
 #[derive(Default)]
-pub struct JsOverrides {
+pub struct Overrides {
     /// Directories to protect, project-relative or absolute-inside-the-project,
     /// appended to the configured targets.
     pub targets: Option<Vec<String>>,
@@ -38,9 +40,9 @@ pub struct JsOverrides {
     pub embed_strings: Option<bool>,
 }
 
-impl JsOverrides {
-    pub(crate) fn into_inner(self) -> Overrides {
-        Overrides {
+impl Overrides {
+    pub(crate) fn into_inner(self) -> SdkOverrides {
+        SdkOverrides {
             targets: self.targets.unwrap_or_default(),
             excludes: self.excludes.unwrap_or_default(),
             target_sites: self.target_sites,
@@ -54,7 +56,7 @@ impl JsOverrides {
 /// the CLI and in `swp-sdk` — every release the project has is loaded, because
 /// picking one silently would be an unstated claim about which.
 #[napi(object, js_name = "ReleaseSelection")]
-pub struct JsReleaseSelection {
+pub struct ReleaseSelection {
     /// Which of the three this is.
     #[napi(ts_type = "'all' | 'latest' | 'ids'")]
     pub kind: String,
@@ -63,11 +65,11 @@ pub struct JsReleaseSelection {
     pub ids: Option<Vec<String>>,
 }
 
-impl JsReleaseSelection {
-    pub(crate) fn into_inner(self) -> std::result::Result<ReleaseSelection, Failure> {
+impl ReleaseSelection {
+    pub(crate) fn into_inner(self) -> std::result::Result<SdkReleaseSelection, Failure> {
         match self.kind.as_str() {
-            "all" => Ok(ReleaseSelection::All),
-            "latest" => Ok(ReleaseSelection::Latest),
+            "all" => Ok(SdkReleaseSelection::All),
+            "latest" => Ok(SdkReleaseSelection::Latest),
             "ids" => {
                 let raw = self.ids.ok_or_else(|| {
                     Failure::usage("a release selection of kind 'ids' needs an `ids` array")
@@ -76,7 +78,7 @@ impl JsReleaseSelection {
                 for id in raw {
                     out.push(ReleaseId::new(id).map_err(Failure::from)?);
                 }
-                Ok(ReleaseSelection::Ids(out))
+                Ok(SdkReleaseSelection::Ids(out))
             }
             other => Err(Failure::usage(format!(
                 "release selection kind must be 'all', 'latest' or 'ids'; got '{other}'"
@@ -88,15 +90,15 @@ impl JsReleaseSelection {
 /// What `Session.init` is told.
 #[napi(object, js_name = "InitOptions")]
 #[derive(Default)]
-pub struct JsInitOptions {
+pub struct InitOptions {
     /// The label the project asked for. Never hashed, never trusted.
     pub name: Option<String>,
     pub force: Option<bool>,
 }
 
-impl JsInitOptions {
-    pub(crate) fn into_inner(self) -> InitOptions {
-        InitOptions {
+impl InitOptions {
+    pub(crate) fn into_inner(self) -> SdkInitOptions {
+        SdkInitOptions {
             name: self.name,
             force: self.force.unwrap_or_default(),
         }
@@ -105,7 +107,7 @@ impl JsInitOptions {
 
 /// What one `protectSummary` call is told.
 #[napi(object, js_name = "ProtectOptions")]
-pub struct JsProtectOptions {
+pub struct ProtectOptions {
     /// A run that plans, applies or does neither.
     #[napi(ts_type = "'plan' | 'release' | 'dry-run'")]
     pub mode: String,
@@ -120,11 +122,11 @@ pub struct JsProtectOptions {
     pub revision: Option<String>,
 }
 
-impl JsProtectOptions {
+impl ProtectOptions {
     /// Built through `ProtectOptions::new`, the only constructor the façade
     /// offers, on purpose: it is where a mode's defaults come from.
-    pub(crate) fn into_inner(self) -> std::result::Result<ProtectOptions, Failure> {
-        let mut inner = ProtectOptions::new(parse_mode(&self.mode)?);
+    pub(crate) fn into_inner(self) -> std::result::Result<SdkProtectOptions, Failure> {
+        let mut inner = SdkProtectOptions::new(parse_mode(&self.mode)?);
         if let Some(raw) = self.release_id {
             inner.release_id = Some(ReleaseId::new(raw).map_err(Failure::from)?);
         }
@@ -136,7 +138,7 @@ impl JsProtectOptions {
 /// What one `verify` call is told.
 #[napi(object, js_name = "VerifyOptions")]
 #[derive(Default)]
-pub struct JsVerifyOptions {
+pub struct VerifyOptions {
     /// The release to check against; `undefined` is the newest, because "is the
     /// tree I am standing in still the tree I protected?" is a question about
     /// the last protection run.
@@ -151,9 +153,9 @@ pub struct JsVerifyOptions {
     pub rows: Option<u32>,
 }
 
-impl JsVerifyOptions {
-    pub(crate) fn into_inner(self) -> std::result::Result<VerifyOptions, Failure> {
-        Ok(VerifyOptions {
+impl VerifyOptions {
+    pub(crate) fn into_inner(self) -> std::result::Result<SdkVerifyOptions, Failure> {
+        Ok(SdkVerifyOptions {
             release: self
                 .release
                 .map(ReleaseId::new)
@@ -214,7 +216,7 @@ mod tests {
     /// not a silent `'all'`.
     #[test]
     fn an_ids_selection_without_ids_is_refused() {
-        let sel = JsReleaseSelection {
+        let sel = ReleaseSelection {
             kind: "ids".to_string(),
             ids: None,
         };
@@ -227,22 +229,22 @@ mod tests {
     #[test]
     fn the_three_kinds_convert_what_the_protocol_defines() {
         assert_eq!(
-            JsReleaseSelection {
+            ReleaseSelection {
                 kind: "all".to_string(),
                 ids: Some(vec!["ignored".to_string()]),
             }
             .into_inner()
             .unwrap(),
-            ReleaseSelection::All
+            SdkReleaseSelection::All
         );
         assert!(matches!(
-            JsReleaseSelection {
+            ReleaseSelection {
                 kind: "ids".to_string(),
                 ids: Some(vec![]),
             }
             .into_inner()
             .unwrap(),
-            ReleaseSelection::Ids(v) if v.is_empty()
+            SdkReleaseSelection::Ids(v) if v.is_empty()
         ));
     }
 }

@@ -15,7 +15,7 @@
 //!
 //! ## Why some of these objects hold a Rust value and some hold copies
 //!
-//! `JsSession` holds a `swp_sdk::Session` by value and reads its fields. It
+//! `Session` holds a `swp_sdk::Session` by value and reads its fields. It
 //! cannot hold a `swp_identity::PublicKeys`, because this crate does not depend
 //! on `swp-identity` and cannot name that type — it can only read the fields off
 //! the value the SDK hands back. That constraint is the reason the leaf objects
@@ -37,19 +37,18 @@ use std::path::PathBuf;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use swp_sdk::{
-    Limits, ProjectIdentity, ReleaseId, ReleaseRecord, ReleaseSelection, Session, SwpConfig,
-    VerifyOptions,
+    Limits as SdkLimits, ProjectIdentity as SdkProjectIdentity, ReleaseId,
+    ReleaseRecord as SdkReleaseRecord, ReleaseSelection as SdkReleaseSelection,
+    Session as SdkSession, SwpConfig as SdkSwpConfig, VerifyOptions as SdkVerifyOptions,
 };
 
 use crate::error::{guarded, Failure};
-use crate::init::JsInitOutcome;
-use crate::options::{
-    JsInitOptions, JsOverrides, JsProtectOptions, JsReleaseSelection, JsVerifyOptions,
-};
+use crate::init::InitOutcome;
+use crate::options::{InitOptions, Overrides, ProtectOptions, ReleaseSelection, VerifyOptions};
 use crate::protect::ProtectTask;
-use crate::report::JsStoredReport;
+use crate::report::StoredReport;
 use crate::scan::ScanTask;
-use crate::verify::JsVerifyOutcome;
+use crate::verify::VerifyOutcome;
 
 /// An opened SWP-1 project.
 ///
@@ -58,38 +57,35 @@ use crate::verify::JsVerifyOutcome;
 /// for the same project, exactly as two shells can.
 #[napi(js_name = "Session")]
 #[derive(Clone)]
-pub struct JsSession {
-    pub(crate) inner: Session,
+pub struct Session {
+    pub(crate) inner: SdkSession,
 }
 
 #[napi]
-impl JsSession {
+impl Session {
     /// Open the project rooted at `projectRoot`.
     ///
     /// A directory with no `.swp/` rejects with `code === "NOT_PROTECTED"`, and a
     /// store this build cannot read rejects with `PROTOCOL_VERSION_UNSUPPORTED`.
     /// Both are refusals to guess rather than partial results.
     #[napi]
-    pub fn open(
-        env: &Env,
-        project_root: String,
-        overrides: Option<JsOverrides>,
-    ) -> Result<JsSession> {
+    pub fn open(env: &Env, project_root: String, overrides: Option<Overrides>) -> Result<Session> {
         let overrides = overrides.map(|o| o.into_inner()).unwrap_or_default();
         let inner = guarded(env, move || {
-            Session::open(PathBuf::from(project_root).as_path(), &overrides).map_err(Failure::from)
+            SdkSession::open(PathBuf::from(project_root).as_path(), &overrides)
+                .map_err(Failure::from)
         })?;
-        Ok(JsSession { inner })
+        Ok(Session { inner })
     }
 
     /// Walk up from `from` until a project root is found.
     #[napi]
-    pub fn discover(env: &Env, from: String, overrides: Option<JsOverrides>) -> Result<JsSession> {
+    pub fn discover(env: &Env, from: String, overrides: Option<Overrides>) -> Result<Session> {
         let overrides = overrides.map(|o| o.into_inner()).unwrap_or_default();
         let inner = guarded(env, move || {
-            Session::discover(PathBuf::from(from).as_path(), &overrides).map_err(Failure::from)
+            SdkSession::discover(PathBuf::from(from).as_path(), &overrides).map_err(Failure::from)
         })?;
-        Ok(JsSession { inner })
+        Ok(Session { inner })
     }
 
     /// Draw and seal a project secret, measure the tree, and write the store.
@@ -107,13 +103,13 @@ impl JsSession {
     pub fn init(
         env: &Env,
         project_root: String,
-        options: Option<JsInitOptions>,
-    ) -> Result<JsInitOutcome> {
+        options: Option<InitOptions>,
+    ) -> Result<InitOutcome> {
         let options = options.map(|o| o.into_inner()).unwrap_or_default();
         let outcome = guarded(env, move || {
-            Session::init(PathBuf::from(project_root).as_path(), &options).map_err(Failure::from)
+            SdkSession::init(PathBuf::from(project_root).as_path(), &options).map_err(Failure::from)
         })?;
-        Ok(JsInitOutcome::from_outcome(outcome))
+        Ok(InitOutcome::from_outcome(outcome))
     }
 
     /// The directory the project is rooted at, as the caller named it.
@@ -125,13 +121,13 @@ impl JsSession {
     /// `.swp/public/identity.json` — the half of the identity meant to be
     /// distributed, and the one that needs no key to read.
     #[napi(getter)]
-    pub fn identity(&self) -> JsProjectIdentity {
+    pub fn identity(&self) -> ProjectIdentity {
         project_identity(self.inner.identity())
     }
 
     /// The `[protect]` settings in force for this session, overrides included.
     #[napi(getter)]
-    pub fn config(&self) -> JsSwpConfig {
+    pub fn config(&self) -> SwpConfig {
         swp_config(self.inner.config())
     }
 
@@ -144,13 +140,13 @@ impl JsSession {
 
     /// The resource ceilings this build enforces.
     #[napi(getter)]
-    pub fn limits(&self) -> JsLimits {
+    pub fn limits(&self) -> Limits {
         limits(self.inner.limits())
     }
 
     /// The config as the file on disk reads, without this session's overrides.
     #[napi]
-    pub fn stored_config(&self, env: &Env) -> Result<JsSwpConfig> {
+    pub fn stored_config(&self, env: &Env) -> Result<SwpConfig> {
         let session = &self.inner;
         let config = guarded(env, || session.stored_config().map_err(Failure::from))?;
         Ok(swp_config(&config))
@@ -158,7 +154,7 @@ impl JsSession {
 
     /// The release ids a selection names, in the order the store keeps them.
     #[napi]
-    pub fn releases(&self, env: &Env, selection: JsReleaseSelection) -> Result<Vec<String>> {
+    pub fn releases(&self, env: &Env, selection: ReleaseSelection) -> Result<Vec<String>> {
         let selection = selection.into_inner().map_err(|f| f.into_napi_error(env))?;
         let session = &self.inner;
         let ids = guarded(env, || {
@@ -176,7 +172,7 @@ impl JsSession {
 
     /// The one release a selection names, refusing a selection that names several.
     #[napi]
-    pub fn one_release(&self, env: &Env, selection: JsReleaseSelection) -> Result<String> {
+    pub fn one_release(&self, env: &Env, selection: ReleaseSelection) -> Result<String> {
         let selection = selection.into_inner().map_err(|f| f.into_napi_error(env))?;
         let session = &self.inner;
         let id = guarded(env, || {
@@ -190,7 +186,7 @@ impl JsSession {
 
     /// Every release record: the public history, signatures and all.
     #[napi]
-    pub fn release_history(&self, env: &Env) -> Result<Vec<JsReleaseRecord>> {
+    pub fn release_history(&self, env: &Env) -> Result<Vec<ReleaseRecord>> {
         let session = &self.inner;
         let records = guarded(env, || session.release_history().map_err(Failure::from))?;
         Ok(records.into_iter().map(release_record).collect())
@@ -198,7 +194,7 @@ impl JsSession {
 
     /// One release record by id.
     #[napi]
-    pub fn release(&self, env: &Env, release_id: String) -> Result<JsReleaseRecord> {
+    pub fn release(&self, env: &Env, release_id: String) -> Result<ReleaseRecord> {
         let session = &self.inner;
         let record = guarded(env, || {
             let id = ReleaseId::new(release_id).map_err(Failure::from)?;
@@ -224,7 +220,7 @@ impl JsSession {
     pub fn protect_summary(
         &self,
         env: &Env,
-        options: JsProtectOptions,
+        options: ProtectOptions,
     ) -> Result<AsyncTask<ProtectTask>> {
         let options = options.into_inner().map_err(|f| f.into_napi_error(env))?;
         Ok(AsyncTask::new(ProtectTask {
@@ -235,14 +231,14 @@ impl JsSession {
 
     /// Grade this project's own tree against one of its releases.
     #[napi]
-    pub fn verify(&self, env: &Env, options: Option<JsVerifyOptions>) -> Result<JsVerifyOutcome> {
+    pub fn verify(&self, env: &Env, options: Option<VerifyOptions>) -> Result<VerifyOutcome> {
         let options = match options {
             Some(o) => o.into_inner().map_err(|f| f.into_napi_error(env))?,
-            None => VerifyOptions::default(),
+            None => SdkVerifyOptions::default(),
         };
         let session = self.inner.clone();
         let outcome = guarded(env, move || session.verify(&options).map_err(Failure::from))?;
-        Ok(JsVerifyOutcome::from_outcome(outcome))
+        Ok(VerifyOutcome::from_outcome(outcome))
     }
 
     /// Look for this project's provenance in a candidate tree or archive.
@@ -256,12 +252,12 @@ impl JsSession {
         &self,
         env: &Env,
         candidate: String,
-        releases: Option<JsReleaseSelection>,
+        releases: Option<ReleaseSelection>,
         save: Option<bool>,
     ) -> Result<AsyncTask<ScanTask>> {
         let selection = match releases {
             Some(s) => s.into_inner().map_err(|f| f.into_napi_error(env))?,
-            None => ReleaseSelection::All,
+            None => SdkReleaseSelection::All,
         };
         Ok(AsyncTask::new(ScanTask {
             session: self.inner.clone(),
@@ -280,10 +276,10 @@ impl JsSession {
 
     /// Read one saved report back as the document it says it is.
     #[napi]
-    pub fn read_report(&self, env: &Env, name: String) -> Result<JsStoredReport> {
+    pub fn read_report(&self, env: &Env, name: String) -> Result<StoredReport> {
         let session = &self.inner;
         let stored = guarded(env, || session.read_report(&name).map_err(Failure::from))?;
-        Ok(JsStoredReport::from_stored(stored))
+        Ok(StoredReport::from_stored(stored))
     }
 
     /// The root and the project id, and nothing else. A session is a path and
@@ -301,31 +297,31 @@ impl JsSession {
     }
 }
 
-impl JsSession {
-    pub(crate) fn from_session(inner: Session) -> Self {
-        JsSession { inner }
+impl Session {
+    pub(crate) fn from_session(inner: SdkSession) -> Self {
+        Session { inner }
     }
 }
 
 /// `.swp/public/identity.json`.
 #[napi(object, js_name = "ProjectIdentity")]
 #[derive(Clone)]
-pub struct JsProjectIdentity {
+pub struct ProjectIdentity {
     pub protocol: String,
     pub schema: u16,
     pub project_id: String,
     /// RFC 3339, UTC.
     pub created_at: String,
-    pub verification: JsPublicKeys,
+    pub verification: PublicKeys,
     pub canonicalizer_version: u16,
-    pub generator: JsGeneratorInfo,
+    pub generator: GeneratorInfo,
     pub display_name: String,
 }
 
 /// The Ed25519 verify key, and the scheme that produced it.
 #[napi(object, js_name = "PublicKeys")]
 #[derive(Clone)]
-pub struct JsPublicKeys {
+pub struct PublicKeys {
     /// Base64. Public by design — releases are signed against it.
     pub verify_key_b64: String,
     pub algorithm: String,
@@ -334,7 +330,7 @@ pub struct JsPublicKeys {
 /// The build that wrote a document.
 #[napi(object, js_name = "GeneratorInfo")]
 #[derive(Clone)]
-pub struct JsGeneratorInfo {
+pub struct GeneratorInfo {
     pub swp_version: String,
     pub generator: String,
 }
@@ -342,16 +338,16 @@ pub struct JsGeneratorInfo {
 /// `.swp/public/config.toml`, or the built-in defaults where it is silent.
 #[napi(object, js_name = "SwpConfig")]
 #[derive(Clone)]
-pub struct JsSwpConfig {
+pub struct SwpConfig {
     pub protocol: String,
-    pub protect: JsProtectConfig,
-    pub limits: JsLimits,
+    pub protect: ProtectConfig,
+    pub limits: Limits,
 }
 
 /// The `[protect]` table.
 #[napi(object, js_name = "ProtectConfig")]
 #[derive(Clone)]
-pub struct JsProtectConfig {
+pub struct ProtectConfig {
     /// Paths, project-relative, that may hold protected source.
     pub targets: Vec<String>,
     pub excludes: Vec<String>,
@@ -364,7 +360,7 @@ pub struct JsProtectConfig {
 /// (`f64`) for the reason recorded at the top of `protect.rs`.
 #[napi(object, js_name = "Limits")]
 #[derive(Clone)]
-pub struct JsLimits {
+pub struct Limits {
     pub max_file_bytes: f64,
     pub max_parse_bytes: f64,
     pub max_nodes_per_tree: u32,
@@ -389,7 +385,7 @@ pub struct JsLimits {
 /// A signed, public record of one protected release.
 #[napi(object, js_name = "ReleaseRecord")]
 #[derive(Clone)]
-pub struct JsReleaseRecord {
+pub struct ReleaseRecord {
     pub protocol: String,
     pub schema: u16,
     pub project_id: String,
@@ -407,8 +403,8 @@ pub struct JsReleaseRecord {
     /// The digest of the *private* manifest, hex. One-way, and published by
     /// design so a restored backup can be confirmed against it.
     pub private_manifest_digest: String,
-    pub watermark: JsWatermarkParams,
-    pub generator: JsGeneratorInfo,
+    pub watermark: WatermarkParams,
+    pub generator: GeneratorInfo,
     /// The Ed25519 signature over this document, base64.
     pub signature: String,
     /// Why the record refuses itself, or `undefined` when it does not — the
@@ -423,7 +419,7 @@ pub struct JsReleaseRecord {
 /// old release behaves differently without revealing a single location.
 #[napi(object, js_name = "WatermarkParams")]
 #[derive(Clone)]
-pub struct JsWatermarkParams {
+pub struct WatermarkParams {
     pub target_sites: u32,
     pub tag_bits: u8,
     pub sites_embedded: u32,
@@ -433,14 +429,14 @@ pub struct JsWatermarkParams {
     /// were permitted — a digest rather than the list so the record stays fixed
     /// size.
     pub form_set: String,
-    pub adapters: Vec<JsAdapterUse>,
+    pub adapters: Vec<AdapterUse>,
 }
 
 /// Whether a language was parsed by an AST adapter or fell back to the lexical
 /// one.
 #[napi(object, js_name = "AdapterUse")]
 #[derive(Clone)]
-pub struct JsAdapterUse {
+pub struct AdapterUse {
     pub language: String,
     pub mode: String,
     pub files: u32,
@@ -452,18 +448,18 @@ pub struct JsAdapterUse {
 // does not depend on.
 // --------------------------------------------------------------------------------
 
-fn project_identity(id: &ProjectIdentity) -> JsProjectIdentity {
-    JsProjectIdentity {
+fn project_identity(id: &SdkProjectIdentity) -> ProjectIdentity {
+    ProjectIdentity {
         protocol: id.protocol.clone(),
         schema: id.schema,
         project_id: id.project_id.as_str().to_string(),
         created_at: id.created_at.to_rfc3339(),
-        verification: JsPublicKeys {
+        verification: PublicKeys {
             verify_key_b64: id.verification.verify_key_b64.clone(),
             algorithm: id.verification.algorithm.clone(),
         },
         canonicalizer_version: id.canonicalizer_version,
-        generator: JsGeneratorInfo {
+        generator: GeneratorInfo {
             swp_version: id.generator.swp_version.clone(),
             generator: id.generator.generator.clone(),
         },
@@ -471,10 +467,10 @@ fn project_identity(id: &ProjectIdentity) -> JsProjectIdentity {
     }
 }
 
-fn swp_config(config: &SwpConfig) -> JsSwpConfig {
-    JsSwpConfig {
+fn swp_config(config: &SdkSwpConfig) -> SwpConfig {
+    SwpConfig {
         protocol: config.protocol.clone(),
-        protect: JsProtectConfig {
+        protect: ProtectConfig {
             targets: config.protect.targets.clone(),
             excludes: config.protect.excludes.clone(),
             target_sites: config.protect.target_sites,
@@ -485,8 +481,8 @@ fn swp_config(config: &SwpConfig) -> JsSwpConfig {
     }
 }
 
-fn limits(inner: Limits) -> JsLimits {
-    JsLimits {
+fn limits(inner: SdkLimits) -> Limits {
+    Limits {
         max_file_bytes: inner.max_file_bytes as f64,
         max_parse_bytes: inner.max_parse_bytes as f64,
         max_nodes_per_tree: inner.max_nodes_per_tree,
@@ -507,8 +503,8 @@ fn limits(inner: Limits) -> JsLimits {
     }
 }
 
-fn release_record(record: ReleaseRecord) -> JsReleaseRecord {
-    JsReleaseRecord {
+fn release_record(record: SdkReleaseRecord) -> ReleaseRecord {
+    ReleaseRecord {
         protocol: record.protocol.clone(),
         schema: record.schema,
         project_id: record.project_id.as_str().to_string(),
@@ -518,7 +514,7 @@ fn release_record(record: ReleaseRecord) -> JsReleaseRecord {
         fingerprint: record.fingerprint.hex(),
         fingerprint_level: record.fingerprint_level.clone(),
         private_manifest_digest: record.private_manifest_digest.hex(),
-        watermark: JsWatermarkParams {
+        watermark: WatermarkParams {
             target_sites: record.watermark.target_sites,
             tag_bits: record.watermark.tag_bits,
             sites_embedded: record.watermark.sites_embedded,
@@ -529,14 +525,14 @@ fn release_record(record: ReleaseRecord) -> JsReleaseRecord {
                 .watermark
                 .adapters
                 .iter()
-                .map(|a| JsAdapterUse {
+                .map(|a| AdapterUse {
                     language: a.language.clone(),
                     mode: a.mode.clone(),
                     files: a.files,
                 })
                 .collect(),
         },
-        generator: JsGeneratorInfo {
+        generator: GeneratorInfo {
             swp_version: record.generator.swp_version.clone(),
             generator: record.generator.generator.clone(),
         },

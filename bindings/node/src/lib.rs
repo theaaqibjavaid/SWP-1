@@ -76,8 +76,8 @@ pub fn report_stem(what: String) -> String {
 /// caller branches on `error.code`, and this is the list to check a branch
 /// against. What is deliberately *not* here is `ErrorCode::exit_code`, which is
 /// `swp`'s contract with a shell and not a library caller's: the two numbers
-/// that do reach Node are a [`Report`](report::JsReport)'s and a
-/// [`VerifyOutcome`](verify::JsVerifyOutcome)'s, and there they are fields of a
+/// that do reach Node are a [`Report`](report::Report)'s and a
+/// [`VerifyOutcome`](verify::VerifyOutcome)'s, and there they are fields of a
 /// document.
 #[napi]
 pub fn error_codes() -> Vec<String> {
@@ -91,7 +91,7 @@ pub fn error_codes() -> Vec<String> {
 ///
 /// It touches nothing: no filesystem, no project, no secret. It cannot fail.
 #[napi]
-pub fn capabilities() -> capabilities::JsCapabilities {
+pub fn capabilities() -> capabilities::Capabilities {
     capabilities::project(&swp_sdk::capabilities())
 }
 

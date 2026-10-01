@@ -14,13 +14,13 @@
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use swp_sdk::{SiteRow, VerifyDocument, VerifyOutcome};
+use swp_sdk::{SiteRow as SdkSiteRow, VerifyDocument, VerifyOutcome as SdkVerifyOutcome};
 
 use crate::error::Failure;
 
 /// A verification's answer: the document, and where a saved copy went.
 #[napi(js_name = "VerifyOutcome")]
-pub struct JsVerifyOutcome {
+pub struct VerifyOutcome {
     document: VerifyDocument,
     report_saved: Option<String>,
 }
@@ -32,7 +32,7 @@ pub struct JsVerifyOutcome {
 /// which asks the one place the protocol draws the watermark/not-watermark line.
 #[napi(object, js_name = "SiteRow")]
 #[derive(Clone)]
-pub struct JsSiteRow {
+pub struct SiteRow {
     /// Index into the release's site list, matching `swp inspect manifest`.
     pub site: f64,
     /// Where this site was when the release was made. A hint for a human, never
@@ -60,7 +60,7 @@ pub struct JsSiteRow {
 }
 
 #[napi]
-impl JsVerifyOutcome {
+impl VerifyOutcome {
     /// `SWP-1-verify-v1`.
     #[napi(getter)]
     pub fn schema(&self) -> String {
@@ -197,7 +197,7 @@ impl JsVerifyOutcome {
 
     /// Every site of the release, in the order the document records them.
     #[napi(getter)]
-    pub fn sites(&self) -> Vec<JsSiteRow> {
+    pub fn sites(&self) -> Vec<SiteRow> {
         self.document.sites.iter().map(project_row).collect()
     }
 
@@ -272,8 +272,8 @@ impl JsVerifyOutcome {
     }
 }
 
-fn project_row(row: &SiteRow) -> JsSiteRow {
-    JsSiteRow {
+fn project_row(row: &SdkSiteRow) -> SiteRow {
+    SiteRow {
         site: row.site as f64,
         file: row.file.clone(),
         line_hint: row.line_hint,
@@ -292,9 +292,9 @@ fn project_row(row: &SiteRow) -> JsSiteRow {
     }
 }
 
-impl JsVerifyOutcome {
-    pub(crate) fn from_outcome(inner: VerifyOutcome) -> Self {
-        JsVerifyOutcome {
+impl VerifyOutcome {
+    pub(crate) fn from_outcome(inner: SdkVerifyOutcome) -> Self {
+        VerifyOutcome {
             document: inner.document,
             report_saved: inner.report_saved,
         }

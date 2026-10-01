@@ -17,21 +17,24 @@
 use std::collections::BTreeMap;
 
 use napi_derive::napi;
-use swp_sdk::{InitOutcome, InitResult, Measurement, Settings};
+use swp_sdk::{
+    InitOutcome as SdkInitOutcome, InitResult as SdkInitResult, Measurement as SdkMeasurement,
+    Settings as SdkSettings,
+};
 
-use crate::session::JsSession;
+use crate::session::Session;
 
 /// A project that is ready to protect, and what initializing it produced.
 #[napi(js_name = "InitOutcome")]
-pub struct JsInitOutcome {
-    pub(crate) session: JsSession,
-    pub(crate) result: JsInitResult,
+pub struct InitOutcome {
+    pub(crate) session: Session,
+    pub(crate) result: InitResult,
 }
 
 /// What a store now holds, in the form an application can act on.
 #[napi(object, js_name = "InitResult")]
 #[derive(Clone)]
-pub struct JsInitResult {
+pub struct InitResult {
     pub project_id: String,
     pub display_name: String,
     /// Whether the store was already there. A pre-existing store keeps its
@@ -56,14 +59,14 @@ pub struct JsInitResult {
     pub created: Vec<String>,
     /// Whether this run changed the project's display label.
     pub renamed: bool,
-    pub measurement: JsMeasurement,
-    pub settings: JsSettings,
+    pub measurement: Measurement,
+    pub settings: Settings,
 }
 
 /// What the tree holds, measured the way a scan would measure it.
 #[napi(object, js_name = "Measurement")]
 #[derive(Clone)]
-pub struct JsMeasurement {
+pub struct Measurement {
     /// Files with a parser-covered extension.
     pub files: u32,
     pub bytes: f64,
@@ -81,7 +84,7 @@ pub struct JsMeasurement {
 /// The `[protect]` section this run left behind.
 #[napi(object, js_name = "Settings")]
 #[derive(Clone)]
-pub struct JsSettings {
+pub struct Settings {
     pub targets: Vec<String>,
     pub target_sites: u32,
     pub tag_bits: u8,
@@ -93,33 +96,33 @@ pub struct JsSettings {
 }
 
 #[napi]
-impl JsInitOutcome {
+impl InitOutcome {
     /// The opened session for the project `init` just created or re-opened.
     #[napi(getter)]
-    pub fn session(&self) -> JsSession {
+    pub fn session(&self) -> Session {
         self.session.clone()
     }
 
     /// What the run did: the identity, the seal's metadata, the measurement, the
     /// settings it wrote or left alone.
     #[napi(getter)]
-    pub fn result(&self) -> JsInitResult {
+    pub fn result(&self) -> InitResult {
         self.result.clone()
     }
 }
 
-impl JsInitOutcome {
-    pub(crate) fn from_outcome(inner: InitOutcome) -> Self {
+impl InitOutcome {
+    pub(crate) fn from_outcome(inner: SdkInitOutcome) -> Self {
         let result = project_result(inner.result);
-        JsInitOutcome {
-            session: JsSession::from_session(inner.session),
+        InitOutcome {
+            session: Session::from_session(inner.session),
             result,
         }
     }
 }
 
-fn project_result(inner: InitResult) -> JsInitResult {
-    JsInitResult {
+fn project_result(inner: SdkInitResult) -> InitResult {
+    InitResult {
         project_id: inner.project_id.as_str().to_string(),
         display_name: inner.display_name.clone(),
         pre_existing: inner.pre_existing,
@@ -136,8 +139,8 @@ fn project_result(inner: InitResult) -> JsInitResult {
     }
 }
 
-fn project_measurement(inner: Measurement) -> JsMeasurement {
-    JsMeasurement {
+fn project_measurement(inner: SdkMeasurement) -> Measurement {
+    Measurement {
         files: inner.files,
         bytes: inner.bytes as f64,
         skipped: inner.skipped,
@@ -146,8 +149,8 @@ fn project_measurement(inner: Measurement) -> JsMeasurement {
     }
 }
 
-fn project_settings(inner: Settings) -> JsSettings {
-    JsSettings {
+fn project_settings(inner: SdkSettings) -> Settings {
+    Settings {
         targets: inner.targets.clone(),
         target_sites: inner.target_sites,
         tag_bits: inner.tag_bits,
