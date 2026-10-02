@@ -167,6 +167,10 @@ fn capture(work: &Path, example: &str) -> BTreeMap<String, Shot> {
     record(&mut shots, shoot(&["protect", "--dry-run"], &dir));
     record(&mut shots, shoot(&["protect", "--sites", "12"], &dir));
     record(&mut shots, shoot(&["verify"], &dir));
+    // The hook's own question, asked while the tree is still the one `protect`
+    // left: `pre-commit` reads the tree it stands in, so with `copy/` present its
+    // scope line measures a different tree than the pages describe.
+    record(&mut shots, shoot(&["pre-commit"], &dir));
     // The JSON view of the same command, before the copy exists: `verify` reads the
     // tree it is standing in, so a transcript of it is only quotable against the
     // tree the documentation describes, and every page quotes the clean one.
@@ -175,6 +179,9 @@ fn capture(work: &Path, example: &str) -> BTreeMap<String, Shot> {
     let copy_src = dir.join("copy").join("src");
     copy_files(&dir.join("src"), &copy_src);
     record(&mut shots, shoot(&["scan", "./copy"], &dir));
+    // The grade is a second reading of the same measurement, so it is captured with
+    // the scan it grades rather than in the interface loop below.
+    record(&mut shots, shoot(&["scan", "./copy", "--compliance"], &dir));
     record(&mut shots, shoot(&["scan", "../plain"], &dir));
     // The same untouched tree, asked the other question: `verify` there is the
     // failure a reader hits when they run the command before `swp init`, and the
@@ -231,6 +238,18 @@ fn capture(work: &Path, example: &str) -> BTreeMap<String, Shot> {
         &["scan", "./copy", "--format", "json"][..],
         &["scan", "./nowhere"][..],
         &["scan", "--formt", "json", "./copy"][..],
+    ] {
+        record(&mut shots, shoot(argv, &dir));
+    }
+
+    // The three refusals a page has to be able to quote: a flag two verbs stopped
+    // taking, and the one combination that would archive a document their own
+    // reader refuses. Each fails in the parser or before any artifact is written,
+    // so none of them can disturb the transcripts above.
+    for argv in [
+        &["scan", "./copy", "--compliance", "--save"][..],
+        &["verify", "--compliance"][..],
+        &["pre-commit", "--compliance"][..],
     ] {
         record(&mut shots, shoot(argv, &dir));
     }
@@ -849,6 +868,17 @@ fn refused_below(block: &[&str]) -> bool {
         .any(|line| line.starts_with("error [USAGE]"))
 }
 
+/// The first word of a command line, taken from the parser's own list of commands
+/// plus the words that print and leave.
+fn verb_words() -> Vec<&'static str> {
+    let mut words: Vec<&'static str> = swp_cli::args::Command::ALL
+        .iter()
+        .map(|command| command.name())
+        .collect();
+    words.extend(["help", "version", "--help", "-h", "--version"]);
+    words
+}
+
 /// The argv a snippet asks for, or `None` when it is prose rather than a command.
 ///
 /// A trailing period or comma is how a sentence ends, not part of an argument, so
@@ -865,21 +895,15 @@ fn command_words(snippet: &str) -> Option<Vec<String>> {
     let mut words: Vec<String> = body.split_whitespace().map(str::to_string).collect();
     // A line that begins with the word `swp` is just as often the banner this tool
     // prints — `swp SWP-1 · swp <version> · …` — as it is a command someone typed, so
-    // the second word has to be a verb before anything is parsed.
-    const VERBS: [&str; 11] = [
-        "init",
-        "generate",
-        "protect",
-        "verify",
-        "scan",
-        "inspect",
-        "report",
-        "help",
-        "--help",
-        "-h",
-        "--version",
-    ];
-    if !words.first().is_some_and(|w| VERBS.contains(&w.as_str())) {
+    // the second word has to be a verb before anything is parsed. The verbs come
+    // from the parser's own list rather than a copy of it, because a hand-written
+    // list silently stops checking the day a command is added: `pre-commit`,
+    // `registry` and `badge` went unparsed on these pages for as long as they
+    // existed, and no test noticed the absence.
+    if !words
+        .first()
+        .is_some_and(|w| verb_words().iter().any(|v| v == w))
+    {
         return None;
     }
     if let Some(last) = words.last_mut() {
