@@ -209,7 +209,7 @@ already the same function in the CLI (`swp-cli/src/lib.rs:122-123`
 | | |
 | --- | --- |
 | Inputs | `ProtectOptions { mode: Mode, release_id: Option<ReleaseId>, revision: Option<String> }`. The settings the run protects *with* — targets, excludes, site count, tag width, string literals — are the project's `[protect]` config as patched by the `Overrides` the `Session` was opened with, not per-call arguments (§11), because `swp-embedding` validates one coherent settings document rather than a config plus a set of exceptions. |
-| Effects | `plan` → **writes store** (manifest, plan, release record); `release` → **writes store + source**; `dry_run` → **none** (`swp-embedding/src/protect.rs:99, :106`) |
+| Effects | `plan` → **writes store** (the private plan and nothing else: no manifest, no release record, no source change — `swp-embedding/src/protect.rs:282-293`); `release` → **writes store + source** (manifest, then plan, then the public release record, then the source files: `:271-281` → `write_release`, `:336-398`); `dry_run` → **none** (`:294-301`). `Mode::writes_source` / `Mode::writes_store` (`:99`, `:106`) state the same bounds the match enforces: only `release` may touch source, and only `dry_run` leaves nothing behind. |
 | Secret | yes: `ManifestKeys::derive` (`swp-manifest/src/keys.rs:73`) and `ManifestSigningKey::from_root`. Dropped when the call returns (`swp-sdk/src/protect.rs:377`, immediately after `swp_embedding::protect` has derived what it needed). |
 | Blocks | yes, proportional to tree size. This is the call a binding must run off the host's main thread. |
 | Concurrent | one `protect` per project at a time. Two at once write the same files. |
@@ -226,8 +226,9 @@ pub struct ProtectOptions {               // swp-sdk/src/protect.rs:45-73
 pub struct ProtectOutcome {               // :89-101
     pub protection: Protection,           // swp-embedding's result, unaltered
     pub revision: Option<String>,         // what the caller stated, trimmed; `None`
-                                          // when none was stated or it trimmed to
-                                          // nothing in a mode that writes no record
+                                          // only when none was stated — a label
+                                          // that trims to nothing is refused at the
+                                          // door before anything is written
 }
 ```
 

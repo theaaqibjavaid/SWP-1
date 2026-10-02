@@ -129,7 +129,9 @@ for reuse.
 ## 7. Follow-ups
 
 Issue [#27](https://github.com/theaaqibjavaid/SWP-1/issues/27) is the same documentation
-surface one row further up: §4's *Effects* row still credits `Mode::Plan` with a manifest
-and a release record it does not write. This record deliberately did not fold that fix
-in — #26 had to settle what a refused run means before #27 could say what a *successful*
-plan run writes.
+surface one row further up: §4's *Effects* row credited `Mode::Plan` with a manifest
+and a release record it does not write. That row now describes the three branches the
+pipeline actually takes — the plan branch at `swp-embedding/src/protect.rs:282-293`,
+`write_release` at `:336-398`, the dry run's note at `:294-301`. This record
+deliberately did not fold that fix in — #26 had to settle what a refused run means
+before #27 could say what a *successful* plan run writes.
