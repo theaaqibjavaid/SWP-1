@@ -49,7 +49,11 @@ wrapper layer would be where a binding starts restating Rust decisions in Python
 root secret exists: it is drawn, sealed by the operating system, and never
 returned. What comes back is *where* it went — `secret_scheme`, `secret_state`
 and the 40-bit non-secret `secret_handle` on the result — which is the whole of
-the disclosure.
+the disclosure. `secret_scheme` is `"dpapi"` on Windows and `"plain"` everywhere
+else, including macOS: DPAPI is the Windows API, and on the other two the key is
+written as itself and protected only by the file's permissions. On Windows
+`SWP_SECRET_PLAIN=1` (or `=true`) asks for `"plain"` explicitly, for backup
+tooling, containers and CI.
 
 ```python
 import swp
@@ -62,7 +66,7 @@ session = outcome.session
 print(outcome)
 # InitOutcome(project_id='swp1-…', pre_existing=False)
 
-print(outcome.result.secret_scheme)   # "dpapi" on Windows and macOS, "plain" on Linux
+print(outcome.result.secret_scheme)   # "dpapi" on Windows, "plain" on macOS and Linux
 print(outcome.result.secret_state)    # "created" here; "kept" on a re-init
 print(outcome.result.permissions_verified)
 print(outcome.result.settings)
