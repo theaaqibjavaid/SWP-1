@@ -60,12 +60,15 @@ pub struct ProtectOptions {
     /// cannot change the fingerprint.
     ///
     /// `None` records the content fingerprint as the revision; `Some(text)`
-    /// records `text` trimmed. There is no stated-but-empty third state: an empty
-    /// label is refused by the record's own validation where it is written
-    /// (`Store::write_release`, `swp-identity/src/store.rs:346`), so `Some("")`
-    /// and `Some("   ")` end a `Mode::Release` run with `INVALID_MANIFEST` before
-    /// a source file is touched. `Mode::Plan` and `Mode::DryRun` write no release
-    /// record, so in those two the label is neither refused nor stored anywhere.
+    /// records `text` trimmed. There is no stated-but-empty third state: a label
+    /// that trims to nothing, runs over 200 bytes, or carries a control character
+    /// is refused with `INVALID_MANIFEST` by the same validation the record applies
+    /// to itself (`SourceRevision::validate`, `swp-identity/src/release.rs:70`),
+    /// and the run that refuses it writes nothing at all — the label is checked
+    /// with the identity and the config, before the store is consulted
+    /// (`swp-embedding/src/protect.rs:200`). The refusal is mode-independent, so
+    /// `Mode::Plan` and `Mode::DryRun` reject it too rather than silently dropping
+    /// what the caller stated.
     pub revision: Option<String>,
 }
 
@@ -89,11 +92,11 @@ pub struct ProtectOutcome {
     /// the full [`Plan`](swp_embedding::Plan) including every refusal with its
     /// reason.
     pub protection: Protection,
-    /// The revision label the run recorded, after trimming — `None` when the
-    /// caller passed none, or passed one that trims to nothing in a mode that
-    /// writes no release record. It is returned because the release record holds
-    /// what was *stored*, and a caller that normalizes the label a second time
-    /// can disagree with it.
+    /// The revision label the run recorded, after trimming — `None` only when the
+    /// caller passed none. A label that trims to nothing never reaches a recorded
+    /// release: it is refused before anything is written. It is returned because the
+    /// release record holds what was *stored*, and a caller that normalizes the
+    /// label a second time can disagree with it.
     pub revision: Option<String>,
 }
 
@@ -185,8 +188,9 @@ pub struct ProtectSummary {
     pub release_id: ReleaseId,
     pub created_at: Timestamp,
     /// What the operator said the source was, trimmed; `None` when nothing was
-    /// said, or when what was said trimmed to nothing in a mode that writes no
-    /// release record. Display metadata, never hashed.
+    /// said. A label that trims to nothing is refused before the run writes
+    /// anything, so it is never here as a silent absence. Display metadata, never
+    /// hashed.
     pub revision: Option<String>,
     /// §16 fingerprint of the tree as it now stands.
     pub fingerprint: Digest,
@@ -340,9 +344,9 @@ impl Session {
             Some(id) => id.clone(),
             None => new_release_id()?,
         };
-        // What the caller stated, trimmed. `Some("   ")` reaches the record as
-        // `Manual { value: "" }`, and the record's own validation refuses it there
-        // — `swp protect --revision "   "` is that refusal, not a blank label.
+        // What the caller stated, trimmed. `Some("   ")` reaches the pipeline as
+        // `Manual { value: "" }`, and the pipeline refuses it as the input it is —
+        // `swp protect --revision "   "` is that refusal, not a blank label.
         let trimmed = options
             .revision
             .as_ref()
@@ -373,7 +377,7 @@ impl Session {
         drop(secret);
         Ok(ProtectOutcome {
             protection,
-            revision: trimmed.filter(|s| !s.is_empty()),
+            revision: trimmed,
         })
     }
 }
