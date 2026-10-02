@@ -12,7 +12,7 @@ implementation, because a decision record that moves its own evidence to match t
 is not a record. Its two pointers into `crates/swp-sdk/src/protect.rs` are the file as it
 stood then — `Request<'a>` still borrows the secret at `swp-embedding/src/protect.rs:118`,
 and that is unchanged — while the implementation grew the SDK module, so what it cites as
-the drop at `:137` is `:367` now and `ProtectOptions` at `:35-57` is `:45-67`.
+the drop at `:137` is `:373` now and `ProtectOptions` at `:35-57` is `:45-70`.
 
 Implemented as §7 decided: `swp_sdk::Session::protect_summary(&ProtectOptions) ->
 swp_sdk::ProtectSummary` (`crates/swp-sdk/src/protect.rs`), a `binding_facing`

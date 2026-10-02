@@ -28,7 +28,7 @@ Conventions used below:
   where it is dropped. A `Session` never holds one between calls; the
   implementation loads inside the operation and drops it before the tree walk
   (`crates/swp-sdk/src/session.rs:403` in the release loader,
-  `crates/swp-sdk/src/protect.rs:367` after `swp-embedding` has derived what it
+  `crates/swp-sdk/src/protect.rs:373` after `swp-embedding` has derived what it
   needs, `crates/swp-sdk/src/init.rs:175, :190, :195` for the secret a run drew and
   did not use), and the boundary keeps that.
 * **Blocks** — whether the call is expected to take long enough that a binding
@@ -210,22 +210,24 @@ already the same function in the CLI (`swp-cli/src/lib.rs:122-123`
 | --- | --- |
 | Inputs | `ProtectOptions { mode: Mode, release_id: Option<ReleaseId>, revision: Option<String> }`. The settings the run protects *with* — targets, excludes, site count, tag width, string literals — are the project's `[protect]` config as patched by the `Overrides` the `Session` was opened with, not per-call arguments (§11), because `swp-embedding` validates one coherent settings document rather than a config plus a set of exceptions. |
 | Effects | `plan` → **writes store** (manifest, plan, release record); `release` → **writes store + source**; `dry_run` → **none** (`swp-embedding/src/protect.rs:99, :106`) |
-| Secret | yes: `ManifestKeys::derive` (`swp-manifest/src/keys.rs:73`) and `ManifestSigningKey::from_root`. Dropped when the call returns (`swp-sdk/src/protect.rs:367`, immediately after `swp_embedding::protect` has derived what it needed). |
+| Secret | yes: `ManifestKeys::derive` (`swp-manifest/src/keys.rs:73`) and `ManifestSigningKey::from_root`. Dropped when the call returns (`swp-sdk/src/protect.rs:373`, immediately after `swp_embedding::protect` has derived what it needed). |
 | Blocks | yes, proportional to tree size. This is the call a binding must run off the host's main thread. |
 | Concurrent | one `protect` per project at a time. Two at once write the same files. |
 
 ```rust
 pub enum Mode { Plan, Release, DryRun }   // swp_embedding::Mode, re-exported (protect.rs:80-87)
 
-pub struct ProtectOptions {               // swp-sdk/src/protect.rs:45-67
+pub struct ProtectOptions {               // swp-sdk/src/protect.rs:45-70
     pub mode: Mode,
     pub release_id: Option<ReleaseId>,    // None allocates one
     pub revision: Option<String>,         // display metadata; never hashed
 }
 
-pub struct ProtectOutcome {               // :83-94
+pub struct ProtectOutcome {               // :86-98
     pub protection: Protection,           // swp-embedding's result, unaltered
-    pub revision: Option<String>,         // what was recorded, after trimming
+    pub revision: Option<String>,         // what the caller stated, trimmed; `None`
+                                          // when none was stated or it trimmed to
+                                          // nothing in a mode that writes no record
 }
 ```
 
@@ -235,13 +237,19 @@ argument of `ProtectOptions::new` and cannot be reached by accident.
 
 `revision` is what the operator claims the source is — a git ref, a version, a
 build number. `None` records the content fingerprint as the revision
-(`SourceRevision::Content`); `Some(text)` records `text` trimmed, and `Some("")`
-is therefore a stated-but-empty revision, which is `swp protect --revision ""` and
-is not the stored value you get by passing nothing. `ProtectOutcome::revision` is
-`None` for both the unstated and the all-whitespace case, and it is returned
-because the release record holds what was *stored*: a caller that normalized the
-label a second time could disagree with it. There is no `git` shell-out on this
-path in either door (§21).
+(`SourceRevision::Content`); `Some(text)` records `text` trimmed. There is no
+stated-but-empty third state. `SourceRevision::validate` rejects an empty label,
+and it runs where the record is written (`Store::write_release`,
+`swp-identity/src/store.rs:345-348`), so `swp protect --revision ""` — and
+`--revision "   "`, which trims to the same thing — is refused with
+`INVALID_MANIFEST`, exit 5, after the release's private manifest and plan are on
+disk (the documented write order) and before one source file is touched.
+`Mode::Plan` and `Mode::DryRun` write no release record, so there the label is
+neither refused nor stored. In both of them `ProtectOutcome::revision` is `None`
+for the unstated and the trims-to-nothing case, and it is returned because the
+release record holds what was *stored*: a caller that normalized the label a second
+time could disagree with it. There is no `git` shell-out on this path in either door
+(§21).
 
 The `Protection` inside the outcome is the service crate's type
 (`swp-embedding/src/protect.rs:143-171`), which already derives `Serialize` and
@@ -284,12 +292,12 @@ today because its result can: `ProtectOutcome` → `Protection` → `Plan` →
 printing the envelope prints every keyed site address in the project. This is the
 accepted answer to that — Option B of
 [ADR-0001](adr/0001-protect-generate-binding-boundary.md) — and it is one operation,
-not two: `protect_summary` calls `protect` (`swp-sdk/src/protect.rs:247-251`) and
-projects the result onto fields that carry no key (`summarize`, `:258`). Nothing is
+not two: `protect_summary` calls `protect` (`swp-sdk/src/protect.rs:252-256`) and
+projects the result onto fields that carry no key (`summarize`, `:263`). Nothing is
 re-derived, so the two cannot disagree about what the run did, and the mode
 semantics, errors and the secret's lifetime are `protect`'s unchanged.
 ```rust
-pub struct ProtectSummary {               // swp-sdk/src/protect.rs:173-231
+pub struct ProtectSummary {               // swp-sdk/src/protect.rs:177-236
     pub mode: Mode,                       // serializes snake_case: `dry_run`, not `dry-run`
     pub project_id: ProjectId,
     pub release_id: ReleaseId,            // pass it back to apply this constellation
@@ -478,7 +486,7 @@ pub struct VerifyOutcome {                   // :48-57
 }
 ```
 
-`VerifyDocument` is `swp_evidence`'s type (`swp-evidence/src/verify.rs:139-180`,
+`VerifyDocument` is `swp_evidence`'s type (`swp-evidence/src/verify.rs:139-183`,
 schema constant `SCHEMA` at `:46`) — it moved out of `swp-cli` before this
 operation could be exposed, so that a bound caller and a terminal read one schema
 and one grading function. Its fields are the verdict (`verdict: Verdict`, plus
@@ -770,12 +778,12 @@ with it — Rust-only, never wrapped by a binding.
 of the default constellation (§9's no-hard-coded-site-count rule) and a caller that
 wants to explain a number must be able to compute it.
 
-**`protect`** — `ProtectOptions` (`protect.rs:45-67`) + `ProtectOptions::new(Mode)`
-(`:72`), `ProtectOutcome` (`:83-94`), and the binding-facing account of the same run
-`ProtectSummary` (`:173-231`) with its three row types `ProtectedFile` (`:102`),
-`ProtectedSite` (`:119`) and `RefusedSite` (`:149`), returned by
-`Session::protect_summary` (`:247`) and built by the one private projection
-`summarize` (`:258`). **No `Default`** on `ProtectOptions`, by the
+**`protect`** — `ProtectOptions` (`protect.rs:45-70`) + `ProtectOptions::new(Mode)`
+(`:75`), `ProtectOutcome` (`:86-98`), and the binding-facing account of the same run
+`ProtectSummary` (`:177-236`) with its three row types `ProtectedFile` (`:106`),
+`ProtectedSite` (`:123`) and `RefusedSite` (`:153`), returned by
+`Session::protect_summary` (`:252`) and built by the one private projection
+`summarize` (`:263`). **No `Default`** on `ProtectOptions`, by the
 reason stated in §4.
 
 **`verify`** — `VerifyOptions` (`verify.rs:27-44`, `Default`), `VerifyOutcome`

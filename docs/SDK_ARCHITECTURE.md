@@ -86,7 +86,7 @@ Two invariants that keep the façade from becoming a second product:
 What the façade adds that the crates do not have: a `Session` that owns no
 secret between calls (the `Ctx` this came from loaded and dropped one per
 operation, `ctx.rs:270`/`:298` in the pre-extraction file, and `Session` keeps
-that at `session.rs:403` and `swp-sdk/src/protect.rs:367`), owned plain-data
+that at `session.rs:403` and `swp-sdk/src/protect.rs:373`), owned plain-data
 argument types instead of eight-borrow `Request<'a>`
 (`swp-embedding/src/protect.rs:114-130`), and one place for the errors to be
 shaped. The `catch_unwind` and the error *conversion* in this list belong to the
@@ -216,9 +216,14 @@ by JavaScript and TypeScript, not a `swp` plus a `swp-types` pair.
   finishes and the binding offers no abort; a "timeout" that abandons a
   half-rewritten tree is a data-corruption feature. That is the API's
   documented behaviour, not an omission.
-* *Errors:* rejects with an `SwpError extends Error` carrying `code`, `path`,
-  `causedBy`, `nextStep`; `Result`-returning variants for callers who would
-  rather not use `try`.
+* *Errors:* one `SwpError extends Error` class carrying `code`, `path`,
+  `causedBy`, `nextStep` and `rendered` — the [SDK_API.md](SDK_API.md) §8
+  envelope, with `code` as the discriminant and no subclass per code, as in
+  §4.1. A synchronous operation throws it; the two asynchronous ones,
+  `protectSummary` and `scan`, reject with it. No `Result`-returning variant is
+  offered: §8 gives a bound caller one failure type and one way to raise it, and
+  a second spelling of the same outcome would be the second implementation §4.2
+  exists to avoid.
 * *TypeScript is the same package.* napi-rs emits `index.d.ts` from the Rust
   signatures, and the TS deliverable is that file plus a compile-time test
   (`tsc --noEmit` over `types/*.test-d.ts`). There is no `swp-ts` package and no
@@ -340,7 +345,7 @@ reads the same file; nothing in it has to be re-derived from prose.
 The review found one exposure that is *not* a signature-name leak, and it is recorded
 rather than repaired by narrowing the API: `Session::protect()` is public Rust API, and
 its result reaches the keyed site identities of a private plan document by field —
-`ProtectOutcome.protection` (`swp-sdk/src/protect.rs:83-94`),
+`ProtectOutcome.protection` (`swp-sdk/src/protect.rs:86-98`),
 `Protection.plan` (`swp-embedding/src/protect.rs:170`), `Plan.sites`, and
 `PlannedSite.locations: [LocationId; 4]` (`swp-embedding/src/plan.rs:57`), which is
 128 bits of HMAC output per radius under the project's root secret. `LocationId` is a
@@ -354,10 +359,10 @@ blocked by that field — and `LocationId`, `Plan`, `PlannedSite` and `Protectio
 removes the field, not by an edit to this page.
 
 What crosses instead is `Session::protect_summary(&ProtectOptions) -> ProtectSummary`
-(`swp-sdk/src/protect.rs:247`), the accepted answer in
+(`swp-sdk/src/protect.rs:252`), the accepted answer in
 [ADR-0001](adr/0001-protect-generate-binding-boundary.md) and one operation rather than
 two: it calls `protect` and projects the result onto the fields the CLI itself reads
-(`summarize`, `:258`), so the pipeline stays authoritative and the two results cannot
+(`summarize`, `:263`), so the pipeline stays authoritative and the two results cannot
 drift on what a run did. The projection is written as a copy out of named fields, not
 as a filter over the struct — a keyed value crosses only if something reads it, and
 this reads no `locations` and no refusal `detail`. The suite checks that claim three

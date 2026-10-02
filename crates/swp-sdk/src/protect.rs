@@ -60,9 +60,12 @@ pub struct ProtectOptions {
     /// cannot change the fingerprint.
     ///
     /// `None` records the content fingerprint as the revision; `Some(text)`
-    /// records `text` trimmed. A `Some("")` is therefore a stated-but-empty
-    /// revision, which is what `swp protect --revision ""` means, and is not the
-    /// same stored value as passing nothing.
+    /// records `text` trimmed. There is no stated-but-empty third state: an empty
+    /// label is refused by the record's own validation where it is written
+    /// (`Store::write_release`, `swp-identity/src/store.rs:346`), so `Some("")`
+    /// and `Some("   ")` end a `Mode::Release` run with `INVALID_MANIFEST` before
+    /// a source file is touched. `Mode::Plan` and `Mode::DryRun` write no release
+    /// record, so in those two the label is neither refused nor stored anywhere.
     pub revision: Option<String>,
 }
 
@@ -87,9 +90,10 @@ pub struct ProtectOutcome {
     /// reason.
     pub protection: Protection,
     /// The revision label the run recorded, after trimming — `None` when the
-    /// caller passed none or passed only spaces. It is returned because the
-    /// release record holds what was *stored*, and a caller that normalizes the
-    /// label a second time can disagree with it.
+    /// caller passed none, or passed one that trims to nothing in a mode that
+    /// writes no release record. It is returned because the release record holds
+    /// what was *stored*, and a caller that normalizes the label a second time
+    /// can disagree with it.
     pub revision: Option<String>,
 }
 
@@ -181,7 +185,8 @@ pub struct ProtectSummary {
     pub release_id: ReleaseId,
     pub created_at: Timestamp,
     /// What the operator said the source was, trimmed; `None` when nothing was
-    /// said. Display metadata, never hashed.
+    /// said, or when what was said trimmed to nothing in a mode that writes no
+    /// release record. Display metadata, never hashed.
     pub revision: Option<String>,
     /// §16 fingerprint of the tree as it now stands.
     pub fingerprint: Digest,
@@ -335,8 +340,9 @@ impl Session {
             Some(id) => id.clone(),
             None => new_release_id()?,
         };
-        // What the caller stated, trimmed — including the empty case, which is a
-        // stated revision of "" and is what `swp protect --revision "  "` records.
+        // What the caller stated, trimmed. `Some("   ")` reaches the record as
+        // `Manual { value: "" }`, and the record's own validation refuses it there
+        // — `swp protect --revision "   "` is that refusal, not a blank label.
         let trimmed = options
             .revision
             .as_ref()
