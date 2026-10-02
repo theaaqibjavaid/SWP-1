@@ -148,6 +148,22 @@ assert rehearsal.artifacts == []
 assert session.release_history() == []
 ```
 
+A `revision` that is not usable is refused, not trimmed into nothing and not dropped,
+and in every mode:
+
+```python
+for label in ["", "   ", "x" * 201, "a\tb"]:
+    try:
+        session.protect_summary(swp.ProtectOptions(swp.Mode.Release, revision=label))
+    except swp.Error as error:
+        assert error.code == "INVALID_MANIFEST" and "revision" in error.message
+```
+
+The label is checked at the door of the run, before the store is asked for a release id,
+so a refusal writes nothing: no plan, no manifest, no release record, and no byte of
+source. `ProtectOptions` itself still accepts any string — `revision` is display
+metadata, and the check is on what a release can record, not on what a caller typed.
+
 `files_changed` is filled in for every mode; the `mode` word and `artifacts`
 are what tell the three apart.
 

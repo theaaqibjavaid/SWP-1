@@ -405,6 +405,40 @@ def test_revision_is_display_metadata(make_project):
     assert swp.ProtectOptions(swp.Mode.Plan).revision is None
 
 
+#: Labels the door refuses rather than trims away: nothing, nothing but spaces, one
+#: byte over the 200-byte cap, and one carrying a control character. `SourceRevision`
+#: validates each for its own reason (`swp-identity/src/release.rs:70-91`), and ADR-0002
+#: makes the refusal mode-independent, so `plan` and `dry_run` reject them too instead
+#: of quietly dropping the label.
+UNUSABLE_REVISIONS = ["", "   ", "x" * 201, "a\tb"]
+
+
+@pytest.mark.parametrize("mode", [swp.Mode.Release, swp.Mode.Plan, swp.Mode.DryRun])
+@pytest.mark.parametrize("label", UNUSABLE_REVISIONS)
+def test_an_unusable_revision_is_refused_before_anything_is_written(make_project, mode, label):
+    """The Python half of the invariant #26 settled, and the one Node already held.
+
+    `ProtectOptions` takes the label without comment — the check is at the door of the
+    run (`swp-embedding/src/protect.rs:200`), before the store is asked for a release
+    id — so a refusal leaves the project exactly as it was found, private store
+    included. `options.rs` validating the label at construction instead would pass
+    every assertion below except the one that runs, which is why the pair is here.
+    """
+    made = make_project("revision-refused")
+    options = swp.ProtectOptions(mode, revision=label)
+    assert options.revision == label
+    before = _whole_tree(made)
+    with pytest.raises(swp.Error) as caught:
+        made.protect(mode, revision=label)
+    assert caught.value.code == "INVALID_MANIFEST", caught.value.message
+    assert re.search("revision", caught.value.message), caught.value.message
+    assert _whole_tree(made) == before
+    assert made.private_documents() == []
+    with pytest.raises(swp.Error) as nothing:
+        made.session.releases(swp.ReleaseSelection.all())
+    assert "no protected releases" in nothing.value.message
+
+
 def test_target_sites_and_tag_bits_overrides_reach_the_run(make_project):
     """The overridden settings are the ones the run reports, not the stored ones.
 
