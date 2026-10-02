@@ -1,57 +1,53 @@
-//! `swp badge` — a trust anchor badge for a project.
+//! `swp badge` — one signed page about the project.
 //!
-//! A badge is a small signed document that lets a project assert "I am really
-//! project X" without revealing the root secret. It carries:
+//! The badge is a small JSON document a project owner writes when they want to
+//! point someone at the basics without handing over the store: which project
+//! this is, how many releases it has, and what the newest one is. It is signed
+//! with the project's own manifest key, so the page cannot be edited after
+//! publication.
 //!
-//! * the project's public identity (project id, verify key, display name)
-//! * an **anchor key** — derived from the root secret via the Evidence domain
-//!   with a "badge" field, so it is provably a function of the secret but not
-//!   the secret itself. Anyone who computes the anchor key from a candidate
-//!   root secret can check that they hold the right one.
-//! * a count of releases and the newest release id
-//! * an Ed25519 signature over the whole document, from the project's
-//!   manifest signing key
+//! ## What it is not
 //!
-//! The badge is written to `.swp/public/badge.json` and is safe to commit:
-//! it carries no private manifest data, no site locations, no literal text.
-//! The anchor key is public and is the one thing an external party can use
-//! to assert "I know the root secret" without actually revealing it.
+//! It is not a trust anchor. An earlier draft of this command put an "anchor
+//! key" in the file — a value derived from the root secret, offered as proof
+//! that the bearer knew that secret. That is exactly the thing §18 keeps out of
+//! a committable document: a key-derived value published under `.swp/public/`
+//! gives a holder of the file a target to mount an offline search against, and
+//! it cannot be taken back once it is in history. The field is gone, and with
+//! it the only use of the `Evidence` derivation domain, which is reserved
+//! again.
 //!
-//! `swp badge` (no subcommand) generates and writes the badge.
-//! `swp badge show` prints the badge document.
+//! SPEC 16 defines no way for one project to vouch for another, so the badge
+//! creates no cross-project channel either. It is a publisher's own document:
+//! it authenticates its own contents, and `swp badge show` compares those
+//! contents against the identity in the store it was read from.
+//!
+//! `swp badge` (no subcommand) regenerates and writes the badge.
+//! `swp badge show` reads it back, authenticates it, and prints it.
 
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use swp_core::error::{ErrorCode, SwpError};
 use swp_core::version::{GeneratorInfo, SWP_PROTOCOL_NAME};
-use swp_crypto::{derive::derive_key, Domain};
+use swp_crypto::VerifyingKey;
 use swp_identity::ProjectIdentity;
-use swp_identity::SWP_DIR;
 
 use crate::args::{Flag, Parsed};
 use crate::ctx::Ctx;
 use crate::output::{self, Sink};
 
-/// The field name under which the anchor key is derived, for domain separation.
-const ANCHOR_FIELD: &str = "badge";
-
 /// The schema version for the badge document.
 pub const BADGE_SCHEMA: &str = "SWP-1-badge-v1";
 
-/// The trust anchor badge document.
+/// The trust badge document.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BadgeDocument {
     pub schema: String,
     pub protocol: String,
-    /// The project's identity, embedded verbatim.
+    /// The project's public identity, embedded verbatim.
     pub project: ProjectIdentity,
-    /// The anchor key: derived from the root secret via the Evidence domain
-    /// with the "badge" field. Public, non-secret, and a function of the
-    /// root secret. Anyone who holds the root secret can recompute it;
-    /// anyone who does not, cannot.
-    pub anchor_key: String,
     /// How many releases the project has.
     pub release_count: u32,
     /// The newest release id, or `null` if none.
@@ -72,27 +68,58 @@ impl BadgeDocument {
         s.into_bytes()
     }
 
+    /// Read, validate and authenticate a badge document from JSON bytes.
+    ///
+    /// Authentication is part of reading, not an optional extra: a document whose
+    /// release count or newest release id was edited after signing must fail here
+    /// rather than reach a reader that prints it.
     pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, SwpError> {
         let text = swp_core::text::decode_utf8_strict(bytes)
             .ok_or_else(|| SwpError::invalid_manifest("badge document is not valid UTF-8"))?;
         let doc: BadgeDocument = serde_json::from_str(text)
             .map_err(|e| SwpError::invalid_manifest(format!("badge document: {e}")))?;
-        if doc.schema != BADGE_SCHEMA {
+        doc.validate()?;
+        doc.verify_signature()?;
+        Ok(doc)
+    }
+
+    pub fn validate(&self) -> Result<(), SwpError> {
+        if self.schema != BADGE_SCHEMA {
             return Err(SwpError::new(
                 ErrorCode::ProtocolVersionUnsupported,
                 format!(
                     "badge document declares schema {:?}, this build supports {BADGE_SCHEMA:?}",
-                    doc.schema
+                    self.schema
                 ),
             ));
         }
-        if doc.protocol != SWP_PROTOCOL_NAME {
+        if self.protocol != SWP_PROTOCOL_NAME {
             return Err(SwpError::new(
                 ErrorCode::ProtocolVersionUnsupported,
-                format!("badge document declares protocol {:?}", doc.protocol),
+                format!("badge document declares protocol {:?}", self.protocol),
             ));
         }
-        Ok(doc)
+        self.project.validate()?;
+        Ok(())
+    }
+
+    /// Check this document's signature against the verify key the embedded
+    /// identity publishes.
+    ///
+    /// What that establishes, stated exactly: these are the bytes some holder of
+    /// a manifest signing key chose to sign. It does not say whose key — the
+    /// document names the key's owner itself, and a signature cannot corroborate
+    /// a claim its own signed bytes are the only source of. `show` settles that
+    /// by comparing the embedded identity with the store the file came out of.
+    pub fn verify_signature(&self) -> Result<(), SwpError> {
+        if self.signature.is_empty() {
+            return Err(SwpError::invalid_manifest(
+                "badge document is unsigned: no publisher's key attests to the claims in it",
+            ));
+        }
+        let key = VerifyingKey::from_public_keys(&self.project.verification)?;
+        swp_manifest::sig::verify_json_document(self, &self.signature, &key)
+            .map_err(|e| SwpError::new(e.code(), format!("badge document: {}", e.message())))
     }
 }
 
@@ -112,22 +139,7 @@ fn generate(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, Swp
         sink.warn(warning);
     }
 
-    let root = project.store.load_root()?;
-    let identity = project.identity();
-    let project_id_str = identity.project_id.as_str();
-
-    // Derive the anchor key: an Evidence-domain key over the "badge" field,
-    // then a second HMAC keyed under that Evidence key over the project id.
-    // This keeps the anchor key in a different domain from the site keys,
-    // so it cannot be confused with a location id or a tag.
-    let evidence_key = derive_key(&root, Domain::Evidence, &[project_id_str.as_bytes()]);
-    let anchor_bytes = swp_crypto::derive::hmac_keyed(
-        &evidence_key,
-        Domain::Evidence,
-        &[ANCHOR_FIELD.as_bytes(), project_id_str.as_bytes()],
-    )?;
-    let anchor_b32 = swp_core::id::base32_lower(&anchor_bytes);
-
+    let identity = project.identity().clone();
     let releases = project.session.release_history()?;
     let newest = releases.last().map(|r| r.release_id.as_str().to_string());
 
@@ -135,8 +147,7 @@ fn generate(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, Swp
     let doc_unsigned = BadgeDocument {
         schema: BADGE_SCHEMA.to_string(),
         protocol: SWP_PROTOCOL_NAME.to_string(),
-        project: identity.clone(),
-        anchor_key: anchor_b32,
+        project: identity,
         release_count: releases.len() as u32,
         newest_release: newest,
         generated_at: at.to_rfc3339(),
@@ -149,16 +160,13 @@ fn generate(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, Swp
     let mut doc = doc_unsigned;
     doc.signature = sig;
 
-    let out_path = project
-        .root()
-        .join(SWP_DIR)
-        .join("public")
-        .join("badge.json");
-    std::fs::write(&out_path, doc.to_json_bytes())
-        .map_err(|e| SwpError::io(format!("cannot write badge: {e}")))?;
+    project.store.write_badge(&doc.to_json_bytes())?;
 
     if parsed.verbose() {
-        sink.note(&format!("badge written to {}", out_path.display()));
+        sink.note(&format!(
+            "badge written to {}",
+            project.store.badge_path().display()
+        ));
     }
 
     let text = String::from_utf8_lossy(&doc.to_json_bytes()).to_string();
@@ -169,11 +177,10 @@ fn generate(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, Swp
 
 fn show(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpError> {
     let project = Ctx::open(parsed, cwd)?;
-    let path = project
-        .root()
-        .join(SWP_DIR)
-        .join("public")
-        .join("badge.json");
+    for warning in project.warnings() {
+        sink.warn(warning);
+    }
+    let path = project.store.badge_path();
     if !path.is_file() {
         return Err(SwpError::new(
             ErrorCode::NotProtected,
@@ -183,6 +190,30 @@ fn show(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpErro
     let bytes =
         std::fs::read(&path).map_err(|e| SwpError::io(format!("cannot read badge: {e}")))?;
     let doc = BadgeDocument::from_json_bytes(&bytes)?;
+
+    // The signature says a manifest key signed these bytes; the store says which
+    // project that key belongs to. Without this comparison a badge copied out of
+    // another project would print here as if it described this one.
+    let identity = project.identity();
+    if identity.project_id != doc.project.project_id {
+        return Err(SwpError::invalid_manifest(format!(
+            "this badge is for project {}, but the project here is {} — it was written by \
+             someone else, so nothing in it describes this tree",
+            doc.project.project_id, identity.project_id
+        )));
+    }
+    if identity.verification != doc.project.verification {
+        return Err(SwpError::invalid_manifest(format!(
+            "badge for {} carries a verify key that is not this project's own",
+            doc.project.project_id
+        )));
+    }
+    if parsed.verbose() {
+        sink.note(&format!(
+            "badge for {} authenticated and matched to this project's identity",
+            doc.project.project_id
+        ));
+    }
 
     let text = String::from_utf8_lossy(&doc.to_json_bytes()).to_string();
     let lines = vec![text];
@@ -195,26 +226,61 @@ mod tests {
     use super::*;
     use crate::scratch::Scratch;
 
+    fn written(dir: &Scratch) -> BadgeDocument {
+        let bytes = std::fs::read(dir.store().badge_path()).unwrap();
+        BadgeDocument::from_json_bytes(&bytes).unwrap()
+    }
+
     #[test]
     fn badge_generation_writes_a_valid_document() {
         let dir = Scratch::protected("badge", "generate");
         let r = dir.run(&["badge"]);
         assert_eq!(r.code, 0, "{}{}", r.out, r.err);
-        let path = dir.root.join(".swp/public/badge.json");
+        let path = dir.store().badge_path();
         assert!(
             path.is_file(),
             "badge.json was not written: {}",
             path.display()
         );
-        let on_disk = std::fs::read_to_string(&path).unwrap();
-        let doc = BadgeDocument::from_json_bytes(on_disk.as_bytes()).unwrap();
+        let doc = written(&dir);
         assert_eq!(doc.schema, BADGE_SCHEMA);
         assert_eq!(doc.protocol, "SWP-1");
         assert_eq!(doc.project.project_id.to_string(), dir.project_id());
         assert_eq!(doc.release_count, 1);
         assert!(doc.newest_release.is_some());
-        assert!(!doc.anchor_key.is_empty());
         assert!(!doc.signature.is_empty());
+    }
+
+    #[test]
+    fn a_badge_holds_only_the_fields_the_format_declares() {
+        // The document used to carry an "anchor_key" derived from the root
+        // secret. A committable public file must not hold key-derived material,
+        // so the field list is asserted here rather than left to the struct:
+        // re-adding any such field fails this test.
+        let dir = Scratch::protected("badge", "fields");
+        assert_eq!(dir.run(&["badge"]).code, 0);
+        let text = std::fs::read_to_string(dir.store().badge_path()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let mut keys: Vec<String> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(|k| k.to_string())
+            .collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            vec![
+                "generated_at",
+                "generator",
+                "newest_release",
+                "project",
+                "protocol",
+                "release_count",
+                "schema",
+                "signature",
+            ]
+        );
     }
 
     #[test]
@@ -238,25 +304,72 @@ mod tests {
     }
 
     #[test]
-    fn badge_anchor_key_is_deterministic_across_runs() {
-        let dir = Scratch::protected("badge", "deterministic");
-        let r1 = dir.run(&["badge"]);
-        assert_eq!(r1.code, 0, "{}", r1.err);
-        let doc1: BadgeDocument = {
-            let bytes = std::fs::read(dir.root.join(".swp/public/badge.json")).unwrap();
-            BadgeDocument::from_json_bytes(&bytes).unwrap()
-        };
-        assert!(!doc1.anchor_key.is_empty());
-        let r2 = dir.run(&["badge"]);
-        assert_eq!(r2.code, 0, "{}", r2.err);
-        let doc2: BadgeDocument = {
-            let bytes = std::fs::read(dir.root.join(".swp/public/badge.json")).unwrap();
-            BadgeDocument::from_json_bytes(&bytes).unwrap()
-        };
+    fn an_unsigned_badge_is_refused() {
+        let dir = Scratch::protected("badge", "unsigned");
+        assert_eq!(dir.run(&["badge"]).code, 0);
+        let mut value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.store().badge_path()).unwrap())
+                .unwrap();
+        value["signature"] = serde_json::Value::String(String::new());
+        std::fs::write(
+            dir.store().badge_path(),
+            serde_json::to_vec_pretty(&value).unwrap(),
+        )
+        .unwrap();
+        let r = dir.run(&["badge", "show"]);
         assert_eq!(
-            doc1.anchor_key, doc2.anchor_key,
-            "the anchor key must be a pure function of the root secret and project id"
+            r.code,
+            ErrorCode::InvalidManifest.exit_code(),
+            "{}{}",
+            r.out,
+            r.err
         );
+        assert!(r.err.contains("unsigned"), "{}", r.err);
+    }
+
+    #[test]
+    fn an_edited_claim_in_a_signed_badge_is_refused() {
+        let dir = Scratch::protected("badge", "edited");
+        assert_eq!(dir.run(&["badge"]).code, 0);
+        let mut value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.store().badge_path()).unwrap())
+                .unwrap();
+        value["release_count"] = serde_json::json!(99);
+        std::fs::write(
+            dir.store().badge_path(),
+            serde_json::to_vec_pretty(&value).unwrap(),
+        )
+        .unwrap();
+        let r = dir.run(&["badge", "show"]);
+        assert_eq!(
+            r.code,
+            ErrorCode::InvalidManifest.exit_code(),
+            "{}{}",
+            r.out,
+            r.err
+        );
+        assert!(r.err.contains("does not verify"), "{}", r.err);
+    }
+
+    #[test]
+    fn a_badge_copied_from_another_project_is_refused_here() {
+        // A whole-document copy carries a valid signature, so the signature check
+        // alone cannot catch it. The identity comparison is the check that does.
+        let owner = Scratch::protected("badge", "copy-owner");
+        let other = Scratch::protected_variant("badge", "copy-other", 1);
+        assert_eq!(owner.run(&["badge"]).code, 0);
+        let bytes = std::fs::read(owner.store().badge_path()).unwrap();
+        std::fs::write(other.store().badge_path(), &bytes).unwrap();
+        let r = other.run(&["badge", "show"]);
+        assert_eq!(
+            r.code,
+            ErrorCode::InvalidManifest.exit_code(),
+            "{}{}",
+            r.out,
+            r.err
+        );
+        assert!(r.err.contains("written by someone else"), "{}", r.err);
+        assert!(r.err.contains(&other.project_id().to_string()), "{}", r.err);
     }
 
     #[test]
@@ -270,17 +383,29 @@ mod tests {
     #[test]
     fn badge_release_count_matches_the_store() {
         let dir = Scratch::protected("badge", "count");
-        let store = dir.store();
-        let n = store.releases().unwrap().len();
-        let r = dir.run(&["badge"]);
-        assert_eq!(r.code, 0, "{}", r.err);
-        let doc: BadgeDocument = {
-            let bytes = std::fs::read(dir.root.join(".swp/public/badge.json")).unwrap();
-            BadgeDocument::from_json_bytes(&bytes).unwrap()
-        };
+        let n = dir.store().releases().unwrap().len();
+        assert_eq!(dir.run(&["badge"]).code, 0);
+        let doc = written(&dir);
         assert_eq!(
             doc.release_count, n as u32,
             "release_count must match the store"
+        );
+    }
+
+    #[test]
+    fn the_badge_is_listed_in_the_store_inventory() {
+        // `swp inspect store` is the artifact list SECURITY.md points at, so a
+        // file the tool writes has to appear in it once it exists.
+        let dir = Scratch::protected("badge", "inventory");
+        let before = dir.store().inventory().unwrap();
+        assert!(!before.iter().any(|(p, _)| p.ends_with("badge.json")));
+        assert_eq!(dir.run(&["badge"]).code, 0);
+        let after = dir.store().inventory().unwrap();
+        assert!(
+            after
+                .iter()
+                .any(|(p, public)| p.ends_with("badge.json") && *public),
+            "badge.json missing from the inventory: {after:?}"
         );
     }
 }

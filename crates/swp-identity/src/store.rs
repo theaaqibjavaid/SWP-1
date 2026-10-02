@@ -33,8 +33,9 @@ use crate::config::SwpConfig;
 use crate::project::ProjectIdentity;
 use crate::release::ReleaseRecord;
 use crate::{
-    CONFIG_FILE, GITIGNORE_ENTRY, GITIGNORE_MARKER, IDENTITY_FILE, MANIFESTS_DIR, PLANS_DIR,
-    PRIVATE_DIR, PUBLIC_DIR, REGISTRY_FILE, RELEASES_DIR, REPORTS_DIR, ROOT_KEY_FILE, SWP_DIR,
+    BADGE_FILE, CONFIG_FILE, GITIGNORE_ENTRY, GITIGNORE_MARKER, IDENTITY_FILE, MANIFESTS_DIR,
+    PLANS_DIR, PRIVATE_DIR, PUBLIC_DIR, REGISTRY_FILE, RELEASES_DIR, REPORTS_DIR, ROOT_KEY_FILE,
+    SWP_DIR,
 };
 
 /// An opened handle on a project's `.swp/` store.
@@ -117,6 +118,11 @@ impl Store {
     /// end up with two different files.
     pub fn registry_path(&self) -> PathBuf {
         self.public_dir().join(REGISTRY_FILE)
+    }
+
+    /// Where a published trust badge lives, when the project writes one.
+    pub fn badge_path(&self) -> PathBuf {
+        self.public_dir().join(BADGE_FILE)
     }
 
     pub fn manifest_path(&self, id: &ReleaseId) -> PathBuf {
@@ -362,6 +368,11 @@ impl Store {
         write_public(&self.registry_path(), bytes)
     }
 
+    /// Publish the badge atomically, for the same reason as the index.
+    pub fn write_badge(&self, bytes: &[u8]) -> Result<(), SwpError> {
+        write_public(&self.badge_path(), bytes)
+    }
+
     pub fn private_manifest_ids(&self) -> Result<Vec<ReleaseId>, SwpError> {
         list_json_ids(&self.manifests_dir(), "manifest")
     }
@@ -430,6 +441,14 @@ impl Store {
             (self.relabel(&self.identity_path()), true),
             (self.relabel(&self.root_key_path()), false),
         ];
+        // The two documents a publisher may write into `public/` are listed when
+        // they exist and not otherwise: this inventory is a record of what is on
+        // disk, which is what `swp inspect store` and SECURITY.md both read.
+        for path in [self.registry_path(), self.badge_path()] {
+            if path.is_file() {
+                out.push((self.relabel(&path), true));
+            }
+        }
         for (dir, is_public) in [
             (self.releases_dir(), true),
             (self.manifests_dir(), false),

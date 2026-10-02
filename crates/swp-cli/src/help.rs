@@ -89,9 +89,7 @@ pub fn overview(sink: &mut Sink<'_>) -> Result<(), SwpError> {
             .to_string(),
     );
     lines.push("  swp registry search <f>  look up a release in a registry file".to_string());
-    lines.push(
-        "  swp badge                generate a trust anchor badge for the project".to_string(),
-    );
+    lines.push("  swp badge                write the project's signed badge document".to_string());
     lines.push(String::new());
     lines.push("Every command takes --help. Machine-readable output is --format json.".to_string());
     lines.push(String::new());
@@ -261,14 +259,15 @@ fn detail(cmd: Command) -> Option<Vec<String>> {
             "it had nothing to compare them to.",
         ],
         Command::Badge => &[
-            "badge generates .swp/public/badge.json: a trust anchor document that lets a",
-            "project assert 'I am really project X' without revealing the root secret.",
-            "The anchor key is HMAC(key = root_secret, message = domain || project_id),",
-            "so anyone who holds the root secret can recompute it, and no one else can.",
-            "The badge carries the project's public identity, the release count, the",
-            "newest release id, and an Ed25519 signature. It is safe to commit.",
-            "swp badge show re-reads and prints the badge; swp badge (or no argument)",
-            "regenerates it.",
+            "badge writes .swp/public/badge.json: a signed one-page summary of the project —",
+            "its public identity, how many releases it has, and the newest release id. The",
+            "document authenticates itself; nothing in it proves knowledge of the root",
+            "secret, and no key-derived value is published in it. SPEC 16 defines no way for",
+            "one project to vouch for another, so a badge is a publisher's own page, not a",
+            "verification channel.",
+            "swp badge show re-reads the file, checks its signature, and compares the",
+            "identity inside it with this project's own — a badge copied from elsewhere is",
+            "refused rather than printed. swp badge (or no argument) regenerates it.",
         ],
         Command::Inspect => &[
             "inspect reads the local store only. It cannot report anything about a candidate;",
@@ -356,6 +355,11 @@ fn command_exit_codes(cmd: Command) -> Vec<(i32, &'static str)> {
         Command::Badge => vec![
             (0, "the badge was generated or read"),
             (4, "the project is not protected yet, or no badge exists"),
+            (
+                5,
+                "the badge does not authenticate: it is unsigned, was edited, or was written \
+                 by another project",
+            ),
         ],
         Command::Verify => vec![
             (0, "every site of the release is present and still carries its code"),
