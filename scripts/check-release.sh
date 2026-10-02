@@ -163,7 +163,7 @@ else
 fi
 
 printf '\n== the sources contain no built artefacts ==\n'
-TRACKED=$(git ls-files | grep -Ei '\.(pyc|pyo|o|a|so|dll|dylib|exe|class|wasm)$' || true)
+TRACKED=$(git ls-files | grep -Ei '\.(pyc|pyo|o|a|so|dll|dylib|exe|class|wasm|node)$' || true)
 if [ -z "$TRACKED" ]; then
     ok "no compiled artefacts are tracked"
 else
