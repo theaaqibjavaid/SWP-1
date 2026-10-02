@@ -131,9 +131,7 @@ impl Flag {
             Flag::Full => "list every item, not the first page of them",
             Flag::Quiet => "print only the result line",
             Flag::Verbose => "explain what is being looked at while it is looked at",
-            Flag::Compliance => {
-                "stricter grading: a scan exits 1 unless every site is exact-rendered"
-            }
+            Flag::Compliance => "add a coverage grade over the keyed sites of one release",
         }
     }
 
@@ -277,7 +275,6 @@ impl Command {
                 Flag::Output,
                 Flag::Full,
                 Flag::Limit,
-                Flag::Compliance,
                 Flag::Quiet,
                 Flag::Verbose,
             ],

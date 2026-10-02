@@ -39,6 +39,15 @@ use crate::output::{self, Sink};
 
 pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpError> {
     let candidate = candidate_path(parsed, cwd)?;
+    if parsed.has(Flag::Compliance) && parsed.has(Flag::Save) {
+        return Err(SwpError::usage(
+            "--save keeps reports under .swp/private/reports/ and `swp report` reads them \
+             back as SWP-1-report-v2 documents; --compliance prints a SWP-1-compliance-v1 \
+             document, which that reader refuses. Keep the grade by writing this run with \
+             --output <file>, or re-run with --save alone for the report on its own.",
+        )
+        .with_path("--save --compliance".to_string()));
+    }
     let project = Ctx::open(parsed, cwd)?;
     for warning in project.warnings() {
         sink.warn(warning);
@@ -77,46 +86,15 @@ pub fn run(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpE
             report.omissions.len()
         )),
     }
-    let lines = render(report, parsed, saved)?;
     if parsed.has(Flag::Compliance) {
-        let compliance_doc = ComplianceReport::from_report(report.clone(), true);
-        let compliance_lines = render_compliance_lines(&compliance_doc, parsed)?;
-        deliver_compliance(
-            sink,
-            &compliance_doc,
-            &compliance_lines,
-            parsed.value(Flag::Output),
-        )?;
+        let doc = ComplianceReport::from_report(report.clone());
+        let lines = render_compliance(&doc, parsed)?;
+        output::deliver(sink, &doc, &lines, parsed.value(Flag::Output))?;
     } else {
+        let lines = render(report, parsed, saved)?;
         output::deliver(sink, report, &lines, parsed.value(Flag::Output))?;
     }
     Ok(report.exit_code())
-}
-
-/// Deliver a compliance document: in JSON mode the whole JSON (report + compliance
-/// block) is printed or written to `--output`; in text mode the standard report's
-/// text lines are printed with the compliance block appended.
-fn deliver_compliance(
-    sink: &mut Sink,
-    doc: &compliance::ComplianceReport,
-    lines: &[String],
-    output: Option<&str>,
-) -> Result<(), SwpError> {
-    let json_text = doc.to_json();
-    if let Some(path) = output.filter(|p| !p.trim().is_empty()) {
-        crate::help::write_document(path, &json_text)?;
-        sink.note(&format!(
-            "wrote the JSON document to {path}; {} line(s) of text were not printed",
-            lines.len()
-        ));
-        return Ok(());
-    }
-    if sink.json() {
-        sink.result_json_bytes(json_text.as_bytes(), lines)?;
-    } else {
-        sink.result(&doc.report, lines)?;
-    }
-    Ok(())
 }
 
 /// The one positional this command takes, and nothing else.
@@ -160,7 +138,7 @@ fn render(
     }
     lines.push(String::new());
     lines.push("Next".to_string());
-    for step in next_steps(report, parsed.json()?, saved) {
+    for step in next_steps(report, parsed.json()?, saved, false) {
         lines.push(format!("  {step}"));
     }
     lines.push(String::new());
@@ -168,7 +146,15 @@ fn render(
     Ok(lines)
 }
 
-fn next_steps(report: &Report, json: bool, saved: Option<&SavedReport>) -> Vec<String> {
+/// What to tell the reader to do next. `graded` is the `--compliance` run, which
+/// cannot use `--save` (the store's reader takes a plain report), so its way to
+/// keep the document is `--output`.
+fn next_steps(
+    report: &Report,
+    json: bool,
+    saved: Option<&SavedReport>,
+    graded: bool,
+) -> Vec<String> {
     let mut out = Vec::new();
     match report.result {
         Outcome::ProvenanceDetected => {
@@ -184,10 +170,13 @@ fn next_steps(report: &Report, json: bool, saved: Option<&SavedReport>) -> Vec<S
                     .to_string(),
             );
             if saved.is_none() {
-                out.push(
-                    "re-run with --save to keep this report under .swp/private/reports/"
-                        .to_string(),
-                );
+                out.push(if graded {
+                    "re-run with --output <file> to keep this document; --save writes the \
+                     report alone, without the grade"
+                        .to_string()
+                } else {
+                    "re-run with --save to keep this report under .swp/private/reports/".to_string()
+                });
             } else {
                 out.push(format!(
                     "swp report {} --format json   (re-render the saved copy)",
@@ -216,30 +205,26 @@ fn next_steps(report: &Report, json: bool, saved: Option<&SavedReport>) -> Vec<S
     out
 }
 
-/// The text lines for a compliance report: the standard report's lines, plus
-/// the compliance block's lines.
-fn render_compliance_lines(
-    doc: &ComplianceReport,
-    parsed: &Parsed,
-) -> Result<Vec<String>, SwpError> {
+/// The text lines for a compliance run: the standard report's own rendering, then
+/// the grade block, then what to do next. The block is a view over the report above
+/// it, so it prints after the evidence it reads from and never replaces it.
+fn render_compliance(doc: &ComplianceReport, parsed: &Parsed) -> Result<Vec<String>, SwpError> {
     let limit = crate::output::window(parsed.has(Flag::Full), parsed.number(Flag::Limit)?);
-    let mut lines: Vec<String> = doc
-        .report
+    let report = &doc.report;
+    let mut lines: Vec<String> = report
         .to_text_items(limit)
         .lines()
         .map(|l| l.to_string())
         .collect();
     lines.push(String::new());
-    if let Some(block) = &doc.compliance {
-        lines.extend(compliance::render_compliance_text(block, limit));
-    }
+    lines.extend(compliance::render_text(&doc.compliance, limit));
     lines.push(String::new());
     lines.push("Next".to_string());
-    for step in next_steps(&doc.report, parsed.json()?, None) {
+    for step in next_steps(report, parsed.json()?, None, true) {
         lines.push(format!("  {step}"));
     }
     lines.push(String::new());
-    lines.push(format!("exit {}", doc.exit_code()));
+    lines.push(format!("exit {}", report.exit_code()));
     Ok(lines)
 }
 
@@ -442,6 +427,153 @@ mod tests {
         assert_eq!(r.code, ErrorCode::NotProtected.exit_code());
         assert!(r.err.contains("no release"), "{}", r.err);
         assert!(r.err.contains("inspect releases"), "{}", r.err);
+    }
+
+    #[test]
+    fn the_compliance_grade_is_a_document_of_its_own() {
+        let owner = Scratch::protected("scan", "grade-doc");
+        let leak = Scratch::new("scan", "grade-tree");
+        owner.copy_sources_to(&leak);
+        let at = leak.root.display().to_string();
+        let r = owner.run(&["scan", &at, "--compliance", "--format", "json"]);
+        // The grade is a view, so the exit code stays the report's: a run that
+        // confirmed a copy exits 1 whether or not the coverage was complete.
+        assert_eq!(r.code, 1, "{}{}", r.out, r.err);
+        let doc = r.json();
+        assert_eq!(doc["schema"], crate::compliance::COMPLIANCE_SCHEMA);
+        assert_eq!(doc["report"]["schema"], swp_evidence::REPORT_SCHEMA);
+        assert_eq!(doc["report"]["result"], "PROVENANCE_DETECTED");
+        // An exact copy of the protected sources holds every keyed site of its own
+        // release, and the whole candidate was read, so this one is FULL — and it is
+        // FULL because the two measured counts agree, not because a table said so.
+        let grade = &doc["compliance"];
+        assert_eq!(grade["level"], "FULL");
+        assert_eq!(grade["measured"]["sites"], grade["measured"]["fragments"]);
+        assert_eq!(grade["measured"]["absent"], serde_json::Value::from(0));
+        assert_eq!(
+            grade["release_id"],
+            doc["report"]["releases"][0]["release_id"]
+        );
+        // The nested report is the standard document verbatim: the plain v2 reader
+        // accepts it, and reading it gives the same report the same run without the
+        // flag printed.
+        let nested = swp_evidence::Report::from_json(&doc["report"].to_string())
+            .expect("the nested report is a document this build reads");
+        assert_eq!(nested.schema, swp_evidence::REPORT_SCHEMA);
+        let plain = owner.run(&["scan", &at, "--format", "json"]);
+        assert_eq!(
+            plain.json()["schema"],
+            swp_evidence::REPORT_SCHEMA,
+            "{}{}",
+            plain.out,
+            plain.err
+        );
+        // Two runs of the same scan differ in one field — the timestamp the caller
+        // supplied — so that is the one field this comparison cannot demand equality
+        // on. Everything else has to match, or the grade changed the measurement.
+        let without_a_clock = |mut v: serde_json::Value| {
+            v["run"]["created_at"] = serde_json::Value::String("whenever".to_string());
+            v
+        };
+        assert_eq!(
+            without_a_clock(doc["report"].clone()),
+            without_a_clock(plain.json()),
+            "--compliance changed the report it was supposed to only show"
+        );
+        let rows = grade["sites"].as_array().unwrap();
+        assert!(!rows.is_empty(), "{grade:#}");
+        for row in rows {
+            assert_eq!(row["release_id"], grade["release_id"], "{row:#}");
+            assert!(
+                row["id"].as_str().unwrap().starts_with("EV-"),
+                "a row cites the evidence item it came from: {row:#}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_graded_text_report_prints_the_grade_after_the_evidence() {
+        let owner = Scratch::protected("scan", "grade-text");
+        let leak = Scratch::new("scan", "grade-text-tree");
+        owner.copy_sources_to(&leak);
+        let r = owner.run(&["scan", &leak.root.display().to_string(), "--compliance"]);
+        assert_eq!(r.code, 1, "{}{}", r.out, r.err);
+        let text = r.out;
+        assert!(
+            text.contains("does not establish authorship"),
+            "the grade is printed on top of the boundary, not instead of it:\n{text}"
+        );
+        let grade_at = text
+            .find("Compliance grade:")
+            .unwrap_or_else(|| panic!("no grade line:\n{text}"));
+        let evidence_at = text.find("Evidence").unwrap_or(grade_at);
+        assert!(
+            evidence_at <= grade_at,
+            "the block that cites the evidence printed before it:\n{text}"
+        );
+        assert!(
+            text[grade_at..].contains("sites "),
+            "the denominator travels with the grade:\n{text}"
+        );
+        assert!(
+            text.trim_end().ends_with("exit 1"),
+            "the last line is still the exit code:\n{text}"
+        );
+        assert!(
+            text.contains("--output <file>"),
+            "a graded run cannot be saved, so it is told how to keep it:\n{text}"
+        );
+    }
+
+    #[test]
+    fn the_compliance_document_is_what_output_writes() {
+        let owner = Scratch::protected("scan", "grade-output");
+        let leak = Scratch::new("scan", "grade-output-tree");
+        owner.copy_sources_to(&leak);
+        let path = owner.root.join("grade.json");
+        let r = owner.run(&[
+            "scan",
+            &leak.root.display().to_string(),
+            "--compliance",
+            "--output",
+            &path.display().to_string(),
+        ]);
+        assert_eq!(r.code, 1, "{}{}", r.out, r.err);
+        assert!(r.out.is_empty(), "stdout stays empty: {:?}", r.out);
+        let written = std::fs::read_to_string(&path).unwrap();
+        let doc: serde_json::Value = serde_json::from_str(&written).unwrap();
+        assert_eq!(doc["schema"], crate::compliance::COMPLIANCE_SCHEMA);
+        assert_eq!(doc["report"]["schema"], swp_evidence::REPORT_SCHEMA);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn a_grade_and_a_saved_report_are_refused_before_anything_is_read() {
+        // `--save` writes into the store, whose reader takes SWP-1-report-v2 and
+        // refuses a document carrying an extra top-level field. Rather than archive a
+        // different document than the one printed, the combination is refused.
+        let owner = Scratch::protected("scan", "grade-save");
+        let leak = Scratch::new("scan", "grade-save-tree");
+        owner.copy_sources_to(&leak);
+        let r = owner.run(&[
+            "scan",
+            &leak.root.display().to_string(),
+            "--compliance",
+            "--save",
+        ]);
+        assert_eq!(r.code, ErrorCode::Usage.exit_code(), "{}{}", r.out, r.err);
+        assert!(r.err.contains("--output"), "{}", r.err);
+        let reports = owner.root.join(".swp").join("private").join("reports");
+        let kept: Vec<String> = std::fs::read_dir(&reports)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .filter(|n| n.starts_with("scan-"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(kept.is_empty(), "the refusal still saved: {kept:?}");
     }
 
     #[test]

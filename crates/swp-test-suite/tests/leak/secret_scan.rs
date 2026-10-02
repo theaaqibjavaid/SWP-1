@@ -533,6 +533,20 @@ fn every_command_prints_and_writes_nothing_searchable() {
         cli.run(&["scan", &at, "--verbose"]);
         cli.run(&["scan", &at, "--full", "--limit", "3"]);
         cli.run(&["scan", &at, "--release", &release, "--save"]);
+        // `--compliance` prints a second document over the same measurement, in text
+        // and as JSON, and writes one to `--output` — three surfaces, none of which
+        // any other run of `scan` reaches.
+        cli.run(&["scan", &at, "--compliance"]);
+        cli.run(&["scan", &at, "--compliance", "--format", "json"]);
+        let graded = outdir.child(&format!("compliance-{kind}.json"));
+        cli.run(&[
+            "scan",
+            &at,
+            "--compliance",
+            "--output",
+            &graded.display().to_string(),
+        ]);
+        cli.file(&graded);
         let doc = outdir.child(&format!("scan-{kind}.json"));
         cli.run(&[
             "scan",
