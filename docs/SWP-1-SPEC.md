@@ -62,8 +62,13 @@ and bytes, so no two different field sequences can encode to the same message.
 | verify key | — | the ed25519 public half, published in `identity.json` — the only key anybody outside the project ever holds |
 
 The domain column is the `Domain` enum in `swp-crypto/src/derive.rs`; two of its
-seven labels (`release`, `evidence`) are reserved and nothing derives under them,
-spent now so a later protocol version cannot give an old label a new meaning.
+seven labels (`release`, `evidence`) are reserved and nothing in the product
+derives under them, spent now so a later protocol version cannot give an old label
+a new meaning. The `evidence` one is not hypothetical: a build of `swp badge` did
+derive a value under it and publish that value in `.swp/public/badge.json`, which
+is exactly the row this sentence forbids. The field is gone, and the leak sweep
+carries the reserved domain's own keyed output as a third needle so the promise
+holds by test rather than by memory ([SECURITY.md](SECURITY.md)).
 `hmac_keyed` refuses a key whose recorded domain does not match the domain of the
 derivation it is used in, so swapping two of these rows is an internal error
 rather than a quiet wrong answer.
@@ -192,17 +197,25 @@ project's intuition about "why is this one not watermarked" can disagree.
 
 ## 8. Artifacts
 
-Five documents, four schemas. `schema` is the numeric `1` inside the private and
-public artifacts; a report's `schema` is the string `SWP-1-report-v2` because a
-report is rendered for humans as well as machines and names its own shape. The
-second version is the coincidence arithmetic: the tally records the distinct keyed
-codes it billed as well as the windows it saw, and the probability the verdict
-cleared (§12).
+Eight documents, two conventions. The four the store keeps for its own reading —
+identity, release record, manifest, plan — carry `schema` as the numeric `1` of
+`swp_core::SchemaVersion`. The three a project sends somewhere else — a report, a
+registry index, a badge — spell their shape out as a string (`SWP-1-report-v2`,
+`SWP-1-registry-v1`, `SWP-1-badge-v1`), because a forwarded document cannot assume
+its reader knows which build wrote it, and a reader that does not recognise the id
+it is holding refuses the file instead of guessing at it. The eighth,
+`SWP-1-compliance-v1`, is printed and never stored: `swp scan --compliance` refuses
+`--save` as a usage error precisely so that no grade document reaches a reader that
+would have to guess. The report's second version is the coincidence arithmetic: the
+tally records the distinct keyed codes it billed as well as the windows it saw, and
+the probability the verdict cleared (§12).
 
 | path | document | signed |
 | --- | --- | --- |
 | `.swp/public/identity.json` | protocol, schema, project id, created, verification block (ed25519 public key), canonicalizer version, generator, display name | no |
 | `.swp/public/releases/<id>.json` | ids, created, `source_revision`, `fingerprint` + `fingerprint_level`, `private_manifest_digest`, `watermark` (target sites, tag bits, sites embedded/skipped, canonicalizer version, form set, adapters), generator, signature | yes |
+| `.swp/public/registry.json` | `SWP-1-registry-v1`, protocol, project id, the verify key already in `identity.json`, every release record with the signature it was published with, generated, generator, signature | yes |
+| `.swp/public/badge.json` | `SWP-1-badge-v1`, protocol, `identity.json` embedded verbatim, release count, newest release id, generated, generator, signature | yes |
 | `.swp/private/manifests/<id>.json` | per site: four location ids and which is primary, file, line hint, language, adapter, grammar, class, family, width, `original`, `rendered`; plus the tree fingerprint | yes |
 | `.swp/private/plans/<id>.json` | intended sites and every refusal, with reason | **no** |
 | `.swp/private/reports/<name>.json` | a saved `verify` or `scan` result, `SWP-1-report-v2` | no |
@@ -218,6 +231,16 @@ and signing it would imply a claim about a tree that may never have been written
 `identity.json` is unsigned because it is the key the other signatures are checked
 with; self-signing it would move the trust problem rather than solve it, so the
 file's authenticity is established by the channel you copied it through.
+
+The registry index and the badge disclose nothing the store does not already hold,
+though they change how much of it travels in one file. Each is a signed restatement
+of data `public/` already carries — the index holds the release records themselves,
+the badge holds `identity.json` and two counts — which is why `swp registry publish`
+and `swp badge` need the secret only to produce a signature, why `swp registry
+search` and `swp badge show` need no key at all, and why neither file can become a
+second trust anchor or a route for a keyed value out of the project. A public
+format that declares no key field has nowhere to put one, and `secret_leak` sweeps
+both files to keep that true by test.
 
 ## 9. Fingerprints
 
@@ -363,11 +386,13 @@ observed. None of them is a probability that anybody copied anything, and the
 ## 14. Versioning
 
 Four version tokens, deliberately separate: the protocol (`SWP-1`), the artifact
-schema (numeric `1`), the canonicalizer version (`1`), and the build version
-(`1.0.0`). An artifact whose protocol token this build does not implement is
-refused with `PROTOCOL_VERSION_UNSUPPORTED` rather than read optimistically, and
-one whose canonicalizer version differs is not comparable at all, because a digest
-computed under a different rule is a different fact.
+schema (the numeric `1` in the documents the store keeps for itself, and a string
+like `SWP-1-report-v2` in the documents that travel — §8 says which is which), the
+canonicalizer version (`1`), and the build version (`1.0.0`). An artifact whose
+protocol token this build does not implement is refused with
+`PROTOCOL_VERSION_UNSUPPORTED` rather than read optimistically, and one whose
+canonicalizer version differs is not comparable at all, because a digest computed
+under a different rule is a different fact.
 
 Compatible changes inside v1 may add: an adapter, a refusal reason, an omission
 kind, a report field, a limit key. They may not: change canonicalization or the
@@ -404,9 +429,13 @@ table; [TROUBLESHOOTING.md](TROUBLESHOOTING.md) is the prose.
   exist yet — stated here rather than hidden.
 * **L2/L3 fingerprints.** Declared in the level grammar, never written, never
   comparable ([Fingerprints](#9-fingerprints)).
-* **Key sharing, delegation, or a registry.** One project, one secret, one store.
-  There is no third party, no online service, and no way for one project to
-  verify another's fragments.
+* **Key sharing, delegation, or a registry service.** One project, one secret, one
+  store. There is no third party, no online service, and no way for one project to
+  verify another's fragments. The one thing in this build called a registry is a
+  file: `swp registry publish` signs an index of *your own* release records into
+  `.swp/public/registry.json`, and the only code that reads a registry document is
+  the `search` verb pointed at a path you named. Nothing fetches one, nothing
+  checks one against an authority, and no command takes a URL.
 * **Any legal or forensic conclusion.** [../README.md](../README.md) states this
   first, because it is the claim most likely to be inferred and the one this tool
   never earns by itself.
