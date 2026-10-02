@@ -501,9 +501,9 @@ page that wants one cites it rather than printing its own.
 Each step is a commit-sized change with the full gate on it
 (`AGENTS.md`'s list, in that order), and none of them depends on a later one to
 be correct. The Rust landing shipped with Beta 3 covers steps 1, 2 and 3, the crate
-part of step 6, and the binding-surface freeze §6 records; steps 4 and 5 have not
-started. The list below is the plan as approved, with what actually happened marked
-on it.
+part of step 6, and the binding-surface freeze §6 records; steps 4 and 5 landed after
+it, and what is left in both is publication rather than implementation.
+The list below is the plan as approved, with what actually happened marked on it.
 
 1. **`swp-sdk` as an extraction.** `Session`, `Error`, `catch_unwind`, and the
    moved composition from `ctx.rs` — no new behaviour, no binding dependency.
@@ -531,17 +531,36 @@ on it.
    it. The condition was met, so the fallback outcome was not taken.*
 4. **Python binding.** `#[pymodule]`, error/`PathLike`/GIL handling, pytest suite,
    wheel matrix in CI, `bindings/python/README.md` with every example executed.
-   *Not started.*
+   *Done, with two of those five items read as what CI runs rather than as what they
+   sound like. The "wheel matrix" is the `binding-python` job's three-operating-system
+   matrix: one `abi3` wheel per OS, each built by `maturin build --release --locked`
+   against CPython 3.10 and installed for `pytest -q`, so the interpreter-version axis
+   is carried by the `abi3` floor and not by a per-version build. The suite is the
+   eleven modules under `bindings/python/tests/`. `bindings/python/README.md` is in the
+   tree and is the one item here no gate re-executes: `docs_examples` does not read it,
+   and Node has a `readme.test.mjs` where Python has none. Whether a wheel goes to an
+   index is step 6's, and none has.*
 5. **Node binding + generated types.** Same list, plus the `.node` prebuild and
    `optionalDependencies` wiring and the `tsc --noEmit` type test.
-   *Not started.*
+   *Done except for the two items that name distribution. The napi addon, the
+   generated `binding.d.ts` beside the hand-written `index.d.ts`, the ten
+   `*.test.mjs` suites (which include `readme.test.mjs`, the one that does execute the
+   README's examples) and the `tsc --noEmit` type test all run in `binding-node` on
+   each of the three operating systems, where the addon is built from source on the
+   runner. The prebuild and the wiring are not: `bindings/node/package.json` names
+   four targets under its `napi` key and declares no `optionalDependencies`, so an
+   archive installed without building gets no binary. Platform prebuilds are #32 and
+   the package name is still the unresolved `jrs-swp`; neither is settled by this step.*
 6. **Release wiring.** `swp-sdk` into `check-release.sh`'s `PUBLISHABLE` order,
    publish job, binding version policy applied
    ([VERSIONING_POLICY.md](VERSIONING_POLICY.md)), CHANGELOG entries. *Two of these
    four have landed: `PUBLISHABLE` is ten crates with `swp-sdk` between `swp-evidence`
    and `swp-cli`, and the Beta 3 CHANGELOG entry is part of the version preparation on
-   this branch. The publish job and the binding version policy are still open, and the
-   binding half of them is gated on steps 4 and 5.*
+   this branch. The publish job and the binding version policy are still open, and they
+   are no longer waiting on a binding to be written — steps 4 and 5 shipped their
+   build-and-test halves, so the outstanding binding work is publication: this step's
+   publish job, the version contract #31 states, and the prebuilt artefacts #32
+   distributes.*
 
 Steps 1-3 are Rust-only and shippable on their own: they make the implementation
 embeddable whether or not a wheel is ever built. That ordering is deliberate —
