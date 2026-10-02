@@ -185,6 +185,11 @@ fn show(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpErro
         return Err(SwpError::new(
             ErrorCode::NotProtected,
             "no badge.json in this project. Run `swp badge` first to generate it.",
+        )
+        .with_next(
+            "The project is protected and has no badge yet, which is a missing file rather \
+             than an unprotected tree. Run `swp badge`; it signs `.swp/public/badge.json` \
+             from this store's identity, so it needs the root secret.",
         ));
     }
     let bytes =
@@ -200,13 +205,23 @@ fn show(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpErro
             "this badge is for project {}, but the project here is {} — it was written by \
              someone else, so nothing in it describes this tree",
             doc.project.project_id, identity.project_id
-        )));
+        ))
+        .with_next(
+            "The badge is signed and intact; it simply is not yours. `swp badge` writes one \
+             from this store's identity and release count.",
+        ));
     }
     if identity.verification != doc.project.verification {
         return Err(SwpError::invalid_manifest(format!(
             "badge for {} carries a verify key that is not this project's own",
             doc.project.project_id
-        )));
+        ))
+        .with_next(
+            "The badge claims this project's identity and was signed against a different key, \
+             so either the badge or `.swp/public/identity.json` was replaced since it was \
+             written. Compare both against version control before regenerating either; \
+             `swp badge` would overwrite the evidence.",
+        ));
     }
     if parsed.verbose() {
         sink.note(&format!(
@@ -315,6 +330,14 @@ mod tests {
         let r = dir.run(&["badge", "show"]);
         assert_eq!(r.code, ErrorCode::NotProtected.exit_code());
         assert!(r.err.contains("Run `swp badge`"), "{}", r.err);
+        // The store here is protected and what is missing is one file in it. The
+        // code's default advice sends the reader back to `swp init`, which would
+        // refuse a store that already exists.
+        assert!(
+            !r.err.contains("swp init"),
+            "the advice tells a protected project to initialise itself: {}",
+            r.err
+        );
     }
 
     #[test]
@@ -384,6 +407,12 @@ mod tests {
         );
         assert!(r.err.contains("written by someone else"), "{}", r.err);
         assert!(r.err.contains(&other.project_id().to_string()), "{}", r.err);
+        assert!(
+            r.err.contains("next: The badge is signed and intact")
+                && r.err.contains("`swp badge` writes one"),
+            "the advice names this badge's own move: {}",
+            r.err
+        );
     }
 
     #[test]

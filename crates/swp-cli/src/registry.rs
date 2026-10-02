@@ -321,13 +321,25 @@ fn pin(
             "this index is for project {}, but the project here is {} — the two are different \
              keys' claims, so nothing in the index says anything about this tree",
             doc.project_id, identity.project_id
-        )));
+        ))
+        .with_next(
+            "This is not damage: the index is intact and describes another project. \
+             Run `swp registry publish` here for an index of this store's own releases, or \
+             run `swp registry search` inside the project the file names.",
+        ));
     }
     if identity.verification != doc.verify_key {
         return Err(SwpError::invalid_manifest(format!(
             "index for {} carries a verify key that is not this project's own ({})",
             doc.project_id, identity.project_id
-        )));
+        ))
+        .with_next(
+            "The index claims this project's id and was signed by a different key, so one of \
+             the two files was replaced since it was published. Compare \
+             `.swp/public/identity.json` and the index against version control before you \
+             re-publish either; `swp registry publish` will overwrite the index and hide the \
+             disagreement.",
+        ));
     }
     if parsed.verbose() {
         sink.note(&format!(
@@ -593,6 +605,17 @@ mod tests {
         assert!(
             r.err.contains("this index is for project") && r.err.contains(&reader.project_id()),
             "the refusal says which project the index is for and which one is here: {}",
+            r.err
+        );
+        // The default INVALID_MANIFEST advice points at *this* project's
+        // .swp/public/releases/ and a provenance backup, which is a repair for a
+        // damaged store. The index is not damaged and is not this store's, so the
+        // reader's move is to publish their own or read it somewhere else.
+        assert!(
+            r.err.contains("next: This is not damage:")
+                && r.err.contains("swp registry publish")
+                && !r.err.contains("provenance backup"),
+            "the advice names the reader's actual move: {}",
             r.err
         );
     }
