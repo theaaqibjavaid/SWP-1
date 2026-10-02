@@ -178,7 +178,7 @@ touched, so an interrupted run leaves a tree `swp verify` can still describe.
 | `--sites <n>` | how many sites to aim for |
 | `--bits <n>` | tag width, 2–8 |
 | `--release <id>` | publish under this id |
-| `--revision <label>` | record a source revision (a commit sha, a version) in the release record |
+| `--revision <label>` | record a source revision (a commit sha, a version) in the release record: one line of 1–200 printable characters, or the run is refused with `INVALID_MANIFEST` before it writes anything |
 | `--dry-run` | decide and report, write nothing |
 | `--format`, `-q`, `-v` | as above |
 
@@ -354,7 +354,7 @@ prints for it:
 | `2` | `USAGE` | unknown command or option, a value that is not a number, an out-of-range setting, a rename without `--force` |
 | `3` | `SECRET_UNAVAILABLE` | the root secret is missing, unreadable, or refused by the permission check |
 | `4` | `NOT_PROTECTED` | no store, no releases, or a `--release` id this project has never published |
-| `5` | `INVALID_MANIFEST` / `RELEASE_MISMATCH` | two readings share this code deliberately: a manifest that fails its signature or disagrees with its record, and a tree that no longer matches the release it is checked against |
+| `5` | `INVALID_MANIFEST` / `RELEASE_MISMATCH` | three readings share this code deliberately: a manifest that fails its signature or disagrees with its record, a tree that no longer matches the release it is checked against, and a `--revision` label the release record will not hold — which is refused before the run writes anything |
 | `6` | `PROTOCOL_VERSION_UNSUPPORTED` | an artifact written by a protocol this build cannot read |
 | `7` | `LIMIT_REACHED` | a `[limits]` ceiling stopped the walk, the parse or the archive |
 | `8` | `UNSUPPORTED_LANGUAGE` | a language was named that no adapter claims |
