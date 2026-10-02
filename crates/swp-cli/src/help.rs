@@ -248,13 +248,17 @@ fn detail(cmd: Command) -> Option<Vec<String>> {
         ],
         Command::Registry => &[
             "registry publish writes .swp/public/registry.json, a signed index of the",
-            "project's releases. Every entry carries the release's own signature plus the",
-            "document-level signature, so a reader can authenticate without ever contacting",
-            "the publisher. This is not a network service; the file is committed to the",
-            "repository and mirrors the release records in .swp/public/releases/.",
-            "registry search <file> reads a registry JSON and prints one release (with",
-            "--release <id>) or the whole document (without it). A revoked release is",
-            "flagged on stderr.",
+            "project's own release records. The document and every record in it verify",
+            "against the project's verify key, so nobody can edit the file without the",
+            "publisher's private key. That is all it does: nothing reads an index for",
+            "you, `swp scan` never consults one, and SPEC 16 keeps cross-project",
+            "verification out of the protocol. The document authenticates itself.",
+            "registry search <file> prints one release (--release <id>), the newest of the",
+            "index (--latest), or the whole document (neither). Inside a project, or with",
+            "--project <dir>, the index is compared against that project's own identity —",
+            "the only check that ties the key the file carries to the project id it names.",
+            "Without a project here the run still verifies the signatures, and says that",
+            "it had nothing to compare them to.",
         ],
         Command::Badge => &[
             "badge generates .swp/public/badge.json: a trust anchor document that lets a",
@@ -343,7 +347,11 @@ fn command_exit_codes(cmd: Command) -> Vec<(i32, &'static str)> {
         ],
         Command::Registry => vec![
             (0, "the registry was read or written"),
-            (5, "the release named is not in this registry file"),
+            (
+                5,
+                "the release named is not in this registry file, or the file does not \
+                 authenticate",
+            ),
         ],
         Command::Badge => vec![
             (0, "the badge was generated or read"),
