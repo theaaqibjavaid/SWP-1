@@ -336,20 +336,6 @@ impl Command {
         }
     }
 
-    /// Whether the command needs the project's private root secret.
-    pub fn needs_secret(self) -> bool {
-        matches!(
-            self,
-            Command::Generate
-                | Command::Protect
-                | Command::Verify
-                | Command::Scan
-                | Command::PreCommit
-                | Command::Registry
-                | Command::Badge
-        )
-    }
-
     /// The command a reader most plausibly meant: the closest name within two
     /// edits, which covers a dropped, doubled or swapped letter without ever
     /// offering something unrelated. `None` when nothing is that close, or when

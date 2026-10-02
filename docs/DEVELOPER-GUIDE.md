@@ -203,10 +203,19 @@ text and `--formt json` has to answer with `Did you mean --format?`.
    `Command::name`, and the `Command::flags` list that says which flags *this*
    command accepts. An unknown flag for a known command is a usage error, not an
    ignored one.
-2. Decide `Command::needs_secret`. `generate`, `protect`, `verify` and `scan` are
-   the four that need the root secret; `init` mints one; `inspect` and `report`
-   must keep working with no secret at all, which is the property that lets a
-   colleague audit a store they were never given.
+2. Do not add a "does this command need the secret?" predicate to `Command`. The
+   answer is not a fact about a verb: `swp registry publish` signs, so it loads the
+   root, and `swp registry search` only authenticates, so it does not — and a
+   per-`Command` enum cannot see that difference, because `Registry` is one variant
+   with two subcommands. The dependency appears where it is used: `Ctx::signing_key`
+   calls `Store::load_root`, and a missing secret answers `SECRET_UNAVAILABLE`/`3`
+   there. `generate`, `protect`, `verify`, `scan`, `pre-commit`, `registry publish`
+   and `badge` take that path; `init` mints the secret, and `inspect`, `report`,
+   `registry search` and `badge show` must keep working with no secret at all, which
+   is the property that lets a colleague audit a store they were never given. Four
+   tests named `*_reads_a_store_whose_root_key_is_absent` in those four modules pin
+   it, each with the key file actually removed rather than the project missing. The
+   measured exits are the table in [CLI.md](CLI.md).
 3. Implement the work in `swp-sdk` — the session and the operations live there —
    and keep the `swp-cli` module to argument parsing, rendering and the exit code,
    reached from `run_in(argv, cwd, out, err)`, which is what every test drives.
