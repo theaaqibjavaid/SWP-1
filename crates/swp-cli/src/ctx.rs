@@ -132,7 +132,7 @@ impl Ctx {
 
     /// The project's signing key, used to sign documents that are committed
     /// alongside the project rather than kept private — the registry, a
-    /// compliance report, a trust anchor badge. Loaded per call, dropped after
+    /// compliance report, a badge document. Loaded per call, dropped after
     /// the operation, the same lifetime rule as every other root-secret use.
     pub fn signing_key(&self) -> Result<swp_crypto::ManifestSigningKey, SwpError> {
         let root = self.store.load_root()?;

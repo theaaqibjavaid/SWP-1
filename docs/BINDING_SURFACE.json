@@ -95,12 +95,6 @@
           "reason": "Grades somebody else's artifact. Loads the keyed constellation inside the call, drops the secret before returning, and hands back only the graded report and per-site counts."
         },
         {
-          "path": "swp_sdk::Session::scan_with_command",
-          "kind": "fn",
-          "declared_in": "crates/swp-sdk/src/scan.rs",
-          "reason": "Same pipeline as `scan` but records a custom command label in the report's `run` block, so a pre-commit hook or other wrapper can report itself by its own name. The rest of the pipeline is identical; only the label differs."
-        },
-        {
           "path": "swp_sdk::Session::reports",
           "kind": "fn",
           "declared_in": "crates/swp-sdk/src/report.rs",

@@ -81,8 +81,7 @@ pub fn overview(sink: &mut Sink<'_>) -> Result<(), SwpError> {
     );
     lines.push("  swp scan ./copy          look at somebody else's tree".to_string());
     lines.push(
-        "  swp pre-commit           scan your own sources, exit 1 if a release is found"
-            .to_string(),
+        "  swp pre-commit           verify this tree before the commit is allowed".to_string(),
     );
     lines.push(
         "  swp registry publish     write a signed release index to .swp/public/registry.json"
@@ -237,12 +236,17 @@ fn detail(cmd: Command) -> Option<Vec<String>> {
             "--save keeps the report with the project being scanned, not with the candidate.",
         ],
         Command::PreCommit => &[
-            "pre-commit scans the project's own target directories against its releases. It",
-            "is meant to run from inside a git pre-commit hook: no git commands are executed,",
-            "the .swp/ directory is never scanned, and exit 1 blocks the commit when a",
-            "release is found — the sources carry a watermark they should not.",
-            "Without --release every release is a suspect; with --latest only the newest is.",
-            "Exit 0 is clean, 1 is a finding (block the commit), 10 is inconclusive.",
+            "pre-commit is swp verify for a git hook: the same measurement of this tree",
+            "against one of its own releases, with the document's exit code handed back to",
+            "git. No git command is run, nothing is written, and .swp/ is not part of the",
+            "tree that is examined.",
+            "One release is graded per run — the newest, or the one --release names — because",
+            "a per-site verdict needs a single manifest. That is swp verify's limit too.",
+            "A 5 is not an accusation: a reverted file, a merge that took the unprotected",
+            "side, and a deliberate strip read the same. Whether a copy exists elsewhere is",
+            "swp scan's question, not this command's.",
+            "Exit 0 allows the commit; 5 and 10 both block it, 10 because the tree was only",
+            "partly read.",
         ],
         Command::Registry => &[
             "registry publish writes .swp/public/registry.json, a signed index of the",
@@ -340,9 +344,9 @@ fn command_exit_codes(cmd: Command) -> Vec<(i32, &'static str)> {
             (10, "inconclusive: nothing was confirmed and part of the candidate was not examined"),
         ],
         Command::PreCommit => vec![
-            (0, "no watermark evidence found in the project sources"),
-            (1, "watermark evidence found: one of your releases is in the sources — the commit is blocked"),
-            (10, "inconclusive: the scan could not examine everything"),
+            (0, "this tree still carries every site of the release it was checked against"),
+            (5, "a site of that release is no longer carrying its code — the commit is blocked"),
+            (10, "inconclusive: part of the tree was never read, so nothing was confirmed — the commit is blocked"),
         ],
         Command::Registry => vec![
             (0, "the registry was read or written"),

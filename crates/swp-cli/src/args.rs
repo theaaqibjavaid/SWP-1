@@ -223,10 +223,10 @@ impl Command {
             Command::Verify => "check this tree against one of its own releases",
             Command::Scan => "scan a candidate copy for evidence of your releases",
             Command::PreCommit => {
-                "scan the project sources against own releases, exit 1 on finding"
+                "check this tree still carries its release, for a git pre-commit hook"
             }
             Command::Registry => "publish a signed release index, or search one",
-            Command::Badge => "generate or show a trust anchor badge for the project",
+            Command::Badge => "write or show the project's signed badge document",
             Command::Inspect => "show what the store holds: identity, releases, fragments",
             Command::Report => "list and re-render saved reports",
             Command::Help => "this text",
@@ -298,7 +298,6 @@ impl Command {
                 Flag::Format,
                 Flag::Full,
                 Flag::Limit,
-                Flag::Compliance,
                 Flag::Quiet,
                 Flag::Verbose,
             ],
