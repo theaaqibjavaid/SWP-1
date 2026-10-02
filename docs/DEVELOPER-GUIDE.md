@@ -29,7 +29,7 @@ is this project's measurement harness rather than something to depend on.
 | `swp-detection` | input sniffing, container extraction, the two-pass site search | everything above |
 | `swp-evidence` | evidence items, the level ladder, the coincidence bound, the report document | core, identity, manifest, detection |
 | `swp-sdk` | the project session and the operations it runs: `init`, `protect`, `scan`, `verify`, saved reports, capabilities | all of the library crates above |
-| `swp-cli` | argument parsing, the seven commands, rendering, exit codes | core, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
+| `swp-cli` | argument parsing, the ten commands, rendering, exit codes | core, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
 | `swp-test-suite` | fixtures, transforms, the measurement suites, the documentation test | used as a dev-dependency only |
 
 `swp-adapters` is the only crate that links tree-sitter, which is what keeps the
@@ -70,10 +70,15 @@ request that violates one is not a style problem.
    prints the two commands that verify that claim and the firewall test.
 5. **The secret is never printable.** `SecretBytes` has no `Display`, no
    `Serialize` and no `Clone`, and its `Debug` is `SecretBytes([REDACTED N
-   bytes])`. Key material is derived, used, and dropped. The seven tests in
-   `tests/leak/secret_scan.rs` install two known needles and sweep every artifact,
-   every command's stdout and stderr, and every temporary file the write path can
-   leave behind.
+   bytes])`. Key material is derived, used, and dropped. The eight tests in
+   `tests/leak/secret_scan.rs` install three known needles — the master key, a raw
+   keyed MAC, and the output of the derivation domain the protocol reserves without
+   giving it a user — and sweep every artifact, every command's stdout and stderr,
+   and every temporary file the write path can leave behind, for each needle in
+   eleven renderings. The eleventh-rendering set is not decoration: ids in this
+   project are lowercase unpadded base32, so a keyed value that leaks *as an id* is
+   invisible to a hex-and-base64 sweep, and one of the three needles exists because
+   of exactly that leak.
 6. **Every loop is bounded.** Bounds live in `swp-core/src/limits.rs`, come
    from `Limits` rather than a local constant, and are clamped to
    `Limits::ceiling()` — a repository's own config may lower a limit but cannot
@@ -104,7 +109,7 @@ cannot run by name is a measurement nobody re-runs:
 
 | suite | file | measures |
 | --- | --- | --- |
-| `secret_leak` | `tests/leak/secret_scan.rs` | the seven sweeps named above |
+| `secret_leak` | `tests/leak/secret_scan.rs` | the eight sweeps named above |
 | `detection_matrix` | `tests/detection/matrix.rs` | the partial-copy ladder, the thirteen refactoring forms, the four removals, an excluded directory, the padded copy |
 | `family_roundtrip` | `tests/detection/roundtrip.rs` | every literal form renders, re-parses and decodes back to its value |
 | `false_positive` | `tests/false_positive/corpora.rs` | 30 scans of six corpora, six generated siblings, shared constants |
