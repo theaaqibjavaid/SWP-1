@@ -296,6 +296,20 @@ mod tests {
     }
 
     #[test]
+    fn badge_show_reads_a_store_whose_root_key_is_absent() {
+        // The badge is the public half of the store summarised, so an auditor with
+        // a copied `public/` directory must be able to read it. `swp badge` needed
+        // the key to sign; `swp badge show` needs the key in `identity.json`, which
+        // is not a secret.
+        let dir = Scratch::protected("badge", "show-no-key");
+        assert_eq!(dir.run(&["badge"]).code, 0, "badge generation failed");
+        std::fs::remove_file(dir.store().root_key_path()).unwrap();
+        let r = dir.run(&["badge", "show", "--format", "json"]);
+        assert_eq!(r.code, 0, "{}{}", r.out, r.err);
+        assert_eq!(r.json()["schema"], BADGE_SCHEMA);
+    }
+
+    #[test]
     fn badge_show_fails_when_no_badge_exists() {
         let dir = Scratch::protected("badge", "no-badge");
         let r = dir.run(&["badge", "show"]);

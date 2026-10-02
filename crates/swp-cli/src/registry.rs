@@ -399,6 +399,27 @@ mod tests {
     }
 
     #[test]
+    fn search_reads_a_store_whose_root_key_is_absent() {
+        // `SECURITY.md` says the readers run against the public half with no key
+        // present, and this command is the one that promise is newest for. Absent
+        // key, not absent project: a store copied for an audit has its `public/`
+        // and does not have its secret.
+        let dir = Scratch::protected("registry", "search-no-key");
+        assert_eq!(dir.run(&["registry", "publish"]).code, 0);
+        let key = dir.store().root_key_path();
+        std::fs::remove_file(&key).unwrap();
+        let registry_path = dir.store().registry_path().display().to_string();
+        let r = dir.run(&["registry", "search", &registry_path, "--format", "json"]);
+        assert_eq!(r.code, 0, "{}{}", r.out, r.err);
+        assert!(
+            !r.out.contains("secret") && !r.err.contains("secret"),
+            "search looked for a key it does not need: {}{}",
+            r.out,
+            r.err
+        );
+    }
+
+    #[test]
     fn search_by_release_id_returns_that_entry() {
         let dir = Scratch::protected("registry", "search-one");
         let r = dir.run(&["registry", "publish"]);
