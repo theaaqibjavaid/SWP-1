@@ -163,13 +163,14 @@ else
 fi
 
 printf '\n== the sources contain no built artefacts ==\n'
-TRACKED=$(git ls-files | grep -Ei '\.(pyc|pyo|o|a|so|dll|dylib|exe|class|wasm|node)$' || true)
+TRACKED=$(git ls-files | grep -Ei '\.(pyc|pyo|o|a|so|dll|dylib|exe|class|wasm|node|whl)$' || true)
 if [ -z "$TRACKED" ]; then
     ok "no compiled artefacts are tracked"
 else
     bad "tracked binary artefacts:"
     printf '        %s\n' $TRACKED
     note "the scanner does not walk __pycache__ or target/, so neither belongs here"
+    note "a wheel is the built binding in a distribution container: on an index, not in the tree"
 fi
 
 printf '\n== every publishable manifest is valid, and the graph resolves ==\n'
