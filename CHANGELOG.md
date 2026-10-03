@@ -20,6 +20,201 @@ every claim of that kind here was run before it was written
 An entry appears here between a change being merged and the tag that carries it,
 and not before.
 
+What follows is merged on `dev` and is under no tag yet, so this is a description of a
+tree rather than of a shipped build. What a user runs went from seven commands to ten
+and from seventeen options to eighteen. The protocol did not move: `swp-crypto` and
+`swp-core` have no diff against `v1.0.0-beta.4`, and neither has the workspace's
+third-party list, so the key derivation, every stored artifact's schema and the verdict
+arithmetic are still `1.0.0-beta.4`'s. That is a measurement, and the command that
+reproduces it is at the end of this entry — as is the pair of builds that was run
+against it.
+
+### Added
+
+**`swp pre-commit` — `swp verify`'s measurement in the shape a git hook needs.** It
+grades the working tree against one of the project's own releases, the newest unless
+`--release` names another, writes nothing, runs no git command, and hands the
+document's exit code back to git: `0` allows the commit, `5` blocks one whose tree no
+longer carries the release it is checked against, `10` blocks one it could not read
+enough of to say anything. It is `verify` and not `scan` because scanning a protected
+project for its own marks always finds them, so a hook that scanned could only ever
+block a healthy tree. It prints `verify`'s page through `verify::text_lines` rather
+than a second rendering of the same `SWP-1-verify-v1` document — two renderers are two
+places for the site wording to disagree.
+
+**`swp scan --compliance` — a coverage grade beside the verdict, capped by what the
+report already measured.** `FULL`, `PARTIAL` or `NONE` over the keyed sites of the
+release the report leads with, computed only from fields that report carries: a
+candidate that was partly read cannot tell an absent site from an unexamined one, and a
+count the report will not carry as a finding — one inside the coincidence bound —
+cannot be rounded up to `FULL` here. Each of those two caps prints a `·` line naming
+the measurement that held the grade back, and the grade changes no exit code. Its
+document is `SWP-1-compliance-v1`, printed and never stored: `--save` beside this
+flag is a
+usage error (`2`), because `swp report` reads `SWP-1-report-v2` and would refuse the
+grade file it had just been handed. `verify` and `pre-commit` reject the option
+outright — neither has a candidate to grade.
+
+**`swp registry publish` and `swp registry search <file>` — a signed index of the
+project's own release records**, at `.swp/public/registry.json` under schema
+`SWP-1-registry-v1`. `publish` needs the root secret for one signature over a document
+whose every other field the store already publishes under `public/releases/`; `search`
+needs no key at all. Reading an index is where its security lives: a document is
+validated for schema and protocol, checked that every record inside it names the
+project the index itself names, and then authenticated — the index's signature and
+each release record's signature inside it, against the verify key the document
+carries. On top of that, when the working directory or `--project` holds a protected
+project, the verify key the index carries has to be *this* project's. With no local
+project it still verifies the signatures and says on stderr that it had nothing to
+compare the author claim against. Nothing reads an index for you and `swp scan` never
+consults one: SPEC §16 keeps one project vouching for another out of the protocol, so
+this is a publisher's list of its own releases and not a trust channel. An earlier
+shape of the same command carried a `revoked` flag that no code could set; it is not
+in this one.
+
+**`swp badge` and `swp badge show [file]` — the public half of a project on one page**,
+at `.swp/public/badge.json` under schema `SWP-1-badge-v1`: `identity.json` embedded
+verbatim, the release count, the newest release id, and a signature over those. No
+key-derived value appears in it, which is now something the leak sweep proves rather
+than something a sentence claimed — an earlier build of this verb published an
+`anchor_key` derived from the root secret into that public file, and the field is gone
+([docs/SECURITY.md](docs/SECURITY.md)). `badge show` is what makes the file worth
+having: it checks the signature and then compares the identity the badge names with
+this store's own, because a badge copied whole from another project signs perfectly.
+
+**Two foreign bindings, built and gated, published by nobody.**
+`bindings/python/` (PyO3, `abi3` with a 3.10 floor, imported as `swp`) and
+`bindings/node/` (napi-rs over Node-API 4, CommonJS and ESM, generated declarations
+beside a hand-written entry point) each wrap the `binding_facing` surface ADR-0001
+froze, over one error class carrying the envelope
+[docs/SDK_API.md](docs/SDK_API.md) §8 defines, and neither adds a rule the Rust
+does not have. Both are their own Cargo workspaces outside the repository's, so a
+binding toolchain requirement cannot raise the published crates' `rust-version`; both
+have a CI job over the three systems the CLI's matrix uses. The Node suite executes
+every example its README prints, which is the binding equivalent of `docs_examples`;
+Python has no such check yet, and the Python step of §9 of
+[docs/SDK_ARCHITECTURE.md](docs/SDK_ARCHITECTURE.md) records that its page is the one
+item there no gate re-executes. Each builds under the working name `jrs-swp` at
+`0.1.0`; the name it would be published under is an open release decision
+([#32](https://github.com/theaaqibjavaid/SWP-1/issues/32)), and no wheel, sdist or npm
+package has gone to any index.
+
+**Two proposals about what the next increment has to prove.**
+[ADR-0003](docs/adr/0003-precommit-hook-proved-as-a-hook.md) records that
+`pre-commit` has been tested as a command and never as a hook;
+[ADR-0004](docs/adr/0004-what-a-badge-proves-to-a-stranger.md) states what a badge can
+say to a reader who has no store of their own. Both are `proposed`, and neither changed
+behaviour here.
+
+### Changed
+
+**A protection run refuses an unusable `--revision` before it writes anything**, which
+is what [ADR-0002](docs/adr/0002-release-failure-semantics.md) settles: a run this
+build rejects is not allowed to leave behind the manifest-and-plan-with-no-release that
+an interrupted run leaves, because the store cannot afterwards tell an operator's typo
+from a crash. The set of accepted labels did not move — `SourceRevision::validate` at
+`v1.0.0-beta.4` already refused an empty string, one longer than 200 bytes, and one
+carrying a control character — so what changed is when the answer arrives and what it
+says: three refusals that each name their own reason, the bound written once as
+`REVISION_MAX_BYTES`, and a `next:` that talks about a display label instead of about a
+corrupt stored file.
+
+**The command line no longer answers "does this verb need the secret".**
+`Command::needs_secret` was public, called by nothing, and wrong in both directions at
+once — it said yes for `registry` and `badge` whole, where `registry search` and
+`badge show` answer with the key file deleted, and it said no for the publishers that
+do need it. It is deleted, and the rule lives where it is used (`Ctx::signing_key`
+calls `Store::load_root`) and in four tests that remove `.swp/private/root.key` and
+assert `inspect`, `report`, `registry search` and `badge show` still read the store.
+Seven commands take the signing path; those four keep the property that lets a
+colleague audit a store they were never given, now measured rather than declared.
+
+**The leak sweep went from two needles in nine renderings to three in eleven.**
+`NeedleSet` had no base32 form at all, and an id in this project is unpadded lowercase
+base32, so a keyed value that reached an artifact *as an id* was invisible to the §29
+sweep in every domain, not just the one that broke. The third needle is the reserved
+`Domain::Evidence` output the badge used to carry, which turns SPEC's "reserved, and
+nothing in the product derives under it" into a tested promise; the suite is eight
+sweeps where it was seven.
+
+**The store can say what a publisher wrote.** `Store::registry_path` and
+`Store::badge_path` own the two paths, so a relocated project and a hand-joined
+`public/` cannot disagree about where an index lives; both documents are written
+through the store's atomic public-write path, so a run that dies halfway leaves the
+previous index readable rather than a truncated file the next reader calls damaged.
+`Store::inventory` lists each when it exists — that is what `swp inspect store` prints,
+and [docs/SECURITY.md](docs/SECURITY.md) reproduces that command's table with its
+"may commit" column, and explains why a store that has never published shows neither
+file. They are deliberately *not* in `PUBLIC_ARTIFACTS`, the list `swp init` prints for
+a store that has just been created, because neither file exists then. SPEC's document
+table went from five documents to eight.
+
+**The release gate can see a build artefact it could not see before.** The artefact
+sweep in `scripts/check-release.sh` now rejects a tracked `.node` addon, a tracked wheel
+and a tracked Python extension module; the pattern it carried at `v1.0.0-beta.4` covered
+object files, shared libraries and `.wasm`, and stopped there — no binding format was in
+it, which is the same blind spot that lets a built binding into a public tree one file
+format at a time. And `publish.yml`'s crate list now matches the ten publishable
+workspace members, including `swp-sdk`, which the workflow's own comment named and its
+list omitted.
+
+### Fixed
+
+**A relative scan candidate is resolved once.** `swp scan src` — the spelling the
+Python binding passes through unchanged, and one the CLI never produces because
+`ctx::resolve` absolutizes before a run starts — failed the scan it had been asked to
+perform: the walk stored `ScannedFile.abs` relative to a root that was itself relative,
+and both read sites joined that root back on, so `src` became `src/src/app.js` and a
+file the walk had listed one line earlier could not be opened
+([#23](https://github.com/theaaqibjavaid/SWP-1/issues/23)). The walk absolutizes before
+it normalizes now, which also makes a leading `..` resolve against the working
+directory instead of vanishing from the front of an empty path, and the root parameters
+that existed only to feed those re-joins are gone with them. `protect` and `verify` are
+untouched — their roots were already absolute — so no release made before the fix reads
+differently after it. A scan of a *sub-directory* of a project is still `INCONCLUSIVE`,
+which is the design rather than the bug: a fragment of a tree holds too little of the
+constellation to say anything about the whole.
+
+### Compatibility, checked rather than assumed
+
+The claim at the top of this entry is a diff, and this is the command that re-runs it:
+
+```sh
+git diff --stat v1.0.0-beta.4..HEAD -- crates/swp-crypto crates/swp-core Cargo.toml
+```
+
+No output is the whole statement: the crates that derive every key, canonicalize every
+document and sign every record, and the third-party list they sit on, are what
+`v1.0.0-beta.4` shipped. `Cargo.lock` gained one line — `swp-crypto` under `swp-cli`'s
+dependencies, for the two publishers — and no third-party crate, so the shipped
+binary's transitive count is still the 80 that
+[docs/SECURITY.md](docs/SECURITY.md) states.
+
+What a diff cannot say is whether a build from before this work reads a record made
+after it, so that was run on 2026-10-03 with two binaries: one built from the tag, one
+from this tree. Both print `swp 1.0.0-beta.4`, because the workspace version is still
+the tag's and this entry describes unreleased work — the difference between them is
+source, not a string.
+
+- A five-site project protected by the tag's build verifies under this one: `manifest
+  authenticated`, verdict `INTACT`, exit `0`. It answers identically under the tag's own
+  build, which is the baseline that makes the first line a measurement.
+- A project protected by *this* build, with a `--revision` label recorded, verifies
+  under the tag's build: same verdict, exit `0`.
+- The three new verbs run against the tag's store — `registry publish`, `badge`,
+  `pre-commit`, then `registry search` and `badge show` reading back what they wrote —
+  and each exits `0`; `swp inspect store` lists both new files.
+- The check that can say no: with one character of that release record's signature
+  flipped, both builds answer `INVALID_MANIFEST` and exit `5`; put the byte back and
+  both return to `INTACT` and `0`.
+- A report saved by the tag's build reads under this one, and one saved by this build
+  reads under the tag's — `swp report`, exit `0` both ways. `SWP-1-report-v2` and the
+  arithmetic behind the grade did not move here.
+
+[docs/VALIDATION.md](docs/VALIDATION.md) remains the record of what the protocol itself
+measures; nothing in the list above required a foreign binding, because the CLI and the
+bindings call one implementation.
+
 ## [1.0.0-beta.4] - 2026-09-30
 
 The release that answered the limitation `1.0.0-beta.3` recorded, and then took the
