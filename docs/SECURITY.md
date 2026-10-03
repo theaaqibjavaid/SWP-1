@@ -147,10 +147,14 @@ container images, backup tooling that must copy a key between machines, CI. With
 it set, the ACL and your volume encryption are the whole at-rest protection, and
 that trade should be a deliberate one.
 
-**Loaded, used, dropped.** Four commands ask for the secret at all — `generate`,
-`protect`, `verify`, `scan`. `init` mints it, and `inspect` and `report` run
-against the public half with no key present, which is what lets a third party
-check a release record. On load the store does one extra thing beyond unsealing:
+**Loaded, used, dropped.** Seven commands ask for the secret: `generate`,
+`protect`, `verify`, `scan`, `pre-commit`, and the two publishers — `registry
+publish` and `badge`, which need it for one ed25519 signature over a document whose
+every other field is already public. `init` mints it. The four readers — `inspect`,
+`report`, `registry search` and `badge show` — run against the public half with no
+key present, which is what lets a third party check a release record, and now check
+an index of them, without being handed anything they could compute a site with. On
+load the store does one extra thing beyond unsealing:
 it derives the project id from the key and compares it with
 `.swp/public/identity.json`, and stops if they disagree. A key and an identity
 from different backups would derive every fragment wrongly and then report "no
@@ -225,8 +229,10 @@ without rotating the first.
 
 ## What is signed, and what a signature does not buy
 
-Both documents a release produces are signed by one rule, written down in exactly
-one function (`swp-manifest/src/sig.rs`):
+Every signed document this build writes — a private manifest, a public release
+record, a registry index and each release record inside it, a badge — is signed
+by one rule, written down in exactly one function
+(`swp-manifest/src/sig.rs`):
 
 ```text
 canonical JSON of the document, with the "signature" field removed
@@ -242,8 +248,11 @@ exist today. Signing is deterministic per RFC 8032, so release records stay
 diffable.
 
 What the signature proves is precisely one thing: that this document was written
-by whoever held the root secret, and has not been edited since. `swp verify` and
-`swp inspect` check it, on the public record as well as the private manifest.
+by whoever held the root secret, and has not been edited since. Four commands
+check it before they print or match anything from the file: `swp verify` and
+`swp inspect` on the public release record as well as the private manifest,
+`swp registry search` on the index and on each release record inside it, and
+`swp badge show` on the badge.
 That check was added after an earlier build verified only the manifest — the
 record is the *committed* half, the one an attacker who can push to your
 repository can reach, and an editor who flips one character of its fingerprint
@@ -265,7 +274,10 @@ registration authority and no revocation list in SWP-1: the verify key is
 self-signed in the sense that `identity.json` is its own trust anchor, which also
 means **whoever can edit your `identity.json` can substitute a key**. The
 residual protection is the one every public key has: distribute it through a
-channel you already trust.
+channel you already trust. This is also why `swp badge show` does not stop at the
+signature: a badge copied whole from another project signs perfectly, so the
+command also requires the project id and the verify key the badge names to match
+*this* store's `identity.json`, and answers `INVALID_MANIFEST` when they do not.
 
 Two artifacts are deliberately *not* signed: reports, because a report is an
 observation made by whoever held the secret at that moment and signing it would
@@ -294,6 +306,13 @@ store .swp — project swp1-…
   .swp/public/releases/rel-….json                     yes
 ```
 
+`registry.json` and `badge.json` belong on the public side of that line for the
+same reason the release records do: every field of either is a restatement of
+something already in `public/`, signed by the project's own key, and neither holds a
+location id, a tag or a byte derived from the secret. They are missing from the
+transcript above because it was captured before either command had been run:
+`swp inspect store` prints what a store holds rather than a fixed table.
+
 `init` appends `.swp/private/` to your `.gitignore` under its own marker comment
 without clobbering the file, and reports `created`, `updated` or `already
 ignored` accordingly. That is a convenience, not a control: the control is that
@@ -317,7 +336,7 @@ identity .swp/public/identity.json
   project     swp1-…
   display     javascript
   protocol    SWP-1 · schema 1 · canonicalizer 1
-  generator   swp-cli 1.0.0-beta.4
+  generator   swp-cli 1.0.0-beta.5
   verify key  … (ed25519, 32 bytes)
 
   This file is public by design: the verify key authenticates this project's
@@ -379,6 +398,8 @@ more reason than that.
 | a plan | the intended constellation *and every refusal* — the sites that were not used | coverage knowledge; still no codes |
 | a report | your paths and a candidate's text, side by side | confidentiality of the fact that you scanned that candidate |
 | a private manifest | every site and both of its spellings | nothing unforgeable; the derivation domains stay unreachable |
+| a registry index | your release records in one file, plus the verify key already in `identity.json` | nothing: it regenerates from the store, and an edited copy fails its signature at every reader that checks one |
+| a badge | the public identity and the count of releases | least of all the secret. A badge publishes no key-derived value, and `secret_leak` runs `swp badge` and sweeps the file it wrote in every rendering an encoder offers, which is how that column stays true instead of being asserted |
 | `root.key` | the tag key: forge your marks, compute any site, sign any release | the ability to *deny* having issued a forged record, and every release's trustworthiness until you rotate by starting a new project |
 
 ## Keeping the secret out: the leak sweep
@@ -388,10 +409,23 @@ secret, any key derived from it, and any expected tag appear in **no** artifact 
 not source, not manifests, not reports, not stdout, not logs, not error messages,
 not temporary files. That is not auditable by reading, so it is asserted by
 `cargo test -p swp-test-suite --test secret_leak`, which installs a root secret
-of *known* value into a real store and then sweeps for it. Two needles, not one:
-the master key and a raw keyed MAC output — because an implementation that
-resists printing the master while happily printing a per-location MAC has leaked
-a derivable half of the same thing.
+of *known* value into a real store and then sweeps for it. Three needles, not one:
+the master key, a raw keyed MAC output, and a value minted in the derivation domain
+the protocol reserves without giving it a user. The second exists because an
+implementation that resists printing the master while happily printing a
+per-location MAC has leaked a derivable half of the same thing. The third was added
+after the fact, and it is here because of what the first two missed: the badge once
+carried an `anchor_key`, a value derived from the root secret in the reserved
+`Evidence` domain and written into a committable public file, and the sweep could not
+see it in any rendering it owned. Removing the field closed the leak; this needle is
+what closes the gap that let it be invisible.
+
+Each needle is looked for in eleven renderings: raw, hex in both cases, hex spaced
+for display, base64 padded, unpadded, URL-safe and hyphenated, percent-encoded, and
+base32 in both cases. The base32 pair is the newest and the least optional. Key
+material does not leak as hex; it leaks as an *id*, and this project renders ids in
+lowercase unpadded base32, so a 32-byte derived value pushed into a field named
+`anchor_key` arrives as 52 characters that no hex or base64 needle can see.
 
 | test | what it looks at |
 | --- | --- |
@@ -402,6 +436,7 @@ a derivable half of the same thing.
 | `error_messages_never_quote_key_material` | the error paths, which is where a `format!("{:?}", secret)` in a message would surface |
 | `no_temporary_or_backup_file_survives_a_write` | the `.name.tmp` siblings the atomic writer creates |
 | `every_command_prints_and_writes_nothing_searchable` | **every** verb the CLI offers, in both formats, with the flags whose purpose is to print more, sweeping stdout, stderr and every file each run wrote |
+| `the_reserved_domain_needle_is_visible_in_the_rendering_a_public_file_used` | the needle itself: the reserved-domain value is planted back into a badge-shaped artifact in both base32 cases and must be found, because a sweep that passes with a needle that never fires has measured nothing |
 
 What the suite says about its own limit, from its header, is worth repeating
 rather than rounding off: it checks the commands that exist, not every way to
@@ -487,7 +522,12 @@ omission and an inconclusive verdict in `tests/resource/hostile.rs`.
 ## Offline, and how to check that claim
 
 SWP-1 makes no network call in any code path, uploads nothing — not your source,
-not your reports, not a usage ping — and requires no account, server or registry.
+not your reports, not a usage ping — and requires no account, server or registry
+service. The one registry in this build is a file: `swp registry publish` signs an
+index of your own release records into `.swp/public/registry.json`, where it sits
+until you commit or ship it, and the only code that reads one is the `search` verb
+pointed at a path you named. Nothing fetches an index, nothing checks one against
+an authority, and no command has a URL in it.
 That is not a preference with a config switch: nothing in the dependency graph
 can open a connection, and the three grammars are compiled into `swp-adapters` as
 prebuilt sources, so a build on a machine with no network succeeds. The shipped

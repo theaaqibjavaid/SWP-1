@@ -169,7 +169,7 @@ gets a different constellation from `swp init` on the same tree.
 
 `swp_cli::protect::run` (`protect.rs:84`) builds a `Ctx` (`ctx.rs:48`), takes a
 fresh `ReleaseId` (`swp_identity::new_release_id`, `release.rs:29`), loads the
-secret, and calls `swp_embedding::protect(&Request)` (`swp-embedding/src/protect.rs:179`)
+secret, and calls `swp_embedding::protect(&Request)` (`swp-embedding/src/protect.rs:197`)
 with `Mode::Plan`, `Mode::Release` or `Mode::DryRun`
 (`lib.rs:131`, `protect.rs:78-108`). Inside that one call:
 `ManifestKeys::derive` (`keys.rs:73`), `ManifestSigningKey::from_root`

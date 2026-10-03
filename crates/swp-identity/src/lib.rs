@@ -43,6 +43,14 @@ pub const MANIFESTS_DIR: &str = "manifests";
 pub const PLANS_DIR: &str = "plans";
 pub const REPORTS_DIR: &str = "reports";
 pub const IDENTITY_FILE: &str = "identity.json";
+/// A publisher's own release index, when they choose to write one. Public: it
+/// carries only records the store already publishes under `public/releases/`,
+/// plus the project's own verify key.
+pub const REGISTRY_FILE: &str = "registry.json";
+/// A publisher's own trust badge, when they choose to write one. Public: the
+/// project's identity as the store already publishes it, a release count, the
+/// newest release id, and a signature over those.
+pub const BADGE_FILE: &str = "badge.json";
 pub const ROOT_KEY_FILE: &str = "root.key";
 pub const CONFIG_FILE: &str = "config.toml";
 

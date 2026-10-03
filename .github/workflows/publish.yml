@@ -58,7 +58,7 @@ jobs:
           # depends on, and the registry will refuse a dependency that is not there
           # yet. This is the same list check-release.sh calls PUBLISHABLE.
           CRATES="swp-core swp-crypto swp-identity swp-manifest swp-adapters
-                  swp-embedding swp-detection swp-evidence swp-cli"
+                  swp-embedding swp-detection swp-evidence swp-sdk swp-cli"
 
           for c in $CRATES; do
             if [ "$DRY_RUN" = "true" ]; then
@@ -85,6 +85,6 @@ jobs:
         if: inputs.dry_run == false
         shell: bash
         run: |
-          echo "Nine crates published. Nothing in this workflow can undo that, so the"
+          echo "Ten crates published. Nothing in this workflow can undo that, so the"
           echo "next step is a manual one: check each page on the registry, then"
           echo "confirm the binaries in release.yml point at the same source."

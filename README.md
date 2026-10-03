@@ -174,6 +174,31 @@ each field may be used to claim.
 verdict, `swp report` re-renders a stored one without re-scanning anything, and a
 document can be exported with `swp report --output <name>`.
 
+**Put the check where the damage happens.** `swp pre-commit` runs the same
+verification over the project's own tree and hands git the verdict as its exit
+code: `0` lets the commit through, `5` blocks it, `10` says the run could not have
+told either way. It reads the files as they stand on disk rather than what is
+staged, and it offers no flag that ignores what it found — a hook with a bypass
+option is a hook that gets bypassed.
+
+**Grade coverage separately from strength.** `swp scan --compliance` prints a second
+document beside a scan whose answer is `NONE`, `PARTIAL` or `FULL`: how much of the
+copy the named release's keyed sites were actually found in, over a candidate this
+build read whole. It is deliberately not a sixth rung on the ladder. A tree can be
+examined completely and still confirm nothing, and a tree can confirm every site of
+a release whose whole claim is four bits per site — coverage and strength are
+different questions, and the grade says only the first. The evidence level and the
+coincidence bound beside it say the second.
+
+**Publish the claim.** `swp registry publish` collects your release records into one
+signed `.swp/public/registry.json` and `swp badge` signs a summary of your public
+identity into `.swp/public/badge.json`. Both are restatements of what `public/`
+already discloses, both need the root secret only to produce a signature, and both
+are readable by `swp registry search <file>` and `swp badge show` with no key
+present — the latter refusing a badge that describes a different project, signature
+and all. There is no service behind any of it: a registry in this build is a file
+you may commit.
+
 **Three languages, one refusal, and a rule about the difference.** JavaScript,
 TypeScript and Python have real tree-sitter adapters sharing a dialect table of
 equivalent literal spellings. Everything else — `examples/generic` is C, shell and
@@ -197,6 +222,7 @@ cannot re-read what it rewrote cannot re-prove it either.
 | [docs/SDK_API.md](docs/SDK_API.md) | the operations such a binding would expose, one by one: inputs, side effects, errors, ownership |
 | [docs/BINDING_SURFACE.json](docs/BINDING_SURFACE.json) | that boundary as data: which `swp-sdk` items a Python or Node binding may wrap, which stay Rust-only, and which are keyed |
 | [docs/adr/0001-protect-generate-binding-boundary.md](docs/adr/0001-protect-generate-binding-boundary.md) | why `protect`'s result does not cross that boundary today, what the keyed field is actually worth to a caller, and the shape that would let it |
+| [docs/adr/0002-release-failure-semantics.md](docs/adr/0002-release-failure-semantics.md) | what a protection run leaves behind when it refuses: bad input writes nothing, and the half-recorded store belongs to an interrupted one |
 | [docs/VERSIONING_POLICY.md](docs/VERSIONING_POLICY.md) | which version moves when, and why a saved report is never reinterpreted |
 | [examples/](examples) | four protected trees, each with the transcript that proves it |
 
@@ -224,7 +250,7 @@ Around the protocol documentation sits the repository's own set:
 | `swp-embedding` | the walk, the candidate harvest, constellation selection, and the rewrite-and-re-prove loop |
 | `swp-detection` | scanning a candidate: fragments, exact renderings, fingerprint, structure |
 | `swp-evidence` | the ladder, the report document, the text renderer |
-| `swp-cli` | the seven commands, the parser, the help pages |
+| `swp-cli` | the ten commands, the parser, the help pages |
 | `swp-test-suite` | every measurement quoted in the documentation, driven against the real product |
 
 The dependency direction is one-way: `swp-cli` over the services over
@@ -313,7 +339,7 @@ source.
 ## Status
 
 Protocol v1.0.0, implemented end to end: embed, verify, scan, report. The public
-build carries `1.0.0-beta.4`: the protocol is settled and a tree protected by
+build carries `1.0.0-beta.5`: the protocol is settled and a tree protected by
 this build verifies against the release after it, so what the beta withholds is the
 endorsement rather than the functionality. Three
 languages with real parser adapters, one refusal that is a design decision, and a

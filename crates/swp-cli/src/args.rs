@@ -54,6 +54,8 @@ pub enum Flag {
     Quiet,
     /// `--verbose`
     Verbose,
+    /// `--compliance`
+    Compliance,
 }
 
 impl Flag {
@@ -77,6 +79,7 @@ impl Flag {
             Flag::Full => "--full",
             Flag::Quiet => "--quiet",
             Flag::Verbose => "--verbose",
+            Flag::Compliance => "--compliance",
         }
     }
 
@@ -128,6 +131,7 @@ impl Flag {
             Flag::Full => "list every item, not the first page of them",
             Flag::Quiet => "print only the result line",
             Flag::Verbose => "explain what is being looked at while it is looked at",
+            Flag::Compliance => "add a coverage grade over the keyed sites of one release",
         }
     }
 
@@ -141,7 +145,7 @@ impl Flag {
 
 /// Every option, in the order the help lists them. Declared once so the parser,
 /// the help and the tests cannot each keep a private copy that falls behind.
-pub const ALL_FLAGS: [Flag; 17] = [
+pub const ALL_FLAGS: [Flag; 18] = [
     Flag::Format,
     Flag::Output,
     Flag::Save,
@@ -159,9 +163,10 @@ pub const ALL_FLAGS: [Flag; 17] = [
     Flag::Full,
     Flag::Quiet,
     Flag::Verbose,
+    Flag::Compliance,
 ];
 
-/// The seven commands, plus the two that print and leave.
+/// The ten commands, plus the two that print and leave.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
     Init,
@@ -169,6 +174,9 @@ pub enum Command {
     Protect,
     Verify,
     Scan,
+    PreCommit,
+    Registry,
+    Badge,
     Inspect,
     Report,
     Help,
@@ -182,6 +190,9 @@ impl Command {
         Command::Protect,
         Command::Verify,
         Command::Scan,
+        Command::PreCommit,
+        Command::Registry,
+        Command::Badge,
         Command::Inspect,
         Command::Report,
     ];
@@ -193,6 +204,9 @@ impl Command {
             Command::Protect => "protect",
             Command::Verify => "verify",
             Command::Scan => "scan",
+            Command::PreCommit => "pre-commit",
+            Command::Registry => "registry",
+            Command::Badge => "badge",
             Command::Inspect => "inspect",
             Command::Report => "report",
             Command::Help => "help",
@@ -208,6 +222,11 @@ impl Command {
             Command::Protect => "embed the watermark and record the release",
             Command::Verify => "check this tree against one of its own releases",
             Command::Scan => "scan a candidate copy for evidence of your releases",
+            Command::PreCommit => {
+                "check this tree still carries its release, for a git pre-commit hook"
+            }
+            Command::Registry => "publish a signed release index, or search one",
+            Command::Badge => "write or show the project's signed badge document",
             Command::Inspect => "show what the store holds: identity, releases, fragments",
             Command::Report => "list and re-render saved reports",
             Command::Help => "this text",
@@ -268,6 +287,33 @@ impl Command {
                 Flag::Output,
                 Flag::Full,
                 Flag::Limit,
+                Flag::Compliance,
+                Flag::Quiet,
+                Flag::Verbose,
+            ],
+            Command::PreCommit => &[
+                Flag::Release,
+                Flag::Latest,
+                Flag::Project,
+                Flag::Format,
+                Flag::Full,
+                Flag::Limit,
+                Flag::Quiet,
+                Flag::Verbose,
+            ],
+            Command::Registry => &[
+                Flag::Project,
+                Flag::Release,
+                Flag::Latest,
+                Flag::Format,
+                Flag::Output,
+                Flag::Quiet,
+                Flag::Verbose,
+            ],
+            Command::Badge => &[
+                Flag::Project,
+                Flag::Format,
+                Flag::Output,
                 Flag::Quiet,
                 Flag::Verbose,
             ],
@@ -288,14 +334,6 @@ impl Command {
             ],
             Command::Help | Command::Version => &[Flag::Format],
         }
-    }
-
-    /// Whether the command needs the project's private root secret.
-    pub fn needs_secret(self) -> bool {
-        matches!(
-            self,
-            Command::Generate | Command::Protect | Command::Verify | Command::Scan
-        )
     }
 
     /// The command a reader most plausibly meant: the closest name within two
@@ -653,8 +691,8 @@ mod tests {
         }
         assert_eq!(
             Command::ALL.len(),
-            7,
-            "seven verbs, and ALL must hold all of them"
+            10,
+            "ten verbs, and ALL must hold all of them"
         );
     }
 

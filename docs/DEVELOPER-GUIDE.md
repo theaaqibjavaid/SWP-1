@@ -29,8 +29,16 @@ is this project's measurement harness rather than something to depend on.
 | `swp-detection` | input sniffing, container extraction, the two-pass site search | everything above |
 | `swp-evidence` | evidence items, the level ladder, the coincidence bound, the report document | core, identity, manifest, detection |
 | `swp-sdk` | the project session and the operations it runs: `init`, `protect`, `scan`, `verify`, saved reports, capabilities | all of the library crates above |
-| `swp-cli` | argument parsing, the seven commands, rendering, exit codes | core, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
+| `swp-cli` | argument parsing, the ten commands, rendering, exit codes | core, crypto, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
 | `swp-test-suite` | fixtures, transforms, the measurement suites, the documentation test | used as a dev-dependency only |
+
+The `crypto` in `swp-cli`'s row is there for the two publishers and nothing else:
+signing an index or a badge goes through `Ctx::signing_key`
+(`swp-cli/src/ctx.rs:139`), and reading one back goes through `VerifyingKey`
+(`swp-cli/src/registry.rs:38`, `badge.rs:33`). Neither call is a session operation —
+a session is about the project standing here, while an index or a badge may have
+travelled to reach it — so the type is used where it is needed rather than
+forwarded through `swp-sdk`.
 
 `swp-adapters` is the only crate that links tree-sitter, which is what keeps the
 C parsing surface in one place. Two structural rules are worth stating because
@@ -70,10 +78,15 @@ request that violates one is not a style problem.
    prints the two commands that verify that claim and the firewall test.
 5. **The secret is never printable.** `SecretBytes` has no `Display`, no
    `Serialize` and no `Clone`, and its `Debug` is `SecretBytes([REDACTED N
-   bytes])`. Key material is derived, used, and dropped. The seven tests in
-   `tests/leak/secret_scan.rs` install two known needles and sweep every artifact,
-   every command's stdout and stderr, and every temporary file the write path can
-   leave behind.
+   bytes])`. Key material is derived, used, and dropped. The eight tests in
+   `tests/leak/secret_scan.rs` install three known needles — the master key, a raw
+   keyed MAC, and the output of the derivation domain the protocol reserves without
+   giving it a user — and sweep every artifact, every command's stdout and stderr,
+   and every temporary file the write path can leave behind, for each needle in
+   eleven renderings. The eleventh-rendering set is not decoration: ids in this
+   project are lowercase unpadded base32, so a keyed value that leaks *as an id* is
+   invisible to a hex-and-base64 sweep, and one of the three needles exists because
+   of exactly that leak.
 6. **Every loop is bounded.** Bounds live in `swp-core/src/limits.rs`, come
    from `Limits` rather than a local constant, and are clamped to
    `Limits::ceiling()` — a repository's own config may lower a limit but cannot
@@ -104,7 +117,7 @@ cannot run by name is a measurement nobody re-runs:
 
 | suite | file | measures |
 | --- | --- | --- |
-| `secret_leak` | `tests/leak/secret_scan.rs` | the seven sweeps named above |
+| `secret_leak` | `tests/leak/secret_scan.rs` | the eight sweeps named above |
 | `detection_matrix` | `tests/detection/matrix.rs` | the partial-copy ladder, the thirteen refactoring forms, the four removals, an excluded directory, the padded copy |
 | `family_roundtrip` | `tests/detection/roundtrip.rs` | every literal form renders, re-parses and decodes back to its value |
 | `false_positive` | `tests/false_positive/corpora.rs` | 30 scans of six corpora, six generated siblings, shared constants |
@@ -198,10 +211,19 @@ text and `--formt json` has to answer with `Did you mean --format?`.
    `Command::name`, and the `Command::flags` list that says which flags *this*
    command accepts. An unknown flag for a known command is a usage error, not an
    ignored one.
-2. Decide `Command::needs_secret`. `generate`, `protect`, `verify` and `scan` are
-   the four that need the root secret; `init` mints one; `inspect` and `report`
-   must keep working with no secret at all, which is the property that lets a
-   colleague audit a store they were never given.
+2. Do not add a "does this command need the secret?" predicate to `Command`. The
+   answer is not a fact about a verb: `swp registry publish` signs, so it loads the
+   root, and `swp registry search` only authenticates, so it does not — and a
+   per-`Command` enum cannot see that difference, because `Registry` is one variant
+   with two subcommands. The dependency appears where it is used: `Ctx::signing_key`
+   calls `Store::load_root`, and a missing secret answers `SECRET_UNAVAILABLE`/`3`
+   there. `generate`, `protect`, `verify`, `scan`, `pre-commit`, `registry publish`
+   and `badge` take that path; `init` mints the secret, and `inspect`, `report`,
+   `registry search` and `badge show` must keep working with no secret at all, which
+   is the property that lets a colleague audit a store they were never given. Four
+   tests named `*_reads_a_store_whose_root_key_is_absent` in those four modules pin
+   it, each with the key file actually removed rather than the project missing. The
+   measured exits are the table in [CLI.md](CLI.md).
 3. Implement the work in `swp-sdk` — the session and the operations live there —
    and keep the `swp-cli` module to argument parsing, rendering and the exit code,
    reached from `run_in(argv, cwd, out, err)`, which is what every test drives.

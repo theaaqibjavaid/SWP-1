@@ -41,10 +41,20 @@ here. The usual causes are that you are standing in the wrong directory (`-p
 <path>` names another one, and discovery walks *up* from where you are, so a
 subdirectory of a protected project is fine) or that `.swp/` is in `.gitignore`,
 which it is, and this checkout was cloned rather than protected. A clone has the
-committed half of the store — `identity.json`, `releases/`, `config.toml` — and
-none of the private half, which is the point: `swp verify` and `swp scan` need
-the root secret, and a clone does not have it. `swp scan` from a clone therefore
-reports `NOT_PROTECTED` no matter what the candidate holds.
+committed half of the store — `identity.json`, `releases/`, `config.toml` — and none
+of the private half, which is the point. Note what it does *not* report: a clone is
+not an unprotected tree, it is a store that opens and cannot be read, so the verb
+that fails is `SECRET_UNAVAILABLE` (`3`, below), not this one. `swp verify`, `swp
+scan`, `swp pre-commit` and `swp registry publish` from a clone all answer `3`,
+whatever the candidate holds, because all four need the root secret.
+
+The two verbs that answer differently are the readers. `swp registry search <file>`
+and `swp badge show` authenticate a signed document against the public verify key
+and ask nothing of `private/`, which is the only reason an outsider holding your
+repository has anything to check at all. `badge show` in a clone is the one case
+where the two codes trade places: it says `NOT_PROTECTED` because the clone's
+`public/` holds no `badge.json` — nothing wrong, the author simply never ran `swp
+badge` and committed what it wrote.
 
 **`.swp/` exists but has no `config.toml`.** A partial checkout, a stray
 `git rm`, a backup restored over itself:
@@ -226,6 +236,56 @@ code that carried it is meant to be gone, and `INCOMPLETE` is the correct report
 of a tree that has moved on. Re-protect when the change is yours; treat the
 finding as a finding when it is not.
 
+## The pre-commit hook blocked the commit
+
+`swp pre-commit` is `swp verify` under a git hook: the same measurement of this
+tree against one of its own releases, with the exit code handed back to git. It
+writes nothing and runs no git command, so a blocked commit costs you a decision,
+not a tree. Three codes come back from it, and two of them are not complaints:
+
+| exit | what happened | what to do |
+| --- | --- | --- |
+| `5` | a site the release recorded is present in the tree and no longer carries its code | read the `channels` line before the verdict. A reverted file, a merge that took the unprotected side and a deliberate strip all produce this, and the command cannot tell them apart — that is not a weakness of the check, it is what a watermark can say |
+| `10` | part of the tree was never read, so nothing was confirmed | usually `[limits]` — a file over `max_file_bytes`, or a ceiling that stopped the walk. The run prints which. This is the code to fix rather than argue about: a hook that passed on an unread tree would be asserting something it had not measured |
+| `4` | no store, or no releases | the hook is installed in a clone whose private half is missing, or in a project nobody has protected yet. See the two sections above |
+
+There is no flag that lets a `5` through. A hook whose refusal can be silenced is a
+hook that reports success while the mark is gone, and the point of running it at
+commit time is that the refusal has consequences. Re-protect when the change that
+dropped the sites is yours — `swp protect` records a new release and the old one
+stays verifiable — and treat the block as the finding when it is not. If you need
+to know whether the tree you are committing is a copy of something published
+elsewhere, that is `swp scan`'s question and not this command's; `pre-commit` only
+knows what your own releases said about your own sites.
+
+`--compliance` is refused on this command, and on `swp verify`:
+
+```console
+$ swp verify --compliance
+error [USAGE]: "--compliance" is not an option of `swp verify`. It accepts: --project, --release, --latest, --format, --save, --output, --full, --limit, --quiet, --verbose.
+  next: Re-run with --help to see accepted arguments.
+exit 2
+```
+
+A coverage grade is a statement about a *candidate* — a tree somebody else handed
+you, measured against the release list your key knows. Both of the verbs that
+refuse the flag are checking your own tree against one release you already picked,
+so there is no coverage question left to grade, and a verb that accepted an option
+and then ignored it would be printing a promise it never kept:
+
+```console
+$ swp pre-commit --compliance
+error [USAGE]: "--compliance" is not an option of `swp pre-commit`. It accepts: --release, --latest, --project, --format, --full, --limit, --quiet, --verbose.
+  next: Re-run with --help to see accepted arguments.
+exit 2
+```
+
+The third refusal in this family is different, and it is the one that catches people
+who have read this far: `swp scan` *does* take `--compliance`, and it also takes
+`--save`, and the pair is refused because the two write different documents. The
+transcript and the reason are on [CLI.md](CLI.md#the-swp-command-line), under the
+grade.
+
 ## A release record will not open
 
 `.swp/public/releases/*.json` is the half of the store you commit, so it is the
@@ -251,6 +311,26 @@ backup. If the record was edited by somebody with write access to your repositor
 and you cannot explain it, the release it describes is the thing to distrust, not
 the parser: `swp protect` publishes a new one, and the source that carries the
 older release's sites is unchanged either way.
+
+`registry.json` and `badge.json` are the same class of object — a signed document
+in the committed half of the store, checked before any of it is printed — and they
+fail in two distinguishable ways. A signature that does not verify is the case
+above: the file was edited, and `INVALID_MANIFEST` is the whole of the advice.
+A signature that verifies *and names a different project* is not damage, and the
+command says which of the two it found. `swp registry search` refuses an index from
+another project when it is run inside one, because inside a project the tool can
+compare the key the file signed itself with against the key in
+`.swp/public/identity.json`, and the two disagreeing is the answer rather than an
+obstacle; run it with no project around and it reads the index on its own terms and
+says, on stderr, that this is the weaker of the two readings. `swp badge show` will
+not make that choice for you — a badge copied from somebody else's repository is
+signed, well-formed and useless, so it is refused as `INVALID_MANIFEST` (exit `5`)
+rather than printed and mistaken for yours.
+
+Regeneration is not a repair for either file. `swp registry publish` and `swp badge`
+rewrite both from your own store, so running them over an edited copy makes the
+evidence of the edit disappear; if you cannot explain a failure here, commit the
+bad file somewhere before you regenerate it.
 
 A record that fails as `PROTOCOL_VERSION_UNSUPPORTED` (exit `6`) is not damage.
 It was written by a newer build; the rules are in [Versioning](SWP-1-SPEC.md#14-versioning).
@@ -284,6 +364,38 @@ any of them, [Adding a language adapter](DEVELOPER-GUIDE.md#adding-a-language-ad
 is what it takes to write one, and it is a real extension point rather than a
 fork: the protocol knows nothing about your language's syntax.
 
+## A `--revision` label the record will not hold
+
+Exit `5`, `INVALID_MANIFEST`, and — unlike the corrupt-file reading above — nothing
+wrong with any file. A stated label is rejected as it is read, and the run says
+which of the three reasons it was:
+
+```text
+error [INVALID_MANIFEST]: source revision is empty: a stated label has to carry at least one character
+error [INVALID_MANIFEST]: source revision is … bytes; the record holds at most 200
+error [INVALID_MANIFEST]: source revision carries a control character
+```
+
+The label is what the operator *says* the source is, so it is bounded and
+control-character-free rather than parsed, and it is judged at the door of the
+protection run — before the store is consulted, so the refused run leaves no
+manifest and no plan behind it. That matters because a manifest and a plan with no
+release record beneath them are what an interrupted run leaves: `swp inspect store`
+counts them, and the release id they carry is then refused for reuse until the
+orphan is removed by hand. A typo should not put a project into the same state as a
+crash.
+
+The `text` fence above quotes the three wordings rather than one transcript. Every
+`console` block on this page is a command the test suite re-executes against the
+current build, and `swp protect --revision "   "` is not a quotable line: the
+argument is made of the spaces the matcher collapses. The byte count is written
+`…` because it is whatever the label was. What the run does is pinned by
+`an_unusable_revision_is_refused_before_anything_is_written` in
+`crates/swp-embedding/src/protect.rs`.
+
+Omit `--revision` and the release records the content fingerprint instead, which is
+the honest answer when there is no label to give.
+
 ## A warning that is not a failure
 
 These print on a run that succeeded, and most readers meet them first:
@@ -296,6 +408,7 @@ These print on a run that succeeded, and most readers meet them first:
 | `survived N site(s) found in another file` (from `swp verify`) | N site addresses were matched at a *different* file than the manifest recorded, which is what a moved function or a rename looks like | read it with `channels`; a site found in another file still carries its code. Ordinary edits between two `protect` runs produce this line, and it is not tampering |
 | `fingerprint no-match (release published …)` with `verdict INTACT` | the fingerprint is a hash of the whole tree, so any edit moves it; the sites are what survived | nothing. This is the pair the design expects after a normal commit |
 | `scope N file(s), M byte(s) — PARTIAL, see notes` in a report you thought was clean | the ceiling stopped part of the walk even though the run finished | see the limits section above; a `PARTIAL` report can only be `INCONCLUSIVE` |
+| `warning: no SWP-1 project here, so swp1-… is authenticated against the verify key it carries and nothing else` (from `swp registry search`) | the index's signatures verify; what could not be checked is the file's own claim about which project its key belongs to, because there was no project standing here to compare it with | nothing, if you meant to read a stranger's index. Run it inside your own project, or with `-p <dir>`, when you meant the stronger question and want to know the two agree |
 
 ## "The scan found nothing, and I know it is a copy"
 

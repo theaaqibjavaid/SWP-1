@@ -1,13 +1,13 @@
 # The `swp` command line
 
-Seven commands, seventeen options, one exit-code table. Everything on this page is
+Ten commands, eighteen options, one exit-code table. Everything on this page is
 generated from the same declaration the binary uses: `swp help` prints the
 overview, `swp help <command>` prints one command's options, and a test fails the
 build if this page lists an option its command would reject.
 
 ```console
 $ swp help
-swp SWP-1 · swp 1.0.0-beta.4 · report schema SWP-1-report-v2
+swp SWP-1 · swp 1.0.0-beta.5 · report schema SWP-1-report-v2
 
 Usage: swp <command> [options]
 
@@ -17,6 +17,9 @@ Commands
   protect    embed the watermark and record the release
   verify     check this tree against one of its own releases
   scan       scan a candidate copy for evidence of your releases
+  pre-commit check this tree still carries its release, for a git pre-commit hook
+  registry   publish a signed release index, or search one
+  badge      write or show the project's signed badge document
   inspect    show what the store holds: identity, releases, fragments
   report     list and re-render saved reports
   help       this text
@@ -28,6 +31,10 @@ The normal sequence in a project you own:
   swp protect              embed it and record a release
   swp verify               confirm this tree still carries that release
   swp scan ./copy          look at somebody else's tree
+  swp pre-commit           verify this tree before the commit is allowed
+  swp registry publish     write a signed release index to .swp/public/registry.json
+  swp registry search <f>  look up a release in a registry file
+  swp badge                write the project's signed badge document
 
 Every command takes --help. Machine-readable output is --format json.
 
@@ -49,9 +56,10 @@ Run `swp help <command>` for a command's options.
 exit 0
 ```
 
-The overview's table is the twelve codes a script is most likely to branch on.
-Six more exist and are listed under [Exit codes](#exit-codes) with the rest;
-they are rarer, not unused.
+The overview's table is the twelve codes a script is most likely to branch on, and
+its command list is the ten this page documents plus the two that only print. Six
+codes are left out of it; they are listed under [Exit codes](#exit-codes) with the
+rest, and they are rarer rather than unused.
 
 ## How the parser behaves
 
@@ -111,13 +119,26 @@ exit 14
 | `swp protect` | yes | plan, manifest, release record, source | yes, in place |
 | `swp verify` | yes | optionally a saved report | never |
 | `swp scan <candidate>` | yes | optionally a saved report | never; never executes the candidate |
+| `swp pre-commit` | yes | nothing | never |
+| `swp registry publish` | yes (it signs) | `.swp/public/registry.json` | never |
+| `swp registry search <file>` | no | nothing (or `--output`) | never |
+| `swp badge` | yes (it signs) | `.swp/public/badge.json` | never |
+| `swp badge show` | no | nothing | never |
 | `swp inspect <view>` | no | nothing | never |
 | `swp report [name]` | no | nothing (or `--output`) | never |
 
+The two verbs whose secret row says no — `registry search` and `badge show` — read a
+signed document and check it against a public key, so neither can produce a result
+that would leak anything. They differ in what else they insist on: `badge show`
+compares the badge with the identity of the project it is run inside, so outside one
+it is `NOT_PROTECTED`, while `registry search` will read an index on its own terms
+and say, on stderr, that it had nothing to compare the claim to.
+
 The store is found by searching upward from the working directory for `.swp/`,
-which is what `-p, --project <path>` overrides. `swp scan` is the one command that
-takes a path *to judge* as a positional argument; it still needs your own project
-for the keys, and never reads the candidate's `.swp/`.
+which is what `-p, --project <path>` overrides. `swp scan` is the command that takes
+a path *to judge* as a positional argument; it still needs your own project for the
+keys, and never reads the candidate's `.swp/`. `swp registry search` takes a path
+too, but as a document to read rather than a tree to judge.
 
 ### `swp init`
 
@@ -178,7 +199,7 @@ touched, so an interrupted run leaves a tree `swp verify` can still describe.
 | `--sites <n>` | how many sites to aim for |
 | `--bits <n>` | tag width, 2–8 |
 | `--release <id>` | publish under this id |
-| `--revision <label>` | record a source revision (a commit sha, a version) in the release record |
+| `--revision <label>` | record a source revision (a commit sha, a version) in the release record: one line of 1–200 printable characters, or the run is refused with `INVALID_MANIFEST` before it writes anything |
 | `--dry-run` | decide and report, write nothing |
 | `--format`, `-q`, `-v` | as above |
 
@@ -262,6 +283,7 @@ single file, or a `.zip` / `.tar` archive.
 | `--save` | keep it with the project doing the scanning |
 | `-o, --output <path>` | write the document there |
 | `--full`, `--limit <n>` | how many evidence items the text lists |
+| `--compliance` | add a coverage grade over the keyed sites of one release |
 | `-q, --quiet`, `-v, --verbose` | print less, or print what is being looked at |
 
 The candidate is read and never run: no build, no install, no import, no
@@ -291,6 +313,155 @@ examined* candidate holds no evidence, and `10` means the scan cannot say —
 either part of the candidate was never examined, or what it found is a lead the
 coincidence floor will not carry as a finding. Scripts must read the result
 field, not the exit code alone.
+
+### `swp scan --compliance`
+
+`--compliance` answers a narrower question than the verdict above it: not *how
+strong is the evidence*, but *how much of this release's keyed surface did the
+candidate reproduce*. It is a coverage grade over one release — the report's own
+lead, the release its verdict and level were reached on — and it exists on `scan`
+alone, because that is the command that reads a tree it does not own.
+
+```console
+$ swp scan ./copy --compliance
+result    PROVENANCE_DETECTED
+evidence  VERY_STRONG
+Compliance grade: FULL
+  release   rel-…
+  sites     10 held, 10 confirmed, 0 address without code, 0 absent
+  · This is a coverage grade over the keyed sites the named release holds. It says nothing about who wrote the copy, and §51 still applies.
+  re-run with --output <file> to keep this document; --save writes the report alone, without the grade
+exit 1
+```
+
+The grade has three values — `FULL`, `PARTIAL`, `NONE` — and two of the ways into
+`PARTIAL` are the point of the block rather than its detail: a candidate that was
+only partly read cannot tell an absent site from an unexamined one, and a count the
+report itself refuses to carry as a finding — one inside the coincidence bound —
+cannot be rounded up to `FULL` here. Either cap prints a `·` note saying which
+measurement held the grade back, so the block can never outrank the verdict it sits
+under.
+
+The evidence rows repeat the items the report already listed, and how many there
+are depends on which families the key chose, so this page quotes none of them;
+`--limit` and `--full` page them as they do everywhere else.
+
+`--compliance` combines with `--output`, and with nothing else that saves. It
+refuses `--save` by name:
+
+```console
+$ swp scan ./copy --compliance --save
+error [USAGE]: --save keeps reports under .swp/private/reports/ and `swp report` reads them back as SWP-1-report-v2 documents; --compliance prints a SWP-1-compliance-v1 document, which that reader refuses. Keep the grade by writing this run with --output <file>, or re-run with --save alone for the report on its own.
+  at: --save --compliance
+  next: Re-run with --help to see accepted arguments.
+exit 2
+```
+
+That is not a limitation being worked around. `swp report` re-renders a stored
+document with the rules *that document* names, and a grade document is not a report;
+letting one be filed among the others would mean a reader meeting it later through a
+command that promises the other thing. `verify` and `pre-commit` reject the option
+outright for the same reason — the grade is a statement about a *candidate*, and
+neither of those commands has one.
+
+### `swp pre-commit`
+
+The same measurement `swp verify` makes, in the shape a git hook needs: this tree
+against one of its own releases, one release graded per run, nothing written, and
+the document's exit code handed back to git. No git command is run, and `.swp/` is
+not part of the tree examined.
+
+| option | meaning |
+| --- | --- |
+| `--release <id>` | which release; the newest one if omitted |
+| `--latest` | the newest release only |
+| `-p, --project <path>` | the project to check |
+| `--format <text\|json>` | the same verdict as a document |
+| `--full`, `--limit <n>` | how much of the site table the text lists |
+| `-q, --quiet`, `-v, --verbose` | print less, or print what is being looked at |
+
+```console
+$ swp pre-commit
+pre-commit javascript (swp1-…) against release rel-…
+  manifest    authenticated · 10 site(s) at 4 bit(s) each
+  fingerprint match (release published …)
+  verdict     INTACT — 10/10 site(s) still carry their code, 40 keyed bit(s)
+  channels    10 exact rendering(s), 0 address-without-code, 0 absent
+
+Every site of this release is present with its code. That is the whole claim; it says nothing about the tree being otherwise unchanged.
+exit 0
+```
+
+`0` allows the commit. `5` and `10` both block it — `5` because a site that is
+present is no longer carrying its code, `10` because the tree was only partly read
+and so nothing was confirmed at all. A `5` is not an accusation: a reverted file, a
+merge that took the unprotected side and a deliberate strip read identically, and
+whether a copy exists elsewhere is `swp scan`'s question rather than this command's.
+
+### `swp registry`
+
+Two subcommands over a signed index of the project's own release records. The
+default format is the document itself, so this section prints no transcript: what
+`publish` writes is the `SWP-1-registry-v1` JSON at
+`.swp/public/registry.json`, and `search` prints either that document, one release
+from it, or nothing but an error.
+
+| subcommand | what it does |
+| --- | --- |
+| `swp registry publish` | sign the project's release records into `.swp/public/registry.json` |
+| `swp registry search <file>` | print the whole index, or `--release <id>` / `--latest` to pick one record out of it |
+
+| option | applies to | meaning |
+| --- | --- | --- |
+| `-p, --project <path>` | both | which project publishes, or which project the index is checked against |
+| `--release <id>`, `--latest` | both | which releases to list; for `publish`, a selection instead of all of them |
+| `--format <text\|json>` | both | the document as prose-wrapped JSON, or as a document |
+| `-o, --output <path>` | both | write the document there instead of to stdout |
+| `-q, --quiet`, `-v, --verbose` | both | print less, or say where the index was written |
+
+Every record in the index, and the index as a whole, verify against the project's
+verify key, so editing the file without the publisher's private key is caught on
+read rather than noticed later. Inside a project — or with `--project <dir>` —
+the key the file signed itself with is additionally compared with the identity in
+`.swp/public/identity.json`, which is the only check available without a network
+that ties *this author* to *that project id*. With no project here the signatures
+are still verified and the run says, on stderr, that it had nothing to compare the
+author claim to.
+
+That is the whole of what it does. Nothing reads an index for you, `swp scan` never
+consults one, and SPEC §16 keeps cross-project verification out of the protocol:
+a registry is a publisher's own list of its own releases, not a channel by which one
+project vouches for another.
+
+Exit codes: `0` read or written; `5` when the named release is not in the file *or*
+the file does not authenticate; `4` for `publish` in a project with no protected
+releases; `14` for an unreadable path.
+
+### `swp badge`
+
+| subcommand | what it does |
+| --- | --- |
+| `swp badge` | regenerate and sign `.swp/public/badge.json` |
+| `swp badge show` | re-read `.swp/public/badge.json`, check its signature, and compare its identity with this project's |
+
+| option | meaning |
+| --- | --- |
+| `-p, --project <path>` | which project the badge is about, or is checked against |
+| `--format <text\|json>` | the document as printed, or as a document |
+| `-o, --output <path>` | write the document there instead of to stdout |
+| `-q, --quiet`, `-v, --verbose` | print less, or print where it was written |
+
+The badge is a one-page signed summary of the public half of a project: its
+identity and verify key, how many releases it has, and the newest release id.
+Nothing in it proves knowledge of the root secret, and no key-derived value appears
+in it — which is the property the `secret_leak` sweep checks by holding a
+reserved-domain MAC against the file in every rendering the encoder offers.
+
+`badge show` is the verb that makes the file worth having: a badge copied from
+somewhere else is refused rather than printed, and a badge that has been edited
+since it was signed fails as `INVALID_MANIFEST`. So `0` means read or written, `4`
+means the project is not protected yet or no badge exists to show, and `5` means the
+badge does not authenticate — unsigned, edited, or another project's.
 
 ### `swp inspect <view>`
 
@@ -353,13 +524,13 @@ prints for it:
 | `1` | — | `scan` only: evidence found; the candidate carries one of your releases |
 | `2` | `USAGE` | unknown command or option, a value that is not a number, an out-of-range setting, a rename without `--force` |
 | `3` | `SECRET_UNAVAILABLE` | the root secret is missing, unreadable, or refused by the permission check |
-| `4` | `NOT_PROTECTED` | no store, no releases, or a `--release` id this project has never published |
-| `5` | `INVALID_MANIFEST` / `RELEASE_MISMATCH` | two readings share this code deliberately: a manifest that fails its signature or disagrees with its record, and a tree that no longer matches the release it is checked against |
+| `4` | `NOT_PROTECTED` | no store, no releases, a `--release` id this project has never published, or no badge written yet |
+| `5` | `INVALID_MANIFEST` / `RELEASE_MISMATCH` | four readings share this code deliberately: a manifest, release record, registry index or badge that fails its signature or disagrees with its own project; a tree that no longer matches the release it is checked against, which is what blocks a `swp pre-commit`; a release the searched index does not list; and a `--revision` label the release record will not hold, which is refused before the run writes anything |
 | `6` | `PROTOCOL_VERSION_UNSUPPORTED` | an artifact written by a protocol this build cannot read |
 | `7` | `LIMIT_REACHED` | a `[limits]` ceiling stopped the walk, the parse or the archive |
 | `8` | `UNSUPPORTED_LANGUAGE` | a language was named that no adapter claims |
 | `9` | `INVALID_WATERMARK` | a fragment that cannot be well-formed: bad width, bad family, bad site id |
-| `10` | `INSUFFICIENT_EVIDENCE` / `INCONCLUSIVE` | this scan cannot say: part of the candidate was not examined, or what it found is a lead the coincidence floor will not carry as a finding |
+| `10` | `INSUFFICIENT_EVIDENCE` / `INCONCLUSIVE` | this scan cannot say: part of the candidate was not examined, or what it found is a lead the coincidence floor will not carry as a finding. For `pre-commit` the same code means the tree was only partly read, and blocks the commit |
 | `11` | `UNSAFE_EMBEDDING` | a rewrite that did not provably survive re-parsing; refused, so normally counted as a refusal rather than an error |
 | `12` | `MALFORMED_SOURCE` | a file the parser could not be handed at all |
 | `13` | `PARSER_FAILURE` | the parser itself errored on a file that looked readable |

@@ -557,7 +557,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "swp-adapters"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "serde",
  "swp-core",
@@ -570,11 +570,12 @@ dependencies = [
 
 [[package]]
 name = "swp-cli"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "serde",
  "serde_json",
  "swp-core",
+ "swp-crypto",
  "swp-embedding",
  "swp-evidence",
  "swp-identity",
@@ -584,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "swp-core"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -595,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "swp-crypto"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -610,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "swp-detection"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "flate2",
  "serde",
@@ -627,7 +628,7 @@ dependencies = [
 
 [[package]]
 name = "swp-embedding"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -641,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "swp-evidence"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -653,7 +654,7 @@ dependencies = [
 
 [[package]]
 name = "swp-identity"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -665,7 +666,7 @@ dependencies = [
 
 [[package]]
 name = "swp-manifest"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "base64",
  "serde",
@@ -678,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "swp-sdk"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "serde",
  "swp-adapters",
@@ -693,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "swp-test-suite"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 dependencies = [
  "base64",
  "serde",

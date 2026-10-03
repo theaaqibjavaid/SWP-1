@@ -1,9 +1,10 @@
 # Getting started
 
-Fifteen minutes, one project, no network. By the end you will have protected a
+Twenty minutes, one project, no network. By the end you will have protected a
 tree, verified it, and scanned a copy of it — and you will know what each of those
 answers does and does not mean, which is the part that matters when the answer is
-the one you did not want.
+the one you did not want. §10 is the four commands you reach for after that, and
+what each one refuses to claim.
 
 Every transcript on this page is verbatim output from this build. A line with `…`
 in it stands for something this project's secret influences — an id, a digest, a
@@ -44,7 +45,7 @@ Check it:
 
 ```console
 $ swp --version
-swp SWP-1 · swp 1.0.0-beta.4 · report schema SWP-1-report-v2
+swp SWP-1 · swp 1.0.0-beta.5 · report schema SWP-1-report-v2
 exit 0
 ```
 
@@ -98,9 +99,13 @@ the manifests, and the per-site codes.
 
 * It lives in `.swp/private/root.key` and nowhere else.
 * It is never printed by any command, never written into a report, a manifest, a
-  release record, a plan, a log or a source file. This is not a convention you
-  have to maintain: `tests/secret_leak/` sweeps every one of those artifact types
-  for it after every run.
+  release record, a plan, a registry index, a badge, a log or a source file. This is
+  not a convention you have to maintain: `tests/secret_leak/` runs every one of
+  those commands and then sweeps every artifact they can produce for it, in each of
+  the renderings a secret can arrive in — hex, base64, base32, percent-encoded. The
+  two files §10 publishes are the newest of those artifact types, and they are on
+  that list because a signed *public* document is exactly where a derived key would
+  be tempting to put.
 * Losing it means losing the ability to verify or scan anything you have already
   protected. The public release records stay readable, and a copy of your source
   still carries its fragments, but only the key can decode them into a claim.
@@ -108,7 +113,7 @@ the manifests, and the per-site codes.
   refuses to replace one. Running it again on an initialized project reports
   `secret kept` and changes nothing.
 
-[§10](#10-backing-up) is about the day you need this.
+[§11](#11-backing-up) is about the day you need this.
 
 ## 5. Configure it, if the defaults are wrong for you
 
@@ -311,7 +316,71 @@ transcript in full, and [Adding a language
 adapter](DEVELOPER-GUIDE.md#adding-a-language-adapter) is how to make your
 language one of the three.
 
-## 10. Backing up
+## 10. The four that come after
+
+Everything so far is the sequence the tool was designed around: plan it, protect
+it, check your own tree, check somebody else's. These four are what people then
+ask for — a commit that cannot go through with the mark missing, a way to hand your
+release list to somebody else, a page to point at, and a coverage number beside a
+finding. None of them measures anything new; all four read the same artifacts the
+sequence above wrote.
+
+Put the check where a commit happens:
+
+```console
+$ swp pre-commit
+pre-commit javascript (swp1-…) against release rel-…
+  manifest    authenticated · 10 site(s) at 4 bit(s) each
+  verdict     INTACT — 10/10 site(s) still carry their code, 40 keyed bit(s)
+  channels    10 exact rendering(s), 0 address-without-code, 0 absent
+
+Every site of this release is present with its code. That is the whole claim; it says nothing about the tree being otherwise unchanged.
+exit 0
+```
+
+That is `swp verify`'s measurement with a hook's exit codes: `0` allows the commit,
+`5` and `10` block it, and there is no flag that lets a `5` through. Put the command
+in `.git/hooks/pre-commit` and a commit cannot go through while the tree on disk has
+lost a site. Note which tree: it reads the *working* tree, not the index, so a
+partial `git add -p` stage is judged as the file currently stands rather than as the
+hunk you picked. That is `swp verify`'s limitation as well, and it is the reason a
+pipeline that cares runs the same command against a checkout.
+
+Ask the same scan how much of the release the copy reproduced:
+
+```console
+$ swp scan ./copy --compliance
+result    PROVENANCE_DETECTED
+evidence  VERY_STRONG
+Compliance grade: FULL
+  release   rel-…
+  sites     10 held, 10 confirmed, 0 address without code, 0 absent
+exit 1
+```
+
+A grade is coverage, not strength: `FULL` here means every keyed site of that one
+release reappeared in a candidate that was read whole, and it is capped at `PARTIAL`
+whenever the report above it declines to treat those confirmations as a finding.
+`--compliance` is refused on `swp verify` and on `swp pre-commit`, because neither of
+them has a candidate to grade.
+
+Publish the list, and a page:
+
+```bash
+swp registry publish
+swp badge
+```
+
+Each writes a signed summary of things already in `.swp/public/`, each is
+committable, and neither is a service: nothing in this build uploads one or reads
+another project's. The reader's side of each is the interesting half —
+`swp registry search <file>` and `swp badge show` verify the signature before they
+print a field, and inside a project they compare the key the document carries
+against the identity in `.swp/public/identity.json`, so a file copied from somewhere
+else is refused rather than believed. [CLI.md](CLI.md) documents all four of these
+verbs; [TROUBLESHOOTING.md](TROUBLESHOOTING.md) is what each refusal asks of you.
+
+## 11. Backing up
 
 Two paths, and both are needed:
 
@@ -331,7 +400,7 @@ backup, or accept that old releases can no longer be verified and start a new
 project id — a new `swp init` never replaces a secret in place, so the old copies
 and the new ones are different projects, deliberately.
 
-## 11. Uninstalling
+## 12. Uninstalling
 
 Delete `.swp/`. The tool leaves your machine entirely; there is nothing to
 de-register.

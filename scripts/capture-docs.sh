@@ -75,10 +75,14 @@ for example in typescript python javascript generic; do
     run "$example.dry-run" "$work" "$SWP" protect --dry-run
     run "$example.protect" "$work" "$SWP" protect --sites 12
     run "$example.verify" "$work" "$SWP" verify
+    # The hook's question, while the tree is still the one protect left: `copy/`
+    # would otherwise be inside the scope it measures.
+    run "$example.pre-commit" "$work" "$SWP" pre-commit
     run "$example.verify-json" "$work" "$SWP" verify --format json
     mkdir -p "$work/copy/src"
     cp "$work"/src/* "$work/copy/src/" 2>/dev/null
     run "$example.scan-copy" "$work" "$SWP" scan ./copy
+    run "$example.scan-compliance" "$work" "$SWP" scan ./copy --compliance
     run "$example.scan-plain" "$work" "$SWP" scan ../plain
     run "$example.verify-plain" "$work" "$SWP" verify -p ../plain
     if [ "$example" = "javascript" ]; then
@@ -110,6 +114,11 @@ for example in typescript python javascript generic; do
     run "$example.scan-copy-json" "$work" "$SWP" scan ./copy --format json
     run "$example.scan-missing" "$work" "$SWP" scan ./nowhere
     run "$example.bad-flag" "$work" "$SWP" scan --formt json ./copy
+    # The three refusals a page has to be able to quote. Each fails in the parser or
+    # before any artifact is written.
+    run "$example.compliance-save" "$work" "$SWP" scan ./copy --compliance --save
+    run "$example.verify-compliance" "$work" "$SWP" verify --compliance
+    run "$example.pre-commit-compliance" "$work" "$SWP" pre-commit --compliance
     # The five experiments, last, because each leaves the tree in a state no page
     # above quotes: a limit small enough to stop a scan halfway, a protected file
     # emptied out from under a verify, a committed release record with one character

@@ -18,14 +18,18 @@ it. Nothing below is such a value.
 | canonicalizer | `V1` | `version.rs:68` | the L1/L2/L3 rules change. Recorded per identity and re-checked per release: a disagreement is `RELEASE_MISMATCH` (`swp-detection/src/index.rs:128-144`) |
 | report schema | `SWP-1-report-v2` | `swp-evidence/src/report.rs:36`, `SchemaVersion::REPORT_V2` | grading arithmetic, field set, or meaning. A reader that does not recognise it refuses the document (`report.rs:147-154`) |
 | other artifact schemas | `SWP-1-manifest-v1`, `-identity-v1`, `-plan-v1` | `version.rs:44-52` | the stored documents' shape. Checked on read, same rule |
-| Rust crate version | `1.0.0-beta.4` | `[workspace.package] version`, inherited by all eleven workspace members; `check-release.sh:43-50` fails if one of the ten *publishable* crates is not pinned to it | a release. There is exactly one version across the workspace, and `swp-sdk` holds it |
+| public document schemas | `SWP-1-registry-v1`, `SWP-1-badge-v1` | `swp-cli/src/registry.rs:47`, `swp-cli/src/badge.rs:41` | the shape of a committed, signed file. Both are checked by the reader that recovers them (`registry search`, `badge show`), so a schema the reader cannot name is a document it refuses |
+| printed-document schema | `SWP-1-compliance-v1` | `swp-cli/src/compliance.rs:38` | the shape of the grade document. Nothing reads it back — `--save` is refused precisely so that no `SWP-1-compliance-v1` file lands where `swp report` would meet it — so this id names what a run printed rather than gating a reader |
+| Rust crate version | `1.0.0-beta.5` | `[workspace.package] version`, inherited by all eleven workspace members; `check-release.sh:43-50` fails if one of the ten *publishable* crates is not pinned to it | a release. There is exactly one version across the workspace, and `swp-sdk` holds it |
 | CLI version | same string | `swp_cli::VERSION` (`swp-cli/src/lib.rs:57`) | never independently |
 | binding package version | none yet | the wheel's / the npm package's own metadata | the binding's own surface, or the façade it wraps |
 | runtime support | CPython ≥ 3.10; Node per §4 | package metadata, binding README | the binding's floor, and only as a *major* |
 
-The four rows a saved artifact carries inside itself — protocol, canonicalizer,
-report schema, and the other document schemas — are the ones the rules below
-protect. Everything else is packaging.
+The rows above that a saved artifact carries inside itself — protocol,
+canonicalizer, report schema, and the stored document schemas — are the ones the
+rules below protect. The printed-document row is the exception that proves the
+rule: it identifies a document no reader recovers, which is why refusing to save
+it is the honest behaviour. Everything else is packaging.
 
 ## 2. Rule: a binding version change never implies a protocol change
 
@@ -83,12 +87,18 @@ quoted later by someone with a different build. So:
   "ABI-compatible with all Python 3 releases from the specified one onward"
   (*C API Stability*, Python 3.14). Nothing verifies that an `abi3` wheel is
   installed into a new-enough interpreter, so `requires-python` is the guarantee
-  and the binding's CI installs at the floor and at the newest supported minor.
+  and the binding's CI installs at the floor — one interpreter, 3.10, on each of
+  three runners. Nothing above the floor is installed or run here, so the range
+  above 3.10 rests on that Limited-API promise rather than on a measurement this
+  tree re-runs.
   Free-threaded builds are not supported until `abi3t` is wired up; that is a
   *stated* limitation, not an assumed one.
 * **Node.** The floor is the range the current napi-rs toolchain supports
   (`^20.17.0 || ^22.13.0 || >=23.5.0` as documented on 2026-09-25) mirrored into
-  `engines`. Dropping a supported major is a binding `MAJOR`, never a `PATCH`
+  `engines`, and the CI job asks for that floor; as of 2026-10-03 the runner reports
+  that it forces Node 24 instead, so the oldest supported release is declared and
+  requested rather than tested — see [the binding's README](../bindings/node/README.md).
+  Dropping a supported major is a binding `MAJOR`, never a `PATCH`
   that a lockfile-free install discovers on its own.
 * **Rust.** The library crates keep `rust-version = "1.85"`. `swp-sdk`, as a
   workspace member, holds that line too: it may not pull a dependency that needs

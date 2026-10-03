@@ -33,6 +33,8 @@ The full layout, and the rule for each path:
 | `.swp/config.toml` | scope, site count, tag width, limits | yes | no |
 | `.swp/public/identity.json` | project id, display name, verify key | yes | no |
 | `.swp/public/releases/*.json` | one record per release: when, how many sites, which fingerprint | yes | via git |
+| `.swp/public/registry.json` | the release records again, as one signed index. Only after `swp registry publish` | yes | no; republish it |
+| `.swp/public/badge.json` | the signed one-page summary of the public identity. Only after `swp badge` | yes | no; regenerate it |
 | `.swp/private/root.key` | the sealed 256-bit secret | **never** | **yes** |
 | `.swp/private/manifests/*.json` | the signed site list, both literals per site | **never** | **yes** |
 | `.swp/private/plans/*.json` | what a run intended, including every refusal | never | optional |
@@ -42,7 +44,12 @@ The full layout, and the rule for each path:
 is prevented rather than documented. The split is not caution for its own sake: a
 manifest is your own copy of the watermark, and a public copy of it lets anybody
 see every site's address without holding the key. The release record, by contrast,
-is designed to be public — it carries the verify key's coverage, not the key.
+is designed to be public — it carries the verify key's coverage, not the key. The
+two files the record is summarized into are public for the same reason and in the
+same way: `registry.json` and `badge.json` are signed restatements of things already
+in `public/`, they carry no key-derived value, and either is regenerable from the
+store with `swp registry publish` or `swp badge`, so losing one costs nothing you
+cannot rewrite.
 
 ## What to protect, and what is skipped by default
 
@@ -161,6 +168,26 @@ Read `candidate.partial` before you read `result`. While it is `true`, part of t
 candidate was never examined, so "no provenance" would be unsound — and the tool
 says `INCONCLUSIVE` and exits `10` instead of clearing the tree.
 
+### The compliance grade
+
+`swp scan --compliance` does not re-measure anything. It wraps: the JSON document is
+`SWP-1-compliance-v1`, with four top-level fields — `schema`, `protocol`, `report`
+(the unchanged `SWP-1-report-v2` this run produced, whole) and `compliance` beside
+it. Every number in `compliance` is a field of the tally above read again.
+
+| field | meaning |
+| --- | --- |
+| `level` | `FULL`, `PARTIAL`, `NONE` — coverage of one release's keyed sites, capped by whether the candidate was read whole and whether the report treats its confirmations as more than chance |
+| `release_id` | which release the grade is about: the report's lead, the release its verdict and level were reached on |
+| `measured` | `sites`, `fragments`, `stripped`, `absent`, `exact_renderings`, `canonical_only`, `moved`, `renderings` — the same eight the tally prints |
+| `sites` | one row per **evidence item** of that release: `id`, `kind`, `strength`, and `file`/`line` where it has them. The name is the text rendering's header, and it is more rows than there are sites, because one site can produce a fragment match and a token match at the same address |
+| `notes` | the caps that applied, in words, including the coincidence probability when a complete-looking count was refused as a finding |
+
+The grade is the only thing `scan` prints that does not get filed: `--save` keeps
+`SWP-1-report-v2` documents and `swp report` reads nothing else, so
+`--compliance --save` is a usage error and `--output <file>` is where a grade goes.
+See [`swp scan --compliance`](CLI.md#the-swp-command-line) for the transcript.
+
 ### The release tally
 
 `releases[]` holds the arithmetic, in three groups that are easy to mix up:
@@ -248,11 +275,14 @@ The exit codes are the contract, and they are stable enough to branch on:
 | command | `0` | non-zero |
 | --- | --- | --- |
 | `swp verify` | every site of the release is present with its code | `5` sites lost or stripped; `10` the tree was not fully read |
+| `swp pre-commit` | the same, phrased for a hook: allow the commit | `5` a site is present and no longer carries its code; `10` the tree was only partly read — both block it |
 | `swp scan <candidate>` | a fully examined candidate holds no evidence | `1` evidence found; `10` the scan cannot say — part of the candidate was never examined, or what it found is a lead the coincidence floor will not carry as a finding |
 | `swp protect` | the constellation was decided, proved and recorded | `15` nothing safe to embed; `7` a limit stopped it |
+| `swp registry publish`, `swp badge` | the document was written and signed | `3` no secret to sign with; `4` nothing published to index |
+| `swp registry search <file>`, `swp badge show` | the document authenticates | `5` it does not: unsigned, edited, or another project's |
 | `swp init`, `swp generate` | done | `2`, `3`, `14` as in [CLI.md](CLI.md#exit-codes) |
 
-Three things worth knowing before you wire it up:
+Four things worth knowing before you wire it up:
 
 * **`scan` exiting `1` is not a build failure.** It is the finding. If your
   pipeline treats non-zero as red, invert it deliberately and read the `result`
@@ -270,7 +300,16 @@ Three things worth knowing before you wire it up:
 * **Never save a report into a build artifact you publish.** `--save` writes under
   `.swp/private/reports/`, and one names your source paths, your sites and the
   files a candidate contained. `-o/--output` to a path you then handle deliberately
-  is the safer shape for an automated check.
+  is the safer shape for an automated check. `--compliance` cannot be combined with
+  it at all: the grade is a `SWP-1-compliance-v1` document, `--save` archives only
+  `SWP-1-report-v2`, and `swp report` would refuse to read back what it filed — so
+  the pair is a usage error and `--output <file>` is where a grade goes.
+* **A hook and a pipeline can be the same line.** `swp pre-commit` in
+  `.git/hooks/pre-commit`, and `swp pre-commit` as the last step of a job, ask one
+  question and answer it with an exit code, so the local check and the CI check
+  cannot disagree about what passed. Neither writes anything and neither runs a git
+  command; the hook's whole contract is that `0` lets the commit through and `5` and
+  `10` do not.
 
 ## Scanning an archive, a directory or one file
 
@@ -315,9 +354,11 @@ swp scan ./builds/suspicious-copy -p packages/ui
 ```
 
 One project can scan a candidate against only its own releases. There is no key
-sharing, no central registry, and no way for project A to verify project B's
-artifacts — a copy of the verify key lets anybody *check* a manifest's signature,
-and nothing else.
+sharing and no central registry — the index `swp registry publish` writes is a file
+in your own `public/` directory listing your own releases, and no code path in this
+build reads another project's store or fetches anything. There is no way for project
+A to verify project B's artifacts: a copy of the verify key lets anybody *check* a
+manifest's signature, and nothing else.
 
 ## The `[limits]` section
 
@@ -354,7 +395,9 @@ defence against a specific way to make a tool work too hard.
 ## Removing SWP-1 from a project
 
 Delete `.swp/` and the tool is gone from the tree; there is no background service
-to uninstall, and it never had one. What deleting the store does not do is remove
+to uninstall, and it never had one — which includes the two signed documents in
+`public/`, both of which go away with the directory. What deleting the store does
+not do is remove
 the fragments: they are arithmetic and string concatenations in your source now,
 and they behave. To get a clean tree, revert the commits `swp protect` produced —
 which is why that command prints the list of files it modified, and why running it

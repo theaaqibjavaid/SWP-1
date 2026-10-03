@@ -41,3 +41,30 @@ __pycache__/
 /bindings/**/*.pyd
 /bindings/**/*.so
 /bindings/**/*.dylib
+
+# The Node binding's own build output: the compiled addon and the package
+# manager's install tree. `**/target/` above already covers bindings/node/
+# target. Two controls keep a built addon out of the history rather than one:
+# the ignore rule below, so a `git add -A` after a build cannot pick it up, and
+# `check-release.sh`'s artifact sweep, which matches `.node` with the other
+# compiled suffixes — so a `git add -f` that defeats the first control fails the
+# release check.
+#
+# `binding.cjs` and `binding.d.ts` are `napi build`'s output beside the addon:
+# the loader that selects the platform binary, and the declarations typegen
+# reads off the Rust surface. Both are rewritten by every build and by nothing
+# else — the entry point callers load, `index.js`, and the types `package.json`
+# advertises, `index.d.ts`, are hand-written and tracked. The `files` list in
+# package.json ships all four, so ignoring the generated pair costs a published
+# package nothing.
+/bindings/*/node_modules/
+/bindings/**/*.node
+/bindings/*/binding.cjs
+/bindings/*/binding.d.ts
+
+# A build that cannot unlink the addon a process still has mapped — the usual
+# case on Windows, where a loaded `.node` file is shared and undeletable —
+# renames it aside instead. The retired copy ends in `.tmp`, so neither the
+# `**/*.node` rule above nor `check-release.sh`'s anchored sweep sees it, and an
+# `git add -A` after a rebuild would commit a second compiled binary.
+/bindings/*/*.retired.tmp*

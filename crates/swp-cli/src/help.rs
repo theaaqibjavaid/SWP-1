@@ -80,6 +80,15 @@ pub fn overview(sink: &mut Sink<'_>) -> Result<(), SwpError> {
         "  swp verify               confirm this tree still carries that release".to_string(),
     );
     lines.push("  swp scan ./copy          look at somebody else's tree".to_string());
+    lines.push(
+        "  swp pre-commit           verify this tree before the commit is allowed".to_string(),
+    );
+    lines.push(
+        "  swp registry publish     write a signed release index to .swp/public/registry.json"
+            .to_string(),
+    );
+    lines.push("  swp registry search <f>  look up a release in a registry file".to_string());
+    lines.push("  swp badge                write the project's signed badge document".to_string());
     lines.push(String::new());
     lines.push("Every command takes --help. Machine-readable output is --format json.".to_string());
     lines.push(String::new());
@@ -226,6 +235,44 @@ fn detail(cmd: Command) -> Option<Vec<String>> {
             "supplies the keys, never the tree being judged.",
             "--save keeps the report with the project being scanned, not with the candidate.",
         ],
+        Command::PreCommit => &[
+            "pre-commit is swp verify for a git hook: the same measurement of this tree",
+            "against one of its own releases, with the document's exit code handed back to",
+            "git. No git command is run, nothing is written, and .swp/ is not part of the",
+            "tree that is examined.",
+            "One release is graded per run — the newest, or the one --release names — because",
+            "a per-site verdict needs a single manifest. That is swp verify's limit too.",
+            "A 5 is not an accusation: a reverted file, a merge that took the unprotected",
+            "side, and a deliberate strip read the same. Whether a copy exists elsewhere is",
+            "swp scan's question, not this command's.",
+            "Exit 0 allows the commit; 5 and 10 both block it, 10 because the tree was only",
+            "partly read.",
+        ],
+        Command::Registry => &[
+            "registry publish writes .swp/public/registry.json, a signed index of the",
+            "project's own release records. The document and every record in it verify",
+            "against the project's verify key, so nobody can edit the file without the",
+            "publisher's private key. That is all it does: nothing reads an index for",
+            "you, `swp scan` never consults one, and SPEC 16 keeps cross-project",
+            "verification out of the protocol. The document authenticates itself.",
+            "registry search <file> prints one release (--release <id>), the newest of the",
+            "index (--latest), or the whole document (neither). Inside a project, or with",
+            "--project <dir>, the index is compared against that project's own identity —",
+            "the only check that ties the key the file carries to the project id it names.",
+            "Without a project here the run still verifies the signatures, and says that",
+            "it had nothing to compare them to.",
+        ],
+        Command::Badge => &[
+            "badge writes .swp/public/badge.json: a signed one-page summary of the project —",
+            "its public identity, how many releases it has, and the newest release id. The",
+            "document authenticates itself; nothing in it proves knowledge of the root",
+            "secret, and no key-derived value is published in it. SPEC 16 defines no way for",
+            "one project to vouch for another, so a badge is a publisher's own page, not a",
+            "verification channel.",
+            "swp badge show re-reads the file, checks its signature, and compares the",
+            "identity inside it with this project's own — a badge copied from elsewhere is",
+            "refused rather than printed. swp badge (or no argument) regenerates it.",
+        ],
         Command::Inspect => &[
             "inspect reads the local store only. It cannot report anything about a candidate;",
             "that is `swp scan`.",
@@ -295,6 +342,28 @@ fn command_exit_codes(cmd: Command) -> Vec<(i32, &'static str)> {
             (0, "no watermark evidence found in a candidate that was fully examined"),
             (1, "watermark evidence found: the candidate carries one of your releases"),
             (10, "inconclusive: nothing was confirmed and part of the candidate was not examined"),
+        ],
+        Command::PreCommit => vec![
+            (0, "this tree still carries every site of the release it was checked against"),
+            (5, "a site of that release is no longer carrying its code — the commit is blocked"),
+            (10, "inconclusive: part of the tree was never read, so nothing was confirmed — the commit is blocked"),
+        ],
+        Command::Registry => vec![
+            (0, "the registry was read or written"),
+            (
+                5,
+                "the release named is not in this registry file, or the file does not \
+                 authenticate",
+            ),
+        ],
+        Command::Badge => vec![
+            (0, "the badge was generated or read"),
+            (4, "the project is not protected yet, or no badge exists"),
+            (
+                5,
+                "the badge does not authenticate: it is unsigned, was edited, or was written \
+                 by another project",
+            ),
         ],
         Command::Verify => vec![
             (0, "every site of the release is present and still carries its code"),

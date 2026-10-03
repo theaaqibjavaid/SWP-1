@@ -12,7 +12,7 @@ implementation, because a decision record that moves its own evidence to match t
 is not a record. Its two pointers into `crates/swp-sdk/src/protect.rs` are the file as it
 stood then — `Request<'a>` still borrows the secret at `swp-embedding/src/protect.rs:118`,
 and that is unchanged — while the implementation grew the SDK module, so what it cites as
-the drop at `:137` is `:367` now and `ProtectOptions` at `:35-57` is `:45-67`.
+the drop at `:137` is `:377` now and `ProtectOptions` at `:35-57` is `:45-73`.
 
 Implemented as §7 decided: `swp_sdk::Session::protect_summary(&ProtectOptions) ->
 swp_sdk::ProtectSummary` (`crates/swp-sdk/src/protect.rs`), a `binding_facing`
@@ -625,7 +625,9 @@ Rejected with reasons, stated so the next reader does not re-litigate:
 ## 9. Unresolved questions
 
 Recorded as open at acceptance. The implementation answered 1, 2 and 4 by deciding
-what to build; 3 and 5 are still open, and nothing built here closes them.
+what to build; 3 and 5 are settled below as positions. Neither is answered by exposing
+more of the Rust surface, so each is closed by stating what will not be built and what
+would have to be true if that ever changes.
 
 1. **Document or struct.** B and E differ on the container, and the evidence does not
    settle it: M6 shows a struct is sufficient, §6 E shows a document is drift-proof. The
@@ -662,11 +664,21 @@ what to build; 3 and 5 are still open, and nothing built here closes them.
    plan-view operation is likely crossable — but the plan it reads is a store file, and
    `Store::read_plan` is `forbidden`, so that is a *new* façade read to design, not a
    reclassification.
-   **Still open, and narrower than it was.** The summary answers most of the question
-   without touching the store: a binding holds every refusal's file, line and reason
-   token from the run that made it. What remains genuinely open is reading a *stored*
-   plan for a release the caller did not just produce — a new façade read, not a
-   reclassification, and still out of scope here.
+   **Decided: out of scope, and the shape a future crossing must take is recorded here
+   so the next reader does not re-derive it.** The summary answers most of the original
+   question without touching the store: a binding holds every refusal's file, line and
+   reason token from the run that made it. What remains — reading a *stored* plan for a
+   release the caller did not just produce — is not a reclassification of
+   `Store::read_plan`, and it will not quietly become one: what that read returns is a
+   `Plan`, whose sites are `PlannedSite`, whose `locations: [LocationId; 4]`
+   (`swp-embedding/src/plan.rs:57`) is precisely the keyed material this boundary exists
+   to stop. The crossing, if a binding
+   caller ever demonstrates the need, is a **second projection** in the `ProtectSummary`
+   mould — a façade read that walks the stored plan and emits file, line and reason token
+   with no id in it, swept by the same `sdk_parity` comparison against the run's own
+   location ids — and never a widened read of the plan type. Until that caller exists
+   this is a design entry, not a deferred task: nothing is built, `read_plan` stays
+   `forbidden`, and `docs/BINDING_SURFACE.json` is unchanged by this decision.
 4. **How much of `notes` is safe.** It is `Vec<String>` assembled from walk omissions and
    resource-limit lines (`plan.rs:154-164`), i.e. free-form text from inside the pipeline.
    A boundary rule that checks types cannot check prose, so its crossing needs the same
@@ -689,11 +701,20 @@ what to build; 3 and 5 are still open, and nothing built here closes them.
    derive on a Rust type, so a Rust program can already write a private-plan equivalent to
    a log. Removing the derive is a breaking Rust-API change (C's cost) that no binding
    needs; it is left as a standing finding rather than folded into this decision.
-   **Still open, and untouched.** The derive is why `ProtectOutcome` is `pending` rather
-   than `binding_facing`, and this change did not move it: a binding is pointed at the
-   projection instead. A Rust caller can still serialize a `Protection` and write the
-   keyed constellation into its own log; that is the standing finding, and it is the
-   CLI's own stdout that M1 measured as carrying zero ids.
+   **Decided: the derive stays, and the finding is a Rust-embedder property rather than a
+   boundary defect.** M1's row is accurate and this record does not reduce it: a Rust
+   program holding a `Protection` can serialize it, and so write a private-plan
+   equivalent into its own log. Removing `Serialize` would not take that away — every
+   field of `Protection` is `pub` (`swp-embedding/src/protect.rs:143-171`), `plan`
+   included — so the identical JSON is writable by hand a line at a time; the cost of
+   removal is a `MAJOR` against a public Rust API and the gain in the property is zero.
+   What the boundary does enforce is the FFI edge, and it is enforced by a check rather
+   than by an opinion: in `docs/BINDING_SURFACE.json` `swp_embedding::Protection` is
+   `forbidden` and `swp_sdk::ProtectOutcome` `pending`, the `binding_surface` suite fails a
+   foreign-facing type that reaches them, and a binding is pointed at
+   `Session::protect_summary`. A Rust embedder logging its own plan is the same operator
+   that already holds the root secret in that process; that is outside this record's
+   reach, and saying so is the answer rather than a hole in it.
 
 ## Appendix A — field-by-field classification
 

@@ -121,6 +121,9 @@ impl Session {
         let opened = swp_detection::input::open(candidate, &limits)?;
         let detection = swp_detection::scan_against(&opened, &indexes, &limits)?;
         let at = Timestamp::now_utc();
+        // The run label names this operation, and a caller cannot change it: a
+        // report whose `run.command` is supplied from outside says nothing about
+        // what produced it, and `swp report` lists reports by that field.
         let report = Report::build(&detection, "scan", &at.to_rfc3339(), &crate::banner());
         let saved = if save {
             let stem = format!("scan-{}", at.filename_stem());

@@ -136,6 +136,67 @@ jobs:
           python -m pip install --force-reinstall target/wheels/*.whl pytest
           pytest -q
 
+  binding-node:
+    name: node binding (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      # As in the Python job: Windows runners would otherwise run these steps in
+      # PowerShell, and every command below is spelled once for all three systems.
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+      # 20 is the floor `package.json` declares in `engines`, not the runner's
+      # default: the addon is built against Node-API 4 and resolves its entries from
+      # the host, so the oldest supported interpreter is the one worth testing.
+      # As of 2026-10-03 this request is not the version that runs — every job
+      # reports `Node.js 20 is deprecated … forced to run on Node.js 24` from
+      # setup-node@v4 — so the floor is asked for and not yet measured. Whether an
+      # exact 20.x version would reach the runner is untested here, and raising the
+      # request is a release decision: it belongs in the binding's README, not in a
+      # workflow edit made under a red check.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: bindings/node/package-lock.json
+      # `npm ci` rather than `npm install`: the lockfile is the decision, and a
+      # build that can drift from it is a build whose `@napi-rs/cli` is not the one
+      # that generated `binding.cjs` and `binding.d.ts` in this commit.
+      - name: install the toolchain the package declares
+        working-directory: bindings/node
+        run: npm ci
+      # The binding is its own Cargo workspace, so the repository's `fmt` and
+      # `clippy` jobs never see it. `-j 2` is the ceiling the rest of this
+      # repository's CI commands use.
+      - name: lint the addon crate
+        working-directory: bindings/node
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked -j 2 -- -D warnings
+      # `napi build` shells out to Cargo with no `--locked` of its own and no way to
+      # pass one through, so the locked build happens first and `napi build` then
+      # reuses it and only names the artifact for this platform.
+      - name: build the addon
+        working-directory: bindings/node
+        run: |
+          cargo build --release --locked -j 2
+          npm run build
+      # `npm test` is `node --test` with no path: the runner walks the package for
+      # `*.test.mjs`. Given a path it does not expand a directory, it tries to run
+      # it, and `node --test tests/` fails with MODULE_NOT_FOUND.
+      - name: run the suite
+        working-directory: bindings/node
+        run: npm test
+      - name: check the declarations compile
+        working-directory: bindings/node
+        run: npm run typecheck
+
   release-readiness:
     name: release readiness
     runs-on: ubuntu-latest

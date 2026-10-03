@@ -10,6 +10,8 @@
 //!          .swp/config.toml
 //!          .swp/public/identity.json
 //!          .swp/public/releases/<release>.json
+//!          .swp/public/registry.json   (only if the publisher wrote one)
+//!          .swp/public/badge.json      (only if the publisher wrote one)
 //! PRIVATE  never committable; .swp/private/ is what `.gitignore` gets
 //!          .swp/private/root.key
 //!          .swp/private/manifests/<release>.json
@@ -18,6 +20,13 @@
 //! SOURCE   the project's own files, modified in place by `swp protect`
 //! BACKUP   not an artifact of a run, but the two things that must be kept
 //! ```
+//!
+//! The two optional documents at the end of the public list are publisher
+//! conveniences, not part of a release: a project works with no `swp init`
+//! output change and no store write for them, so they are absent until the
+//! operator asks for one — which is why they are absent from
+//! [`PUBLIC_ARTIFACTS`], the §35 list `swp init` prints, and present in
+//! `Store::inventory`, the list of what is actually on disk.
 //!
 //! The line is drawn by capability, not by field name. Public documents name the
 //! project and describe a release; every location identifier in them is a keyed
