@@ -20,7 +20,7 @@ it. Nothing below is such a value.
 | other artifact schemas | `SWP-1-manifest-v1`, `-identity-v1`, `-plan-v1` | `version.rs:44-52` | the stored documents' shape. Checked on read, same rule |
 | public document schemas | `SWP-1-registry-v1`, `SWP-1-badge-v1` | `swp-cli/src/registry.rs:47`, `swp-cli/src/badge.rs:41` | the shape of a committed, signed file. Both are checked by the reader that recovers them (`registry search`, `badge show`), so a schema the reader cannot name is a document it refuses |
 | printed-document schema | `SWP-1-compliance-v1` | `swp-cli/src/compliance.rs:38` | the shape of the grade document. Nothing reads it back — `--save` is refused precisely so that no `SWP-1-compliance-v1` file lands where `swp report` would meet it — so this id names what a run printed rather than gating a reader |
-| Rust crate version | `1.0.0-beta.4` | `[workspace.package] version`, inherited by all eleven workspace members; `check-release.sh:43-50` fails if one of the ten *publishable* crates is not pinned to it | a release. There is exactly one version across the workspace, and `swp-sdk` holds it |
+| Rust crate version | `1.0.0-beta.5` | `[workspace.package] version`, inherited by all eleven workspace members; `check-release.sh:43-50` fails if one of the ten *publishable* crates is not pinned to it | a release. There is exactly one version across the workspace, and `swp-sdk` holds it |
 | CLI version | same string | `swp_cli::VERSION` (`swp-cli/src/lib.rs:57`) | never independently |
 | binding package version | none yet | the wheel's / the npm package's own metadata | the binding's own surface, or the façade it wraps |
 | runtime support | CPython ≥ 3.10; Node per §4 | package metadata, binding README | the binding's floor, and only as a *major* |

@@ -45,7 +45,7 @@ Check it:
 
 ```console
 $ swp --version
-swp SWP-1 · swp 1.0.0-beta.4 · report schema SWP-1-report-v2
+swp SWP-1 · swp 1.0.0-beta.5 · report schema SWP-1-report-v2
 exit 0
 ```
 

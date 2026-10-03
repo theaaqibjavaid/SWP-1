@@ -19,11 +19,11 @@ wrapper layer would be where a binding starts restating Rust decisions in Python
 ```python
 >>> import swp
 >>> swp.swp_version          # the tool version the wheel drives
-'1.0.0-beta.4'
+'1.0.0-beta.5'
 >>> swp.__version__          # the binding's own version
 '0.1.0'
 >>> swp.banner()
-'SWP-1 — swp 1.0.0-beta.4 — report schema SWP-1-report-v2'
+'SWP-1 · swp 1.0.0-beta.5 · report schema SWP-1-report-v2'
 ```
 
 ## The two rules that shape this surface
@@ -326,7 +326,7 @@ number that looks close enough:
 
 | binding version | swp / swp-sdk version | protocol | reads report schema | writes report schema |
 | --- | --- | --- | --- | --- |
-| `0.1.0` | `1.0.0-beta.4` | `SWP-1` | `SWP-1-report-v2` | `SWP-1-report-v2` |
+| `0.1.0` | `1.0.0-beta.5` | `SWP-1` | `SWP-1-report-v2` | `SWP-1-report-v2` |
 
 The two report columns match because one `swp-evidence` reader sits behind both
 directions: a saved document's own `schema` field is what the reader checks, and a
@@ -337,7 +337,7 @@ can come apart in a future build; this is the current pair.
 `0.1.0` is this package's own SemVer under §2: it moves when the surface this module
 exposes moves (`PATCH` for a fix, `MINOR` for an added operation or field, `MAJOR` for
 a removal), independently of the workspace version beside it, and a bump of
-`1.0.0-beta.4 → 1.0.0` says nothing about the protocol. No wheel from this tree has
+`1.0.0-beta.5 → 1.0.0` says nothing about the protocol. No wheel from this tree has
 been published, so there is no released row to add to `CHANGELOG.md` yet — that entry
 belongs to the release commit — and the name it would be published under is still an
 open release decision, recorded as such in [issue #32](https://github.com/theaaqibjavaid/SWP-1/issues/32).

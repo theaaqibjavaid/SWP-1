@@ -339,7 +339,7 @@ source.
 ## Status
 
 Protocol v1.0.0, implemented end to end: embed, verify, scan, report. The public
-build carries `1.0.0-beta.4`: the protocol is settled and a tree protected by
+build carries `1.0.0-beta.5`: the protocol is settled and a tree protected by
 this build verifies against the release after it, so what the beta withholds is the
 endorsement rather than the functionality. Three
 languages with real parser adapters, one refusal that is a design decision, and a

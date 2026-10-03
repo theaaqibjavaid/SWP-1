@@ -20,14 +20,18 @@ every claim of that kind here was run before it was written
 An entry appears here between a change being merged and the tag that carries it,
 and not before.
 
-What follows is merged on `dev` and is under no tag yet, so this is a description of a
-tree rather than of a shipped build. What a user runs went from seven commands to ten
-and from seventeen options to eighteen. The protocol did not move: `swp-crypto` and
-`swp-core` have no diff against `v1.0.0-beta.4`, and neither has the workspace's
-third-party list, so the key derivation, every stored artifact's schema and the verdict
-arithmetic are still `1.0.0-beta.4`'s. That is a measurement, and the command that
-reproduces it is at the end of this entry — as is the pair of builds that was run
-against it.
+## [1.0.0-beta.5] - 2026-10-03
+
+The release that added three commands and two foreign bindings without moving the
+protocol. What a user runs went from seven commands to ten and from seventeen
+options to eighteen; `swp-crypto` and `swp-core` have no diff against
+`v1.0.0-beta.4` and the workspace's third-party list gained no crate, so the key
+derivation, every stored artifact's schema and the verdict arithmetic are still
+`1.0.0-beta.4`'s. That is a measurement rather than a reassurance, and the commands
+that reproduce it are at the end of this entry — as is the pair of builds that was
+run against it. The artefacts of this release are the four `swp` binaries: both
+bindings are in the tree as source, gated on the same three systems the CLI is, and
+no wheel, sdist or npm package of either has gone to any index.
 
 ### Added
 
@@ -177,39 +181,56 @@ constellation to say anything about the whole.
 
 ### Compatibility, checked rather than assumed
 
-The claim at the top of this entry is a diff, and this is the command that re-runs it:
+The claim at the top of this entry is a diff, and these are the commands that re-run
+it against the tag:
 
 ```sh
-git diff --stat v1.0.0-beta.4..HEAD -- crates/swp-crypto crates/swp-core Cargo.toml
+git diff --stat v1.0.0-beta.4..HEAD -- crates/swp-crypto crates/swp-core
+git diff v1.0.0-beta.4..HEAD -- Cargo.toml Cargo.lock | grep -E '^[+-][^+-]' | grep -v '1\.0\.0-beta\.'
 ```
 
-No output is the whole statement: the crates that derive every key, canonicalize every
-document and sign every record, and the third-party list they sit on, are what
-`v1.0.0-beta.4` shipped. `Cargo.lock` gained one line — `swp-crypto` under `swp-cli`'s
-dependencies, for the two publishers — and no third-party crate, so the shipped
-binary's transitive count is still the 80 that
-[docs/SECURITY.md](docs/SECURITY.md) states.
+The first prints nothing: the crates that derive every key, canonicalize every
+document and sign every record are what `v1.0.0-beta.4` shipped. The second prints one
+line, `+ "swp-crypto",` — `Cargo.lock` recording that `swp-cli` now names that crate,
+for the two publishers. Of the forty-five lines the two manifests change by, the other
+forty-four are the `1.0.0-beta.4 → 1.0.0-beta.5` version token, and no third-party
+crate appears on either side of the diff, so the shipped binary's transitive count is
+still the 80 that [docs/SECURITY.md](docs/SECURITY.md) states. The two binding
+workspaces carry their own lockfiles and are outside those paths; each moved by
+eighteen lines, every one of them the same token.
 
 What a diff cannot say is whether a build from before this work reads a record made
-after it, so that was run on 2026-10-03 with two binaries: one built from the tag, one
-from this tree. Both print `swp 1.0.0-beta.4`, because the workspace version is still
-the tag's and this entry describes unreleased work — the difference between them is
-source, not a string.
+after it, so that was run on 2026-10-03 with two binaries: one built from the tag,
+which prints `swp 1.0.0-beta.4`, and this release's build, which prints
+`swp 1.0.0-beta.5`. The string is not only a banner — it is a stored field,
+`generator.swp_version` — so the records the two builds write genuinely differ, and
+each reading below is a cross-version read rather than a tautology.
 
 - A five-site project protected by the tag's build verifies under this one: `manifest
   authenticated`, verdict `INTACT`, exit `0`. It answers identically under the tag's own
   build, which is the baseline that makes the first line a measurement.
-- A project protected by *this* build, with a `--revision` label recorded, verifies
-  under the tag's build: same verdict, exit `0`.
-- The three new verbs run against the tag's store — `registry publish`, `badge`,
+- A project protected by this build, with a `--revision` label recorded, verifies under
+  the tag's build: same verdict, exit `0`.
+- The new commands run against the tag's store — `registry publish`, `badge`,
   `pre-commit`, then `registry search` and `badge show` reading back what they wrote —
-  and each exits `0`; `swp inspect store` lists both new files.
+  and each exits `0`. The index and the badge carry the tag's release record verbatim,
+  its `swp_version: 1.0.0-beta.4` and all, while their own generator field names this
+  build; `swp inspect store` lists both new files.
+- What the tag's build makes of those two files: `swp inspect store` exits `0` and
+  counts six artifacts where this build counts eight in the same directory. It has no
+  classifier for a document it has no writer for, and no writer either — `registry`,
+  `badge` and `pre-commit` are each `error [USAGE]` and exit `2` there, as is
+  `scan --compliance`. Nothing in either new format crosses the boundary, because
+  nothing on the old side can reach it.
 - The check that can say no: with one character of that release record's signature
   flipped, both builds answer `INVALID_MANIFEST` and exit `5`; put the byte back and
   both return to `INTACT` and `0`.
 - A report saved by the tag's build reads under this one, and one saved by this build
-  reads under the tag's — `swp report`, exit `0` both ways. `SWP-1-report-v2` and the
-  arithmetic behind the grade did not move here.
+  reads under the tag's — `swp report`, exit `0` both ways, each re-rendered with its
+  own `graded by` line. A saved report keeps the grade and the tool identity it was
+  given; neither build recomputes the other's.
+- A copy of the tree this build protected, scanned by the tag's build, found all five
+  sites: `PROVENANCE_DETECTED` at `MODERATE`, exit `1`.
 
 [docs/VALIDATION.md](docs/VALIDATION.md) remains the record of what the protocol itself
 measures; nothing in the list above required a foreign binding, because the CLI and the
@@ -510,7 +531,8 @@ These are absences with reasons, not a backlog:
   protected literal leaves nothing to key on, and produces the same report as an
   original. `NO_PROVENANCE_DETECTED` is not a finding of originality.
 
-[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.4...HEAD
+[Unreleased]: https://github.com/theaaqibjavaid/SWP-1/compare/v1.0.0-beta.5...HEAD
+[1.0.0-beta.5]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/theaaqibjavaid/SWP-1/releases/tag/v1.0.0-beta.2

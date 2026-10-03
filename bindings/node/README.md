@@ -496,9 +496,9 @@ console.log(swp.errorCodes().length)
 ```
 
 ```text
-1.0.0-beta.4
+1.0.0-beta.5
 0.1.0
-SWP-1 · swp 1.0.0-beta.4 · report schema SWP-1-report-v2
+SWP-1 · swp 1.0.0-beta.5 · report schema SWP-1-report-v2
 SWP-1 SWP-1-report-v2 1
 javascript typescript python
 2 4 8
@@ -559,7 +559,7 @@ close enough:
 
 | binding version | swp / swp-sdk version | protocol | reads report schema | writes report schema |
 | --- | --- | --- | --- | --- |
-| `0.1.0` | `1.0.0-beta.4` | `SWP-1` | `SWP-1-report-v2` | `SWP-1-report-v2` |
+| `0.1.0` | `1.0.0-beta.5` | `SWP-1` | `SWP-1-report-v2` | `SWP-1-report-v2` |
 
 The two report columns match because one `swp-evidence` reader sits behind both
 directions: the `schema` field inside a saved document is what a read checks, and a
@@ -569,7 +569,7 @@ a future build; this is the current pair.
 
 `0.1.0` is this package's own SemVer under §2: it moves when the surface this package
 exposes moves (`PATCH` for a fix, `MINOR` for an added operation or field, `MAJOR` for a
-removal), independently of the workspace version beside it, and `1.0.0-beta.4 → 1.0.0`
+removal), independently of the workspace version beside it, and `1.0.0-beta.5 → 1.0.0`
 would say nothing about the protocol. No release of this package is on the registry, so
 there is no released row to add to `CHANGELOG.md` yet — that entry belongs to the
 release commit — and the name it is published under, `jrs-swp` in `package.json`, is
