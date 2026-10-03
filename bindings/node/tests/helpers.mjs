@@ -121,6 +121,12 @@ export function writeTree (root, files) {
  * silent no-op. The final check is the point of the function: a leftover
  * directory holding a test root secret is the one thing this suite must not
  * leave behind, so it throws rather than being logged.
+ *
+ * A link is removed, never opened into. `chmod` follows a link, so restoring
+ * bits on the link restores them on whatever it points at — and one of this
+ * suite's roots holds a `node_modules` link whose target is the package the
+ * rest of the run is testing. On POSIX that write takes the target's search bit
+ * away and every later process started in the package fails with EACCES.
  */
 export function purge (root) {
   if (!existsSync(root)) return
@@ -133,6 +139,7 @@ export function purge (root) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name)
       if (entry.isDirectory()) walk(path)
+      else if (entry.isSymbolicLink()) continue
       else {
         try {
           chmodSync(path, 0o600)
