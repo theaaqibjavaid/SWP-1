@@ -29,8 +29,16 @@ is this project's measurement harness rather than something to depend on.
 | `swp-detection` | input sniffing, container extraction, the two-pass site search | everything above |
 | `swp-evidence` | evidence items, the level ladder, the coincidence bound, the report document | core, identity, manifest, detection |
 | `swp-sdk` | the project session and the operations it runs: `init`, `protect`, `scan`, `verify`, saved reports, capabilities | all of the library crates above |
-| `swp-cli` | argument parsing, the ten commands, rendering, exit codes | core, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
+| `swp-cli` | argument parsing, the ten commands, rendering, exit codes | core, crypto, identity, manifest, embedding, evidence, and `swp-sdk` for everything else |
 | `swp-test-suite` | fixtures, transforms, the measurement suites, the documentation test | used as a dev-dependency only |
+
+The `crypto` in `swp-cli`'s row is there for the two publishers and nothing else:
+signing an index or a badge goes through `Ctx::signing_key`
+(`swp-cli/src/ctx.rs:139`), and reading one back goes through `VerifyingKey`
+(`swp-cli/src/registry.rs:38`, `badge.rs:33`). Neither call is a session operation —
+a session is about the project standing here, while an index or a badge may have
+travelled to reach it — so the type is used where it is needed rather than
+forwarded through `swp-sdk`.
 
 `swp-adapters` is the only crate that links tree-sitter, which is what keeps the
 C parsing surface in one place. Two structural rules are worth stating because
