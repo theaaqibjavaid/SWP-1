@@ -442,7 +442,7 @@ releases; `14` for an unreadable path.
 | subcommand | what it does |
 | --- | --- |
 | `swp badge` | regenerate and sign `.swp/public/badge.json` |
-| `swp badge show [file]` | re-read a badge, check its signature, and compare its identity with this project's |
+| `swp badge show` | re-read `.swp/public/badge.json`, check its signature, and compare its identity with this project's |
 
 | option | meaning |
 | --- | --- |

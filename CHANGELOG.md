@@ -72,7 +72,7 @@ this is a publisher's list of its own releases and not a trust channel. An earli
 shape of the same command carried a `revoked` flag that no code could set; it is not
 in this one.
 
-**`swp badge` and `swp badge show [file]` — the public half of a project on one page**,
+**`swp badge` and `swp badge show` — the public half of a project on one page**,
 at `.swp/public/badge.json` under schema `SWP-1-badge-v1`: `identity.json` embedded
 verbatim, the release count, the newest release id, and a signature over those. No
 key-derived value appears in it, which is now something the leak sweep proves rather
