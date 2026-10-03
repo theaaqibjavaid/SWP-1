@@ -19,7 +19,7 @@
 // must be visible to `cjs-module-lexer` — and it is recorded at the test, not
 // silently.
 
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
@@ -77,10 +77,28 @@ export const retries = 5;
 
 const createdRoots = []
 
-/** A fresh directory whose name says which suite made it. */
+/**
+ * A fresh directory whose name says which suite made it, in the spelling the
+ * store answers with.
+ *
+ * A temporary root arrives in whatever spelling the platform hands out, and on
+ * two of the three CI runners that spelling is not the directory's own name:
+ * macOS reports `/var/folders/…` for a directory that lives at
+ * `/private/var/folders/…`, and a Windows runner's `%TEMP%` is the 8.3 short
+ * form of its user profile, `C:\Users\RUNNER~1\…`. The binding canonicalises
+ * whatever it is given and reports the resolved path, so a fixture holding the
+ * caller's spelling would compare a path printer against a filesystem and fail
+ * on those two runners while passing on Linux, where `/tmp` is already the
+ * directory's name. Canonicalising here rather than at each comparison leaves
+ * every assertion standing and moves no test to a skip.
+ *
+ * `realpathSync` is not enough: it resolves links but leaves a short name short,
+ * which is exactly how the Windows failure survived a `realpathSync`-on-both-sides
+ * comparison. `realpathSync.native` asks the filesystem for the final path.
+ */
 export function tempRoot (label) {
   const safe = String(label).replace(/[^A-Za-z0-9_-]/g, '-')
-  const root = mkdtempSync(join(tmpdir(), `swp-node-${safe}-`))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), `swp-node-${safe}-`)))
   createdRoots.push(root)
   return root
 }
