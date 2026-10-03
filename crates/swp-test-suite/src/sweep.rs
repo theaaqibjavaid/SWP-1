@@ -13,8 +13,9 @@
 //!
 //! Any of a set of *renderings* of the secret — see [`NeedleSet`]. A secret
 //! that reaches an artifact as raw bytes, as hex, as base64 with or without
-//! padding, or as a URL-escaped string is equally leaked, and an implementation
-//! that leaks only one of those would pass a test that looked for only one.
+//! padding, as a URL-escaped string, or as the base32 this project renders ids
+//! in is equally leaked, and an implementation that leaks only one of those
+//! would pass a test that looked for only one.
 //!
 //! # What this cannot do
 //!
@@ -28,7 +29,7 @@
 use std::path::Path;
 
 use base64::Engine as _;
-use swp_core::hex_encode;
+use swp_core::{base32_lower, hex_encode};
 
 /// Byte length below which a "secret" is too short to search for: at that size
 /// random matches in ordinary text would make the sweep useless, and nothing in
@@ -104,6 +105,15 @@ impl NeedleSet {
             .collect::<Vec<_>>()
             .join("");
         push("percent", escaped.into_bytes());
+        // RFC 4648 base32, lowercased and unpadded, plus its uppercase form. This
+        // is the encoding `swp-core` renders ids in — `base32_lower` is what turns
+        // a digest into the string a document carries — so a keyed value that
+        // reaches an artifact *as an id* is a leak in the shape this project
+        // actually prints, and a sweep that only knew hex and base64 would read
+        // straight past it.
+        let b32 = base32_lower(secret);
+        push("base32-lower", b32.clone().into_bytes());
+        push("base32-upper", b32.to_ascii_uppercase().into_bytes());
 
         NeedleSet {
             label: label.into(),
@@ -307,6 +317,8 @@ mod tests {
             base64::engine::general_purpose::URL_SAFE_NO_PAD
                 .encode(secret())
                 .into_bytes(),
+            base32_lower(&secret()).into_bytes(),
+            base32_lower(&secret()).to_ascii_uppercase().into_bytes(),
         ];
         for form in forms {
             let text = format!(

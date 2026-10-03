@@ -36,8 +36,8 @@ use swp_core::error::{ErrorCode, SwpError};
 use swp_core::id::{base32_lower, Digest, ReleaseId};
 use swp_core::version::{GeneratorInfo, SchemaVersion, SWP_PROTOCOL_NAME};
 use swp_crypto::{
-    derive_key, hmac_keyed, plain_requested, Domain, ManifestSigningKey, RootSecret, Scheme,
-    SealedSecret,
+    derive_key, hmac_keyed, plain_requested, project_id_from_root, Domain, ManifestSigningKey,
+    RootSecret, Scheme, SealedSecret,
 };
 use swp_identity::release::{AdapterUse, ReleaseRecord, SourceRevision, WatermarkParams};
 use swp_identity::{ProjectIdentity, Store, SwpConfig, Timestamp};
@@ -59,11 +59,46 @@ fn root() -> RootSecret {
     RootSecret::from_bytes(&key_bytes()).expect("test key is 32 bytes")
 }
 
-/// The root secret, plus one raw keyed output.
+/// The keyed output `Domain::Evidence` yields for the test secret, through the
+/// chain the removed `badge.anchor_key` field used.
+///
+/// It is a function rather than a line inside [`needles`] because a needle nobody
+/// can show firing is a needle nobody checked, and
+/// [`the_reserved_domain_needle_is_visible_in_the_rendering_a_public_file_used`]
+/// plants this exact value into an artifact-shaped string.
+fn evidence_anchor() -> Vec<u8> {
+    let r = root();
+    let project_id = project_id_from_root(&r)
+        .expect("the test secret mints a project id")
+        .to_string();
+    let evidence_key = derive_key(&r, Domain::Evidence, &[project_id.as_bytes()]);
+    hmac_keyed(
+        &evidence_key,
+        Domain::Evidence,
+        &[b"badge", project_id.as_bytes()],
+    )
+    .expect("the key was just derived in the Evidence domain")
+    .to_vec()
+}
+
+/// The root secret, plus one raw keyed output, plus the reserved domain's key.
 ///
 /// The second needle matters: an implementation could avoid printing the master
 /// key while happily printing the per-location MAC it computed from it, which is
 /// nearly as bad — every other location's tag then becomes derivable.
+///
+/// The third is the tripwire for one regression that happened here.
+/// `Domain::Evidence` is declared reserved and unused, and the build that broke
+/// that promise published a keyed output of it as `badge.anchor_key` in
+/// `.swp/public/badge.json` — a value only the root secret can produce, in the one
+/// file a project is told it may commit. The field is gone; the needle is what
+/// keeps the domain empty, and it is swept in the same base32 rendering that
+/// document used, which the sweep could not see at all until that encoding was
+/// added to [`NeedleSet`].
+///
+/// A byte needle catches the derivation it knows. What catches an unfamiliar one
+/// is the field list in `swp-cli`'s badge test: a public format that declares no
+/// key field has nowhere to put one.
 fn needles() -> Vec<NeedleSet> {
     let r = root();
     let location_key = derive_key(
@@ -80,6 +115,7 @@ fn needles() -> Vec<NeedleSet> {
     vec![
         NeedleSet::new("root-secret", &key_bytes()),
         NeedleSet::new("location-mac", &keyed),
+        NeedleSet::new("evidence-domain-mac", &evidence_anchor()),
     ]
 }
 
@@ -250,6 +286,31 @@ fn public_and_private_artifacts_built_from_the_key_are_clean() {
     sweep_bytes("public-handles", handles.as_bytes(), &needles, &mut report);
 
     report.assert_clean();
+}
+
+/// The third needle is a needle only if the sweep can see the shape the leak had.
+///
+/// `badge.anchor_key` was the Evidence-domain MAC rendered through `base32_lower`
+/// and written into a public JSON file. That rendering is now in [`NeedleSet`], and
+/// this test feeds the value back in exactly that shape — lower and upper case — so
+/// a future field that publishes the same bytes under a different name is caught by
+/// the sweep rather than by someone remembering that base32 exists.
+#[test]
+fn the_reserved_domain_needle_is_visible_in_the_rendering_a_public_file_used() {
+    let anchor = evidence_anchor();
+    let needle = needles()
+        .into_iter()
+        .find(|n| n.label() == "evidence-domain-mac")
+        .expect("the reserved domain is swept for");
+    let lower = base32_lower(&anchor);
+    assert_eq!(lower.len(), 52, "32 bytes is 52 unpadded base32 characters");
+    for rendering in [lower.clone(), lower.to_ascii_uppercase()] {
+        let artifact = format!(r#"{{"schema":"SWP-1-badge-v1","anchor_key":"{rendering}"}}"#);
+        assert!(
+            !needle.find(artifact.as_bytes()).is_empty(),
+            "the reserved-domain needle missed its own {rendering:?} rendering"
+        );
+    }
 }
 
 fn sample_release(store: &Store, identity: &ProjectIdentity) -> ReleaseRecord {
@@ -533,6 +594,20 @@ fn every_command_prints_and_writes_nothing_searchable() {
         cli.run(&["scan", &at, "--verbose"]);
         cli.run(&["scan", &at, "--full", "--limit", "3"]);
         cli.run(&["scan", &at, "--release", &release, "--save"]);
+        // `--compliance` prints a second document over the same measurement, in text
+        // and as JSON, and writes one to `--output` — three surfaces, none of which
+        // any other run of `scan` reaches.
+        cli.run(&["scan", &at, "--compliance"]);
+        cli.run(&["scan", &at, "--compliance", "--format", "json"]);
+        let graded = outdir.child(&format!("compliance-{kind}.json"));
+        cli.run(&[
+            "scan",
+            &at,
+            "--compliance",
+            "--output",
+            &graded.display().to_string(),
+        ]);
+        cli.file(&graded);
         let doc = outdir.child(&format!("scan-{kind}.json"));
         cli.run(&[
             "scan",
@@ -596,6 +671,24 @@ fn every_command_prints_and_writes_nothing_searchable() {
     cli.at(&["inspect"], &bare);
     cli.at(&["report"], &bare);
     cli.at(&["scan", &at], &bare);
+
+    // --- pre-commit: the project's own sources against its releases ----------
+    cli.run(&["pre-commit"]);
+    cli.run(&["pre-commit", "--format", "json"]);
+    cli.run(&["pre-commit", "--latest"]);
+
+    // --- registry: publish and search ----------------------------------------
+    cli.run(&["registry", "publish"]);
+    cli.run(&["registry", "publish", "--format", "json"]);
+    let registry_path = tmp.path().join(".swp/public/registry.json");
+    let registry_str = registry_path.display().to_string();
+    cli.run(&["registry", "search", &registry_str]);
+    cli.run(&["registry", "search", &registry_str, "--release", &release]);
+
+    // --- badge: generate and show --------------------------------------------
+    cli.run(&["badge"]);
+    cli.run(&["badge", "show"]);
+    cli.run(&["badge", "show", "--format", "json"]);
 
     // --- the tree, afterwards ------------------------------------------------
     // Every artifact the runs above wrote is on disk by now: plans, manifests,

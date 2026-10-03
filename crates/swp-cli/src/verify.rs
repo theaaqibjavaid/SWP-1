@@ -57,7 +57,7 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
     // Rows were built from the scan's sites in order, so a row's own status — the
     // one place the watermark/not-watermark line is drawn — selects them here.
     let missing: Vec<&SiteRow> = doc.sites.iter().filter(|r| !r.confirmed()).collect();
-    let lines = text_lines(doc, shown, &missing);
+    let lines = text_lines(doc, "verify", shown, &missing);
     if doc.verdict != Verdict::Intact {
         sink.warn(&format!(
             "{} of {} site(s) of release {} are not carrying their code",
@@ -70,11 +70,22 @@ pub fn run(parsed: &Parsed, cwd: &std::path::Path, sink: &mut Sink<'_>) -> Resul
     Ok(doc.exit_code)
 }
 
-fn text_lines(d: &VerifyDocument, shown: &[SiteRow], missing: &[&SiteRow]) -> Vec<String> {
+/// The verification page.
+///
+/// `head` is the verb that ran it: `swp verify` and `swp pre-commit` measure the
+/// same thing over the same tree and print the same rows, and a second renderer
+/// for the second command is a second place for the two to disagree about what a
+/// site's status means.
+pub(crate) fn text_lines(
+    d: &VerifyDocument,
+    head: &str,
+    shown: &[SiteRow],
+    missing: &[&SiteRow],
+) -> Vec<String> {
     let verdict = d.verdict;
     let mut out = vec![
         format!(
-            "verify {} ({}) against release {}",
+            "{head} {} ({}) against release {}",
             d.display_name, d.project_id, d.release_id
         ),
         format!("  tree        {}", d.tree),

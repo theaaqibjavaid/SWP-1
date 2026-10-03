@@ -528,6 +528,21 @@ mod tests {
     }
 
     #[test]
+    fn report_reads_a_store_whose_root_key_is_absent() {
+        // A stored report is a record of a run that already happened, so reading it
+        // back cannot be a reason to hold the secret: this is the case of an auditor
+        // given the store directory and nothing else.
+        let dir = Scratch::protected("report", "no-key");
+        assert_eq!(dir.run(&["verify", "--save"]).code, 0);
+        std::fs::remove_file(dir.store().root_key_path()).unwrap();
+        let index = dir.run(&["report", "--format", "json"]).json();
+        assert_eq!(index["saved"].as_u64().unwrap(), 1, "{index}");
+        let name = index["reports"][0]["name"].as_str().unwrap().to_string();
+        let r = dir.run(&["report", &name]);
+        assert_eq!(r.code, 0, "{}{}", r.out, r.err);
+    }
+
+    #[test]
     fn the_index_lists_what_was_saved_and_who_wrote_it() {
         let dir = Scratch::protected("report", "index");
         save(
