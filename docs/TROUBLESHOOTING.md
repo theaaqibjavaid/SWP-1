@@ -364,6 +364,38 @@ any of them, [Adding a language adapter](DEVELOPER-GUIDE.md#adding-a-language-ad
 is what it takes to write one, and it is a real extension point rather than a
 fork: the protocol knows nothing about your language's syntax.
 
+## A `--revision` label the record will not hold
+
+Exit `5`, `INVALID_MANIFEST`, and — unlike the corrupt-file reading above — nothing
+wrong with any file. A stated label is rejected as it is read, and the run says
+which of the three reasons it was:
+
+```text
+error [INVALID_MANIFEST]: source revision is empty: a stated label has to carry at least one character
+error [INVALID_MANIFEST]: source revision is … bytes; the record holds at most 200
+error [INVALID_MANIFEST]: source revision carries a control character
+```
+
+The label is what the operator *says* the source is, so it is bounded and
+control-character-free rather than parsed, and it is judged at the door of the
+protection run — before the store is consulted, so the refused run leaves no
+manifest and no plan behind it. That matters because a manifest and a plan with no
+release record beneath them are what an interrupted run leaves: `swp inspect store`
+counts them, and the release id they carry is then refused for reuse until the
+orphan is removed by hand. A typo should not put a project into the same state as a
+crash.
+
+The `text` fence above quotes the three wordings rather than one transcript. Every
+`console` block on this page is a command the test suite re-executes against the
+current build, and `swp protect --revision "   "` is not a quotable line: the
+argument is made of the spaces the matcher collapses. The byte count is written
+`…` because it is whatever the label was. What the run does is pinned by
+`an_unusable_revision_is_refused_before_anything_is_written` in
+`crates/swp-embedding/src/protect.rs`.
+
+Omit `--revision` and the release records the content fingerprint instead, which is
+the honest answer when there is no label to give.
+
 ## A warning that is not a failure
 
 These print on a run that succeeded, and most readers meet them first:

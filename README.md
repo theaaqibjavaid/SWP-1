@@ -222,6 +222,7 @@ cannot re-read what it rewrote cannot re-prove it either.
 | [docs/SDK_API.md](docs/SDK_API.md) | the operations such a binding would expose, one by one: inputs, side effects, errors, ownership |
 | [docs/BINDING_SURFACE.json](docs/BINDING_SURFACE.json) | that boundary as data: which `swp-sdk` items a Python or Node binding may wrap, which stay Rust-only, and which are keyed |
 | [docs/adr/0001-protect-generate-binding-boundary.md](docs/adr/0001-protect-generate-binding-boundary.md) | why `protect`'s result does not cross that boundary today, what the keyed field is actually worth to a caller, and the shape that would let it |
+| [docs/adr/0002-release-failure-semantics.md](docs/adr/0002-release-failure-semantics.md) | what a protection run leaves behind when it refuses: bad input writes nothing, and the half-recorded store belongs to an interrupted one |
 | [docs/VERSIONING_POLICY.md](docs/VERSIONING_POLICY.md) | which version moves when, and why a saved report is never reinterpreted |
 | [examples/](examples) | four protected trees, each with the transcript that proves it |
 

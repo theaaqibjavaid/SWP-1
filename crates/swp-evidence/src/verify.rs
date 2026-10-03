@@ -144,7 +144,10 @@ pub struct VerifyDocument {
     pub tree: String,
     pub release_id: String,
     pub release_created_at: String,
-    /// `content`, or the label `--revision` stated. Display metadata only.
+    /// The label the release recorded for its source (`--revision`, or a git ref
+    /// it was given), or `None` when it recorded the content fingerprint instead:
+    /// `SourceRevision::Content::as_str()` is `None`, so a content-derived release
+    /// has no revision here — never the word `content`. Display metadata only.
     pub revision: Option<String>,
     /// Whether the release's manifest authenticated against the identity in
     /// `.swp/public/identity.json` — the precondition for every claim below.

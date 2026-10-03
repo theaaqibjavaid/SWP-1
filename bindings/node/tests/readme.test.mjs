@@ -14,7 +14,9 @@
 //   `import swp from 'jrs-swp'` resolve the way an installed application's do —
 //   through `node_modules`, not through a relative path the suite happened to know.
 //   An example that only works while the prose around it is remembered is the one a
-//   documentation test would never catch.
+//   documentation test would never catch. That link is why the teardown gets tested
+//   at the end of this file: an example directory is removed with a link inside it,
+//   and the package the link points at has to come out of that intact.
 // * **A fresh root secret per program**, so a transcript that quoted a value the key
 //   decides fails on the second run rather than the first. The byte totals a rewrite
 //   produces are the documented case: they move with the width of the tag literal.
@@ -27,14 +29,14 @@
 // test would be a test that rebuilt the thing it is testing.
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import assert from 'node:assert/strict'
 import test, { after } from 'node:test'
 
-import { purgeAll, tempRoot } from './helpers.mjs'
+import { isDirectory, purge, purgeAll, tempRoot } from './helpers.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PACKAGE = resolve(HERE, '..')
@@ -238,4 +240,33 @@ test('every link the README points at is a file this repository has', () => {
     if (!existsSync(resolve(PACKAGE, target))) broken.push(target)
   }
   assert.deepEqual(broken, [], 'a page that links to a document that is not there is a broken promise, not a typo')
+})
+
+test('an example directory is removed without editing what its link points at', () => {
+  // `stage` reaches this package through `node_modules/jrs-swp`, so every example's
+  // teardown walks past a link whose target is the tree the rest of the run is
+  // testing. `chmod` follows a link, and the teardown chmods what it finds: on POSIX
+  // that write lands on the target directory and takes its search bit away, so
+  // every later `stat`, `chdir` or process started inside the package fails EACCES —
+  // which is how a suite with nothing failing in it came to break the CI step running
+  // next to it on the Linux and macOS runners. Windows is untouched by it because
+  // `chmod` there reaches no access right, measured through a junction, so the mode
+  // half of this claim is made only where a mode carries permission.
+  const run = tempRoot('link-run')
+  const pkg = tempRoot('link-package')
+  mkdirSync(join(pkg, 'tests'), { recursive: true })
+  writeFileSync(join(pkg, 'tests', 'helpers.mjs'), 'export const purge = 1\n', 'utf8')
+  const mode = statSync(pkg).mode
+  const modules = join(run, 'node_modules')
+  mkdirSync(modules, { recursive: true })
+  symlinkSync(pkg, join(modules, 'jrs-swp'), process.platform === 'win32' ? 'junction' : 'dir')
+
+  purge(run)
+
+  assert.ok(!existsSync(run), 'the example directory survived its teardown')
+  assert.ok(isDirectory(pkg), 'the teardown removed the package the link pointed at')
+  assert.equal(readFileSync(join(pkg, 'tests', 'helpers.mjs'), 'utf8'), 'export const purge = 1\n')
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(pkg).mode, mode, 'the teardown chmod-ed through the link into the package')
+  }
 })

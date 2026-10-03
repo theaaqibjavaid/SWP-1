@@ -544,6 +544,34 @@ promises `protectSummary` and `scan` are built on — and resolves its Node-API 
 process at load time, which is what lets one binary serve every release in that range. Outside it,
 the loader's failure names the artifact it tried.
 
+## The published contract
+
+[`docs/VERSIONING_POLICY.md`](../../docs/VERSIONING_POLICY.md) §5 asks a binding release
+to state five things in one table, and §2 says the last three are read out of the build
+rather than typed from memory. The row below is what the addon built from this tree
+reports — `swp.BINDING_VERSION`, `swp.SWP_VERSION`, `swp.capabilities().protocol` and
+`.reportSchema` — so it describes an artefact rather than a version number that looks
+close enough:
+
+| binding version | swp / swp-sdk version | protocol | reads report schema | writes report schema |
+| --- | --- | --- | --- | --- |
+| `0.1.0` | `1.0.0-beta.4` | `SWP-1` | `SWP-1-report-v2` | `SWP-1-report-v2` |
+
+The two report columns match because one `swp-evidence` reader sits behind both
+directions: the `schema` field inside a saved document is what a read checks, and a
+mismatch rejects with `PROTOCOL_VERSION_UNSUPPORTED` — exit code 6 in the CLI, and the
+same `code` on the `SwpError` here. They are two columns because they can come apart in
+a future build; this is the current pair.
+
+`0.1.0` is this package's own SemVer under §2: it moves when the surface this package
+exposes moves (`PATCH` for a fix, `MINOR` for an added operation or field, `MAJOR` for a
+removal), independently of the workspace version beside it, and `1.0.0-beta.4 → 1.0.0`
+would say nothing about the protocol. No release of this package is on the registry, so
+there is no released row to add to `CHANGELOG.md` yet — that entry belongs to the
+release commit — and the name it is published under, `jrs-swp` in `package.json`, is
+still an open release decision recorded in
+[issue #32](https://github.com/theaaqibjavaid/SWP-1/issues/32).
+
 ## Building and installing
 
 The addon is a `cdylib` in its own Cargo workspace, outside the root `members = ["crates/*"]` — the
