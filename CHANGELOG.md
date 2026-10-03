@@ -133,9 +133,9 @@ colleague audit a store they were never given, now measured rather than declared
 `NeedleSet` had no base32 form at all, and an id in this project is unpadded lowercase
 base32, so a keyed value that reached an artifact *as an id* was invisible to the §29
 sweep in every domain, not just the one that broke. The third needle is the reserved
-`Domain::Evidence` output the badge used to carry, which turns SPEC's "reserved, and
-nothing in the product derives under it" into a tested promise; the suite is eight
-sweeps where it was seven.
+`Domain::Evidence` output the badge used to carry, which turns SPEC's promise that
+those labels are "reserved and nothing in the product derives under them" into a
+tested one; the suite is eight sweeps where it was seven.
 
 **The store can say what a publisher wrote.** `Store::registry_path` and
 `Store::badge_path` own the two paths, so a relocated project and a hand-joined
