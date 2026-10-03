@@ -211,6 +211,9 @@ fn show(parsed: &Parsed, cwd: &Path, sink: &mut Sink<'_>) -> Result<i32, SwpErro
              from this store's identity and release count.",
         ));
     }
+    // The two keys derive from the same root secret, so a clean store cannot
+    // produce this pair: it appears only when one of the two files was restored
+    // without the other. The refusal is reviewed, not test-executed.
     if identity.verification != doc.project.verification {
         return Err(SwpError::invalid_manifest(format!(
             "badge for {} carries a verify key that is not this project's own",

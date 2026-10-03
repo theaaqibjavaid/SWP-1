@@ -328,6 +328,9 @@ fn pin(
              run `swp registry search` inside the project the file names.",
         ));
     }
+    // The two keys derive from the same root secret, so a clean store cannot
+    // produce this pair: it appears only when one of the two files was restored
+    // without the other. The refusal is reviewed, not test-executed.
     if identity.verification != doc.verify_key {
         return Err(SwpError::invalid_manifest(format!(
             "index for {} carries a verify key that is not this project's own ({})",
