@@ -34,7 +34,7 @@ arithmetic are `1.0.0-beta.3`'s. No foreign binding ships in this release.
 `ProtectSummary` — twenty fields — with its three row types `ProtectedFile`,
 `ProtectedSite` and `RefusedSite` carries the release id, the counts, which files
 were touched, which sites went in, and which locations were refused; it carries no
-keyed site identity. One private projection (`swp-sdk/src/protect.rs:258`) builds it
+keyed site identity. One private projection (`swp-sdk/src/protect.rs:267`) builds it
 out of the `ProtectOutcome` that `protect` already returns, so the library keeps one
 bookkeeping path rather than two that can disagree. `protect` and `ProtectOutcome`
 are still classified `pending` and that is unchanged; what moved is that a future

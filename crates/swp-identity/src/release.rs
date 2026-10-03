@@ -31,6 +31,12 @@ pub fn new_release_id() -> Result<ReleaseId, SwpError> {
     ReleaseId::new(format!("rel-{}", base32_lower(&bytes)))
 }
 
+/// Longest revision label a release record will hold, in bytes. A display label,
+/// so the bound is room to say a commit or a version with — not a limit anyone is
+/// expected to reach, which is why exceeding it is a refusal rather than a
+/// truncation.
+pub const REVISION_MAX_BYTES: usize = 200;
+
 /// How the source revision was identified.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -56,11 +62,30 @@ impl SourceRevision {
 
     /// A revision string is display metadata, never a hash input, so it is
     /// bounded and control-character-free rather than parsed.
+    ///
+    /// Each refusal names its own reason. This check runs both when a run records
+    /// a label and when a later read opens one, and an operator who typed an empty
+    /// label needs a different answer from an auditor whose stored record has a
+    /// mangled one.
     pub fn validate(&self) -> Result<(), SwpError> {
-        if let Some(s) = self.as_str() {
-            if s.is_empty() || s.len() > 200 || s.chars().any(|c| c.is_control()) {
-                return Err(SwpError::invalid_manifest("source revision is not usable"));
-            }
+        let Some(s) = self.as_str() else {
+            return Ok(());
+        };
+        if s.is_empty() {
+            return Err(SwpError::invalid_manifest(
+                "source revision is empty: a stated label has to carry at least one character",
+            ));
+        }
+        if s.len() > REVISION_MAX_BYTES {
+            return Err(SwpError::invalid_manifest(format!(
+                "source revision is {} bytes; the record holds at most {REVISION_MAX_BYTES}",
+                s.len()
+            )));
+        }
+        if s.chars().any(|c| c.is_control()) {
+            return Err(SwpError::invalid_manifest(
+                "source revision carries a control character",
+            ));
         }
         Ok(())
     }

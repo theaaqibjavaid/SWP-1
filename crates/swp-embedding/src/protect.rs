@@ -170,15 +170,36 @@ pub struct Protection {
     pub plan: Plan,
 }
 
+/// What to do with a revision label the record will not accept. The code is
+/// `INVALID_MANIFEST`, whose generic next step names a corrupt stored file; this
+/// refusal has nothing to do with a stored file, so the run says what it means.
+const REVISION_NEXT_STEP: &str = "The revision is display metadata, so it is bounded rather than \
+     parsed: state it as one line of 1 to 200 printable characters, with no tab or newline in it, \
+     or state no revision at all and let the run record the content fingerprint. Nothing was \
+     written by this run.";
+
 /// Protect a project, or plan to.
 ///
 /// Every failure but one happens before the first write of source. The
 /// exception is a disk error partway through the final loop, which is reported by
 /// naming the protected files that landed and the one that did not — with the
 /// release records already on disk to explain what the tree is missing.
+///
+/// The inputs are judged together, at the top: an identity, a config, a tag width
+/// and a stated revision that this run cannot record are refused before the store
+/// sees the release id at all. That is deliberate. A record the pipeline refuses
+/// for its own bad input would otherwise leave exactly the artifact set a disk
+/// failure leaves — a manifest and a plan with no release under them — and the
+/// store cannot tell an operator's typo from an interrupted run, so neither can
+/// `swp inspect store`, and the id stays unusable until the orphan is removed by
+/// hand. Refusing early keeps the half-recorded state meaning one thing: a run
+/// that got partway to disk.
 pub fn protect(req: &Request<'_>) -> Result<Protection, SwpError> {
     req.identity.validate()?;
     req.config.validate()?;
+    req.revision
+        .validate()
+        .map_err(|e| e.with_next(REVISION_NEXT_STEP))?;
     let project_id = req.identity.project_id.clone();
     let canonicalizer = CanonicalizerVersion(req.identity.canonicalizer_version);
     let width = TagWidth::new(req.config.protect.tag_bits)?;
@@ -802,6 +823,77 @@ mod tests {
         ] {
             assert!(!path.exists(), "a refused run writes {:?}", path);
         }
+    }
+
+    #[test]
+    fn an_unusable_revision_is_refused_before_anything_is_written() {
+        // The label is the operator's own input, so it is judged where every other
+        // input is judged. The alternative — letting the record refuse it at the
+        // moment it is written — leaves a manifest and a plan with no release under
+        // them, which is the artifact set an interrupted run leaves, and the store
+        // cannot tell the two apart afterwards.
+        let cases = [Mode::Release, Mode::Plan, Mode::DryRun];
+        let labels = ["".to_string(), "x".repeat(201), "a\tb".to_string()];
+        for (n, (mode, label)) in cases
+            .iter()
+            .flat_map(|m| labels.iter().map(move |l| (m, l)))
+            .enumerate()
+        {
+            // Distinct ids, because the loop runs in one process and every tree
+            // name has to differ too: the test would otherwise race itself.
+            let id = format!("rel-{}aaaaaaaaaaaaa", char::from(b'a' + n as u8));
+            let t = tree(&format!("revision{n}"), &[("src/a.js", &module(8))]);
+            let cfg = config(8);
+            let mut req = request(&t, &cfg, &id, *mode);
+            req.revision = SourceRevision::Manual {
+                value: label.clone(),
+            };
+            let err = protect(&req).unwrap_err();
+            assert_eq!(err.code(), ErrorCode::InvalidManifest, "{mode:?} {label:?}");
+            assert!(err.message().contains("revision"), "{err}");
+            let id = release(&id);
+            for path in [
+                t.store.manifest_path(&id),
+                t.store.plan_path(&id),
+                t.store.release_path(&id),
+            ] {
+                assert!(
+                    !path.exists(),
+                    "{mode:?} refused {label:?} and still wrote {:?}",
+                    path
+                );
+            }
+            assert_eq!(read(&t, "src/a.js"), module(8));
+        }
+    }
+
+    #[test]
+    fn an_interrupted_record_leaves_the_private_half_for_inspection() {
+        // The other half of the same rule: what *does* reach disk stays there. The
+        // manifest and plan of a run the filesystem stopped are the evidence that
+        // describes the tree, so they are kept, listed by `swp inspect store`, and
+        // their release id is refused for reuse rather than quietly finished.
+        let t = tree("interrupted", &[("src/a.js", &module(8))]);
+        let cfg = config(8);
+        let id = release("rel-iiiiiiiiiiii");
+        std::fs::create_dir(t.store.release_path(&id)).unwrap();
+
+        let err = protect(&request(&t, &cfg, "rel-iiiiiiiiiiii", Mode::Release)).unwrap_err();
+        assert_eq!(err.code(), ErrorCode::Io, "{err}");
+        assert!(
+            t.store.manifest_path(&id).is_file(),
+            "the manifest of an interrupted run is not residue"
+        );
+        assert!(t.store.plan_path(&id).is_file());
+        assert_eq!(
+            read(&t, "src/a.js"),
+            module(8),
+            "no source is written ahead of the record"
+        );
+
+        let reuse = protect(&request(&t, &cfg, "rel-iiiiiiiiiiii", Mode::Release)).unwrap_err();
+        assert_eq!(reuse.code(), ErrorCode::InvalidManifest, "{reuse}");
+        assert!(reuse.message().contains("half-recorded"), "{reuse}");
     }
 
     #[test]

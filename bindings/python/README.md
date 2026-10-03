@@ -49,7 +49,11 @@ wrapper layer would be where a binding starts restating Rust decisions in Python
 root secret exists: it is drawn, sealed by the operating system, and never
 returned. What comes back is *where* it went — `secret_scheme`, `secret_state`
 and the 40-bit non-secret `secret_handle` on the result — which is the whole of
-the disclosure.
+the disclosure. `secret_scheme` is `"dpapi"` on Windows and `"plain"` everywhere
+else, including macOS: DPAPI is the Windows API, and on the other two the key is
+written as itself and protected only by the file's permissions. On Windows
+`SWP_SECRET_PLAIN=1` (or `=true`) asks for `"plain"` explicitly, for backup
+tooling, containers and CI.
 
 ```python
 import swp
@@ -62,7 +66,7 @@ session = outcome.session
 print(outcome)
 # InitOutcome(project_id='swp1-…', pre_existing=False)
 
-print(outcome.result.secret_scheme)   # "dpapi" on Windows and macOS, "plain" on Linux
+print(outcome.result.secret_scheme)   # "dpapi" on Windows, "plain" on macOS and Linux
 print(outcome.result.secret_state)    # "created" here; "kept" on a re-init
 print(outcome.result.permissions_verified)
 print(outcome.result.settings)
@@ -143,6 +147,22 @@ rehearsal = session.protect_summary(swp.ProtectOptions(swp.Mode.DryRun))
 assert rehearsal.artifacts == []
 assert session.release_history() == []
 ```
+
+A `revision` that is not usable is refused, not trimmed into nothing and not dropped,
+and in every mode:
+
+```python
+for label in ["", "   ", "x" * 201, "a\tb"]:
+    try:
+        session.protect_summary(swp.ProtectOptions(swp.Mode.Release, revision=label))
+    except swp.Error as error:
+        assert error.code == "INVALID_MANIFEST" and "revision" in error.message
+```
+
+The label is checked at the door of the run, before the store is asked for a release id,
+so a refusal writes nothing: no plan, no manifest, no release record, and no byte of
+source. `ProtectOptions` itself still accepts any string — `revision` is display
+metadata, and the check is on what a release can record, not on what a caller typed.
 
 `files_changed` is filled in for every mode; the `mode` word and `artifacts`
 are what tell the three apart.
@@ -294,6 +314,33 @@ except swp.Error as err:
 Branch on `code`, never on the message. `swp.error_codes()` is the table the
 branch can check itself against — the same 17 codes the CLI exits with, spelled
 the same way.
+
+## Compatibility
+
+[`docs/VERSIONING_POLICY.md`](../../docs/VERSIONING_POLICY.md) §5 asks a binding
+release to state five things in one table, and §2 says three of them are read out of
+the build rather than typed from memory. This row is what the wheel built from this
+tree reports through `swp.swp_version`, `swp.__version__` and `swp.banner()` — the
+same three lines that open this page — so it describes an artefact, not a version
+number that looks close enough:
+
+| binding version | swp / swp-sdk version | protocol | reads report schema | writes report schema |
+| --- | --- | --- | --- | --- |
+| `0.1.0` | `1.0.0-beta.4` | `SWP-1` | `SWP-1-report-v2` | `SWP-1-report-v2` |
+
+The two report columns match because one `swp-evidence` reader sits behind both
+directions: a saved document's own `schema` field is what the reader checks, and a
+mismatch arrives here as `swp.Error` with `PROTOCOL_VERSION_UNSUPPORTED` — exit code 6
+in the CLI, same code, same next step. They are printed as two columns because they
+can come apart in a future build; this is the current pair.
+
+`0.1.0` is this package's own SemVer under §2: it moves when the surface this module
+exposes moves (`PATCH` for a fix, `MINOR` for an added operation or field, `MAJOR` for
+a removal), independently of the workspace version beside it, and a bump of
+`1.0.0-beta.4 → 1.0.0` says nothing about the protocol. No wheel from this tree has
+been published, so there is no released row to add to `CHANGELOG.md` yet — that entry
+belongs to the release commit — and the name it would be published under is still an
+open release decision, recorded as such in [issue #32](https://github.com/theaaqibjavaid/SWP-1/issues/32).
 
 ## Building the wheel
 
