@@ -154,6 +154,12 @@ jobs:
       # 20 is the floor `package.json` declares in `engines`, not the runner's
       # default: the addon is built against Node-API 4 and resolves its entries from
       # the host, so the oldest supported interpreter is the one worth testing.
+      # As of 2026-10-03 this request is not the version that runs — every job
+      # reports `Node.js 20 is deprecated … forced to run on Node.js 24` from
+      # setup-node@v4 — so the floor is asked for and not yet measured. Whether an
+      # exact 20.x version would reach the runner is untested here, and raising the
+      # request is a release decision: it belongs in the binding's README, not in a
+      # workflow edit made under a red check.
       - uses: actions/setup-node@v4
         with:
           node-version: 20

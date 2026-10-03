@@ -87,12 +87,18 @@ quoted later by someone with a different build. So:
   "ABI-compatible with all Python 3 releases from the specified one onward"
   (*C API Stability*, Python 3.14). Nothing verifies that an `abi3` wheel is
   installed into a new-enough interpreter, so `requires-python` is the guarantee
-  and the binding's CI installs at the floor and at the newest supported minor.
+  and the binding's CI installs at the floor — one interpreter, 3.10, on each of
+  three runners. Nothing above the floor is installed or run here, so the range
+  above 3.10 rests on that Limited-API promise rather than on a measurement this
+  tree re-runs.
   Free-threaded builds are not supported until `abi3t` is wired up; that is a
   *stated* limitation, not an assumed one.
 * **Node.** The floor is the range the current napi-rs toolchain supports
   (`^20.17.0 || ^22.13.0 || >=23.5.0` as documented on 2026-09-25) mirrored into
-  `engines`. Dropping a supported major is a binding `MAJOR`, never a `PATCH`
+  `engines`, and the CI job asks for that floor; as of 2026-10-03 the runner reports
+  that it forces Node 24 instead, so the oldest supported release is declared and
+  requested rather than tested — see [the binding's README](../bindings/node/README.md).
+  Dropping a supported major is a binding `MAJOR`, never a `PATCH`
   that a lockfile-free install discovers on its own.
 * **Rust.** The library crates keep `rust-version = "1.85"`. `swp-sdk`, as a
   workspace member, holds that line too: it may not pull a dependency that needs

@@ -538,8 +538,12 @@ Because Windows' extended-length prefix is not valid in a `file://` URL or a POS
 | TypeScript | the package's own `index.d.ts`; `strict` and `noUnusedLocals` are what the declaration tests are written against |
 | libc | glibc on Linux; the loader detects musl and looks for the `-musl` artifact, which this tree does not build |
 
-`engines` in `package.json` states the Node range, and the CI job runs the suite on the floor of it
-rather than on a runner default. The addon is compiled against Node-API 4 — the version the deferred
+`engines` in `package.json` states the Node range, and the CI job asks for the floor of it
+rather than a runner default. What has actually run is not the floor: since 2026-10-03 the
+jobs report `Node.js 20 is deprecated … being forced to run on Node.js 24` from
+`actions/setup-node@v4`, and the suite's local runs in this tree used v24.18.0. So the floor is
+declared, asked for, and not yet measured; naming a version the runner will honour is a release
+decision rather than a fix to a red check. The addon is compiled against Node-API 4 — the version the deferred
 promises `protectSummary` and `scan` are built on — and resolves its Node-API entries from the host
 process at load time, which is what lets one binary serve every release in that range. Outside it,
 the loader's failure names the artifact it tried.
