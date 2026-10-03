@@ -16,7 +16,7 @@ the public `verify_key` (`crates/swp-cli/src/registry.rs:51-57`), and a badge em
 
 The one real pin available today is a local store. Run inside a project, the readers
 compare the document against `.swp/public/identity.json` — that is what
-`badge.rs:214` and `registry.rs:331` do, and what makes a copied badge refuse to print.
+`badge.rs:217` and `registry.rs:334` do, and what makes a copied badge refuse to print.
 Run outside one the two commands differ, and the difference is the whole question:
 `registry search` degrades on purpose, printing the index after a warning that names the
 weaker reading (`registry.rs:301-311`, and `docs/CLI.md:424-427` says the same in prose),
