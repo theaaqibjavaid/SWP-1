@@ -48,7 +48,7 @@ swp-test-suite = { path = "crates/swp-test-suite" }
 sha2 = "0.11"
 hmac = "0.13"
 ed25519-dalek = { version = "3", features = ["rand_core"] }
-getrandom = "0.3"
+getrandom = "0.4"
 subtle = "2"
 zeroize = { version = "1", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
